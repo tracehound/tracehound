@@ -292,7 +292,7 @@ describe('Integration: Full System Flow', () => {
       expect(results.some((r) => r.status === 'timeout')).toBe(true)
       expect(shortPool.stats.totalTimeouts).toBe(1)
       // Pool should still be usable
-      expect(shortPool.stats.totalWorkers).toBe(1)
+      expect(shortPool.stats.totalProcesses).toBe(1)
 
       shortPool.shutdown()
     })

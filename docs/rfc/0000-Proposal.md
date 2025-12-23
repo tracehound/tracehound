@@ -53,9 +53,9 @@ Tracehound, **immune system** modelini referans alan, runtime-independent, deter
 │                           │                                     │
 │                           ▼                                     │
 ├─────────────────────────────────────────────────────────────────┤
-│                         AGENT                                  │
+│                         AGENT                                   │
 │  ─────────────────────────────────────────                      │
-│  intercept(request) → InterceptResult                                     │
+│  intercept(request) → InterceptResult                           │
 │  Sync, zero-allocation hot-path                                 │
 │  Content-based signature (collision-resistant)                  │
 │                                                                 │
@@ -66,20 +66,20 @@ Tracehound, **immune system** modelini referans alan, runtime-independent, deter
 │                      QUARANTINE                                 │
 │  ─────────────────────────────────────────                      │
 │  Map<ThreatSignature, EvidenceHandle>                           │
-│  Ownership model: atomic neutralize                              │
+│  Ownership model: atomic neutralize                             │
 │  Priority-based eviction                                        │
 │  gzip + binary encoded evidence                                 │
 │                                                                 │
-│       neutralize() → atomic(snapshot + destroy)                  │
-│       evacuate()   → gzip + log → safe-zone                      │
+│       neutralize() → atomic(snapshot + destroy)                 │
+│       evacuate()   → gzip + log → safe-zone                     │
 │                                                                 │
 │                    threshold exceeded                           │
 │                           │                                     │
 │                           ▼                                     │
 ├─────────────────────────────────────────────────────────────────┤
-│                    HOUND POOL                                  │
+│                    HOUND POOL                                   │
 │  ─────────────────────────────────────────                      │
-│  Pre-spawned sandboxed workers                                  │
+│  Pre-spawned sandboxed processes                                │
 │  Read-only return channel                                       │
 │  Timeout + force-terminate                                      │
 │  Jittered rotation cycle                                        │
@@ -381,9 +381,47 @@ function evict(handle: EvidenceHandle): void {
 
 ---
 
-## Hound Pool (Hardened)
+## Hound Isolation Model
 
-Pre-spawned, sandboxed, timeout-protected workers.
+### v1 (Required)
+
+Hound MUST execute in a **separate OS process**.
+
+| Guarantee                 | Description                                          |
+| ------------------------- | ---------------------------------------------------- |
+| Independent crash domain  | Hound crash does not affect Core                     |
+| OS-level memory isolation | No shared memory with Core                           |
+| Resource limits           | Enforced via OS primitives (cgroup, ulimit, seccomp) |
+| Bounded pool              | No unbounded spawn                                   |
+| Binary IPC                | Length-prefixed protocol over stdio                  |
+
+### v2+ (Optional)
+
+Hound MAY execute inside a **WASM sandbox**.
+
+| Guarantee               | Description                  |
+| ----------------------- | ---------------------------- |
+| Deterministic execution | Same input → same output     |
+| Memory-safe             | Linear memory only           |
+| No syscalls             | Except explicitly allowed    |
+| Same semantics          | Pool, IPC, timeout unchanged |
+
+> WASM execution is an implementation detail and MUST NOT change Core or Pool semantics.
+
+### Explicitly Rejected
+
+The following isolation models are **permanently rejected**:
+
+| Model                | Reason                                                                       |
+| -------------------- | ---------------------------------------------------------------------------- |
+| Child Processes      | Insufficient isolation, shared failure domain, non-deterministic termination |
+| In-process execution | No isolation, violates security assumptions                                  |
+
+---
+
+## Hound Pool (Process-Based)
+
+Pre-spawned, isolated, timeout-protected **child processes**.
 
 ```ts
 interface HoundPool {
@@ -398,48 +436,118 @@ interface HoundPool {
 
 interface Hound {
   readonly id: string
+  readonly pid: number // OS process ID
   readonly state: 'dormant' | 'active' | 'disposing'
   readonly createdAt: number
   readonly activatedAt: number | null
 
-  process(buffer: ArrayBuffer): void
-  deactivate(): void
-  dispose(): void
+  send(buffer: ArrayBuffer): void
+  kill(): void
 }
 ```
 
-### Sandbox Constraints
+### Strict Pool Semantics (REQUIRED)
+
+Hound processes MUST be managed by a **bounded pool**.
+
+```
+HoundPool
+ ├─ dormant: N   (pre-spawned)
+ ├─ active: ≤ maxActive
+ └─ spawning: rate-limited
+```
+
+**Rules:**
+
+- No on-demand spawn without pool admission
+- `maxActive` is a **hard limit**
+- Spawn outside pool is **forbidden**
+
+> Hound creation is **capacity-bound**, not demand-driven.
+
+When pool is exhausted, Core MUST:
 
 ```ts
-interface HoundSandbox {
-  // DENIED capabilities
-  eval: false
-  Function: false
-  networkAccess: false
-  storageAccess: false
-  importScripts: false // no dynamic code loading
+type PoolExhaustedAction = 'drop' | 'escalate' | 'defer'
+```
 
-  // ALLOWED capabilities
-  postMessage: 'status-only' // read-only return to main
-  ArrayBuffer: true
+This prevents **fork bomb** attacks.
+
+### Binary IPC Protocol (REQUIRED)
+
+Inter-process communication between Core and Hound MUST use a **length-prefixed binary protocol** over stdio pipes.
+
+```
+[4 bytes length BE][N bytes payload]
+```
+
+**JSON encoding is explicitly forbidden.**
+
+```ts
+interface HoundIPC {
+  send(handle: HoundHandle, payload: ArrayBuffer): void
+  receive(handle: HoundHandle): AsyncIterable<ArrayBuffer>
+}
+```
+
+**Ordering guarantee:**
+
+- Single request per hound at a time
+- No concurrent in-flight messages
+- FIFO by design
+
+### Platform IPC Adapter
+
+```ts
+interface HoundProcessAdapter {
+  spawn(script: string): HoundHandle
+  send(handle: HoundHandle, msg: ArrayBuffer): void
+  kill(handle: HoundHandle): void
+  onExit(handle: HoundHandle, cb: (code: number) => void): void
+}
+```
+
+| Platform | Strategy                                  |
+| -------- | ----------------------------------------- |
+| Linux    | spawn + stdio pipes                       |
+| macOS    | spawn + stdio pipes                       |
+| Windows  | spawn + stdio pipes (no fork assumptions) |
+
+> No fork-specific semantics are relied upon.
+> Spawn + pipe is the portability baseline.
+
+### Process Sandbox Constraints
+
+```ts
+interface HoundProcessConstraints {
+  // Resource limits (Linux/macOS)
+  maxMemoryMB: number // ulimit -v
+  maxCPUSeconds: number // ulimit -t
+  maxFileDescriptors: number // ulimit -n
+
+  // Denied capabilities
+  networkAccess: false
+  fileSystemWrite: false
+  childSpawn: false
+
+  // Allowed capabilities
+  stdio: true
   crypto: true
 }
 ```
 
-**Security:** Compromised worker cannot escape sandbox or attack main thread.
-
 ### Read-Only Return Channel
 
 ```ts
-// Worker can ONLY send status reports
+// Hound process can ONLY send status reports
 type HoundMessage =
   | { type: 'status'; state: 'processing' | 'complete' | 'error' }
   | { type: 'metrics'; processingTime: number; memoryUsed: number }
 
-// Worker CANNOT send:
+// Hound process CANNOT send:
 // - Arbitrary data
 // - Code
-// - Commands to main thread
+// - Commands to main process
 ```
 
 ### Processing Timeout
@@ -449,16 +557,17 @@ interface HoundConfig {
   minimumDormant: number
   maxActive: number
   maxLifeTimeCycle: number
-  maxProcessingTime: number // NEW: timeout (default: 5000ms)
+  maxProcessingTime: number // timeout (default: 5000ms)
   replenishDelay: number
+  onPoolExhausted: PoolExhaustedAction
 }
 
-// Force-terminate stuck Hounds
+// Force-kill stuck Hounds
 function monitorHound(hound: Hound): void {
   const timeout = setTimeout(() => {
     if (hound.state === 'active') {
-      log({ type: 'hound.timeout', id: hound.id })
-      hound.terminate() // force kill
+      log({ type: 'hound.timeout', id: hound.id, pid: hound.pid })
+      hound.kill() // SIGKILL
       pool.replenish()
     }
   }, config.maxProcessingTime)
@@ -663,18 +772,18 @@ interface TracehoundConfig {
 
 ## Security Checklist
 
-| Threat                  | Mitigation                 | Status |
-| ----------------------- | -------------------------- | ------ |
-| Evidence tampering      | Atomic neutralize          | ✅     |
-| Signature collision     | Content-based hash         | ✅     |
-| Worker escape           | Sandbox + read-only return | ✅     |
-| Pool exhaustion DoS     | Rate limiting + timeout    | ✅     |
-| Memory exhaustion       | Priority eviction + alerts | ✅     |
-| ID predictability       | UUIDv7 + random suffix     | ✅     |
-| Scheduler timing attack | Jittered rotation          | ✅     |
-| Payload overflow        | maxPayloadSize             | ✅     |
-| Alert fatigue           | Rate-limited alerts        | ✅     |
-| Audit trail tampering   | Cryptographic hash chain   | ✅     |
+| Threat                  | Mitigation                   | Status |
+| ----------------------- | ---------------------------- | ------ |
+| Evidence tampering      | Atomic neutralize            | ✅     |
+| Signature collision     | Content-based hash           | ✅     |
+| Process escape          | OS isolation + read-only IPC | ✅     |
+| Pool exhaustion DoS     | Rate limiting + timeout      | ✅     |
+| Memory exhaustion       | Priority eviction + alerts   | ✅     |
+| ID predictability       | UUIDv7 + random suffix       | ✅     |
+| Scheduler timing attack | Jittered rotation            | ✅     |
+| Payload overflow        | maxPayloadSize               | ✅     |
+| Alert fatigue           | Rate-limited alerts          | ✅     |
+| Audit trail tampering   | Cryptographic hash chain     | ✅     |
 
 ---
 
@@ -687,7 +796,7 @@ interface TracehoundConfig {
                     │     UNTRUSTED ZONE        │
                     │  External HTTP Requests   │
                     │  Scent Payload          │
-                    │  Worker Output            │
+                    │  Hound Output               │
                     └─────────────┬─────────────┘
                                   │
                     ┌─────────────▼─────────────┐
@@ -702,7 +811,7 @@ interface TracehoundConfig {
                                   │
                     ┌─────────────▼─────────────┐
                     │   ISOLATION BOUNDARY      │
-                    │  Hound Workers (sandbox) │
+                    │  Hound Processes (sandbox) │
                     └───────────────────────────┘
 ```
 
@@ -720,7 +829,7 @@ interface TracehoundConfig {
 | Element               | Mitigation                                       |
 | --------------------- | ------------------------------------------------ |
 | Scent Payload         | Size limit, schema validation, rate limit        |
-| Worker Output         | Read-only, status reports only                   |
+| Hound Output          | Read-only IPC, status reports only               |
 | Cold Storage Response | Fire-and-forget, no read-back                    |
 | Network Input         | External concern, we don't accept direct network |
 
@@ -734,7 +843,7 @@ interface TracehoundConfig {
 | DoS          | Pool exhaustion      | CWE-400  | Rate limiting, timeout               |
 | DoS          | Memory exhaustion    | CWE-770  | Byte limits, priority eviction       |
 | Timing       | Hash timing attack   | CWE-208  | timingSafeEqual                      |
-| Isolation    | Worker escape        | CWE-284  | Sandbox, read-only return            |
+| Isolation    | Process escape       | CWE-284  | OS isolation, read-only IPC          |
 | Integrity    | Evidence tampering   | CWE-494  | Atomic neutralize, hash chain        |
 | Supply Chain | Malicious dependency | CWE-1357 | Minimal deps, lockfile, audit        |
 
@@ -744,7 +853,7 @@ interface TracehoundConfig {
 
 ### Purge + Replace Model
 
-Timeout veya error durumunda thread'i block etmeden controlled destruction:
+Timeout veya error durumunda process'i block etmeden controlled destruction:
 
 ```ts
 // 1. IMMEDIATELY spawn replacement (sync, fast)
@@ -999,7 +1108,7 @@ Implementation order MUST be:
 1. Binary codec (Step 7)
 2. Hound Pool (Step 8)
 
-Reason: Workers need final binary format. Implementing Hound Pool before codec requires interface changes later.
+Reason: Child processes need final binary format. Implementing Hound Pool before codec requires interface changes later.
 
 ### Integration Test Coverage
 

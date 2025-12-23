@@ -4,9 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - Phase 5: Hound Process Isolation
+
+### Changed
+
+- **BREAKING**: Migrated Hound Pool from Worker Threads to **child process-based isolation**.
+  - `activeWorkers` → `activeProcesses`
+  - `totalWorkers` → `totalProcesses`
+  - `workerId` → `processId`
+  - `workerScriptPath` → `processScriptPath`
+  - `SandboxConstraints` → `HoundProcessConstraints` (declarative)
+
 ### Added
 
-- **Working Memory RFC**: RFC-0001 accepted for O(1) in-memory state management.
+- **Hound IPC**: Binary length-prefixed protocol for child process communication.
+- **Process Adapter**: Platform-agnostic spawn/kill abstraction.
+- **Mock Adapter**: For testing without real child processes.
+- **PoolExhaustedAction**: `'drop' | 'escalate' | 'defer'` for pool exhaustion handling.
+- **RFC-0002**: Sentinel & Behavioral Signal Protocol.
+
+### Removed
+
+- `SandboxConstraints` type (replaced by `HoundProcessConstraints`).
+
+### Security
+
+- OS-level memory isolation (child processes, not threads).
+- Independent crash domains.
+- SIGKILL for immediate process termination.
 
 ## [0.4.0] - Phase 4: Observability & Resilience
 

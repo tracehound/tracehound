@@ -1,14 +1,27 @@
 /**
- * Hound Pool - sandboxed worker pool for evidence processing.
+ * Hound Pool - Process-based isolation pool for evidence processing.
  *
  * RFC-0000 CRITICAL INVARIANTS:
  * - activate() returns void, NOT Promise (Agent NEVER awaits)
- * - Strict sandbox only (no permissive mode)
- * - Pre-spawned workers with jittered rotation
- * - Timeout + force-terminate for stuck workers
+ * - OS-level process isolation (child processes, not threads)
+ * - Pre-spawned processes with jittered rotation
+ * - Timeout + SIGKILL for stuck processes
+ * - Binary IPC over stdio (no JSON)
+ *
+ * INVARIANT: activeProcesses <= totalProcesses
+ * activeProcesses reflects OS-level active child processes
  */
 
 import type { Evidence } from './evidence.js'
+import { decodeHoundMessage } from './hound-ipc.js'
+import {
+  createMockAdapter,
+  createProcessAdapter,
+  DEFAULT_CONSTRAINTS,
+  type HoundHandle,
+  type HoundProcessConstraints,
+  type IHoundProcessAdapter,
+} from './process-adapter.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -25,20 +38,22 @@ export interface HoundResult {
   status: 'processed' | 'timeout' | 'error'
   /** Processing duration in ms */
   durationMs: number
-  /** Worker ID that processed this */
-  workerId: string
+  /** Process ID that processed this */
+  processId: string
   /** Error message if status is 'error' */
   error?: string
 }
 
 /**
  * Hound pool statistics (immutable snapshot).
+ *
+ * INVARIANT: activeProcesses <= totalProcesses
  */
 export interface HoundPoolStats {
-  /** Number of active workers */
-  activeWorkers: number
-  /** Total workers in pool */
-  totalWorkers: number
+  /** Number of active processes (OS-level) */
+  activeProcesses: number
+  /** Total processes in pool */
+  totalProcesses: number
   /** Total activations */
   totalActivations: number
   /** Total timeouts */
@@ -50,30 +65,30 @@ export interface HoundPoolStats {
 }
 
 /**
- * Sandbox configuration.
- * RFC: No permissive mode. All constraints are mandatory.
+ * Pool exhaustion action.
  */
-export interface SandboxConstraints {
-  /** Deny eval/Function constructor */
-  readonly eval: false
-  /** Deny network access */
-  readonly network: false
-  /** Deny storage access */
-  readonly storage: false
-  /** Deny importScripts */
-  readonly importScripts: false
-}
+export type PoolExhaustedAction = 'drop' | 'escalate' | 'defer'
 
 /**
  * Hound pool configuration.
  */
 export interface HoundPoolConfig {
-  /** Number of pre-spawned workers */
+  /** Number of pre-spawned processes */
   poolSize: number
-  /** Timeout per worker in ms */
+  /** Timeout per process in ms */
   timeout: number
   /** Jitter range for rotation in ms */
   rotationJitterMs: number
+  /** Action when pool exhausted (default: 'drop') */
+  onPoolExhausted?: PoolExhaustedAction
+  /** Max queue size for 'defer' action (default: 100) */
+  deferQueueLimit?: number
+  /** Process constraints (declarative, best-effort) */
+  processConstraints?: Partial<HoundProcessConstraints>
+  /** Path to hound process script */
+  processScriptPath?: string
+  /** Custom process adapter (for testing) */
+  adapter?: IHoundProcessAdapter
 }
 
 /**
@@ -110,7 +125,7 @@ export interface IHoundPool {
   onResult(handler: (result: HoundResult) => void): void
 
   /**
-   * Shutdown all workers.
+   * Shutdown all processes.
    */
   shutdown(): void
 }
@@ -120,10 +135,12 @@ export interface IHoundPool {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Internal worker state.
+ * Internal process state.
  */
-interface WorkerState {
+interface ProcessState {
   id: string
+  pid: number | null
+  handle: HoundHandle | null
   busy: boolean
   currentSignature: string | null
   startTime: number | null
@@ -133,14 +150,17 @@ interface WorkerState {
 /**
  * Hound Pool implementation.
  *
- * Phase 4 implementation uses simulated workers (no real Worker threads).
- * Real worker isolation will be added in Phase 5.
+ * Uses child process isolation per RFC-0000 amendment.
  */
 export class HoundPool implements IHoundPool {
-  private readonly workers: Map<string, WorkerState> = new Map()
+  private readonly processes: Map<string, ProcessState> = new Map()
   private readonly pendingQueue: Evidence[] = []
   private readonly resultHandlers: Array<(result: HoundResult) => void> = []
   private readonly processingTimes: number[] = []
+  private readonly adapter: IHoundProcessAdapter
+  private readonly processScriptPath: string
+  private readonly onPoolExhausted: PoolExhaustedAction
+  private readonly deferQueueLimit: number
 
   // Statistics
   private _totalActivations = 0
@@ -148,42 +168,86 @@ export class HoundPool implements IHoundPool {
   private _totalErrors = 0
 
   constructor(private readonly config: HoundPoolConfig) {
-    // Pre-spawn workers
+    // Use provided adapter or create real one
+    this.adapter = config.adapter ?? createProcessAdapter()
+    this.processScriptPath = config.processScriptPath ?? './hound-process.js'
+    this.onPoolExhausted = config.onPoolExhausted ?? 'drop'
+    this.deferQueueLimit = config.deferQueueLimit ?? 100
+
+    // Pre-spawn process slots (lazy spawn)
     for (let i = 0; i < config.poolSize; i++) {
-      const worker = this.createWorker(`hound-${i}`)
-      this.workers.set(worker.id, worker)
+      const state = this.createProcessState(`hound-${i}`)
+      this.processes.set(state.id, state)
     }
   }
 
   /**
-   * Sandbox constraints (read-only, no permissive mode).
+   * Process constraints (declarative, best-effort).
    */
-  static readonly SANDBOX_CONSTRAINTS: SandboxConstraints = Object.freeze({
-    eval: false,
-    network: false,
-    storage: false,
-    importScripts: false,
-  })
+  static readonly DEFAULT_CONSTRAINTS = DEFAULT_CONSTRAINTS
 
   activate(evidence: Evidence): void {
     this._totalActivations++
 
-    // Find available worker
-    const worker = this.findAvailableWorker()
+    // Find available process
+    const processState = this.findAvailableProcess()
 
-    if (worker) {
-      this.assignToWorker(worker, evidence)
+    if (processState) {
+      this.assignToProcess(processState, evidence)
     } else {
-      // Queue for later processing
-      this.pendingQueue.push(evidence)
+      // Pool exhausted - apply configured action
+      this.handlePoolExhausted(evidence)
     }
     // Returns immediately - no Promise
   }
 
+  private handlePoolExhausted(evidence: Evidence): void {
+    switch (this.onPoolExhausted) {
+      case 'drop':
+        // Silently drop - emit error result
+        this.emitResult({
+          signature: evidence.signature,
+          status: 'error',
+          durationMs: 0,
+          processId: 'pool',
+          error: 'pool_exhausted',
+        })
+        break
+
+      case 'escalate':
+        // Emit error and continue
+        this._totalErrors++
+        this.emitResult({
+          signature: evidence.signature,
+          status: 'error',
+          durationMs: 0,
+          processId: 'pool',
+          error: 'pool_exhausted_escalated',
+        })
+        break
+
+      case 'defer':
+        // Queue for later (bounded)
+        if (this.pendingQueue.length < this.deferQueueLimit) {
+          this.pendingQueue.push(evidence)
+        } else {
+          // Queue full - drop
+          this.emitResult({
+            signature: evidence.signature,
+            status: 'error',
+            durationMs: 0,
+            processId: 'pool',
+            error: 'defer_queue_full',
+          })
+        }
+        break
+    }
+  }
+
   terminate(signature: string): void {
-    for (const [, worker] of this.workers) {
-      if (worker.currentSignature === signature) {
-        this.terminateWorker(worker, 'forced_terminate')
+    for (const [, processState] of this.processes) {
+      if (processState.currentSignature === signature) {
+        this.terminateProcess(processState, 'forced_terminate')
         return
       }
     }
@@ -191,8 +255,8 @@ export class HoundPool implements IHoundPool {
 
   get stats(): Readonly<HoundPoolStats> {
     let activeCount = 0
-    for (const [, worker] of this.workers) {
-      if (worker.busy) activeCount++
+    for (const [, processState] of this.processes) {
+      if (processState.busy) activeCount++
     }
 
     const avgProcessingMs =
@@ -201,8 +265,8 @@ export class HoundPool implements IHoundPool {
         : 0
 
     return Object.freeze({
-      activeWorkers: activeCount,
-      totalWorkers: this.workers.size,
+      activeProcesses: activeCount,
+      totalProcesses: this.processes.size,
       totalActivations: this._totalActivations,
       totalTimeouts: this._totalTimeouts,
       totalErrors: this._totalErrors,
@@ -215,20 +279,25 @@ export class HoundPool implements IHoundPool {
   }
 
   shutdown(): void {
-    for (const [, worker] of this.workers) {
-      if (worker.timeoutId) {
-        clearTimeout(worker.timeoutId)
+    for (const [, processState] of this.processes) {
+      if (processState.timeoutId) {
+        clearTimeout(processState.timeoutId)
+      }
+      if (processState.handle) {
+        this.adapter.kill(processState.handle)
       }
     }
-    this.workers.clear()
+    this.processes.clear()
     this.pendingQueue.length = 0
   }
 
   // ─── Private Methods ───────────────────────────────────────────────────────
 
-  private createWorker(id: string): WorkerState {
+  private createProcessState(id: string): ProcessState {
     return {
       id,
+      pid: null,
+      handle: null,
       busy: false,
       currentSignature: null,
       startTime: null,
@@ -236,67 +305,123 @@ export class HoundPool implements IHoundPool {
     }
   }
 
-  private findAvailableWorker(): WorkerState | null {
-    for (const [, worker] of this.workers) {
-      if (!worker.busy) {
-        return worker
+  private findAvailableProcess(): ProcessState | null {
+    for (const [, processState] of this.processes) {
+      if (!processState.busy) {
+        return processState
       }
     }
     return null
   }
 
-  private assignToWorker(worker: WorkerState, evidence: Evidence): void {
-    worker.busy = true
-    worker.currentSignature = evidence.signature
-    worker.startTime = Date.now()
+  private assignToProcess(processState: ProcessState, evidence: Evidence): void {
+    processState.busy = true
+    processState.currentSignature = evidence.signature
+    processState.startTime = Date.now()
 
-    // Set timeout
-    worker.timeoutId = setTimeout(() => {
-      this.handleTimeout(worker)
-    }, this.config.timeout)
+    // Lazy spawn if needed
+    if (!processState.handle) {
+      try {
+        processState.handle = this.adapter.spawn(
+          this.processScriptPath,
+          this.config.processConstraints
+        )
+        processState.pid = processState.handle.pid
 
-    // Simulate async processing (Phase 4: no real worker)
-    // In Phase 5, this will dispatch to actual Worker thread
-    this.simulateProcessing(worker, evidence)
-  }
+        // Set up message handler
+        this.adapter.onMessage(processState.handle, (payload) => {
+          this.handleProcessMessage(processState, payload)
+        })
 
-  private simulateProcessing(worker: WorkerState, evidence: Evidence): void {
-    // Simulate processing delay (10-50ms)
-    const jitter = Math.random() * this.config.rotationJitterMs
-    const delay = 10 + jitter
-
-    setTimeout(() => {
-      if (!worker.busy || worker.currentSignature !== evidence.signature) {
-        // Already terminated or reassigned
+        // Set up exit handler
+        this.adapter.onExit(processState.handle, (code) => {
+          this.handleProcessExit(processState, code)
+        })
+      } catch (err) {
+        // Spawn failed
+        this._totalErrors++
+        this.emitResult({
+          signature: evidence.signature,
+          status: 'error',
+          durationMs: 0,
+          processId: processState.id,
+          error: err instanceof Error ? err.message : 'spawn_failed',
+        })
+        processState.busy = false
+        processState.currentSignature = null
+        processState.startTime = null
         return
       }
-
-      this.completeProcessing(worker, 'processed')
-    }, delay)
-  }
-
-  private handleTimeout(worker: WorkerState): void {
-    this._totalTimeouts++
-    this.terminateWorker(worker, 'timeout')
-  }
-
-  private terminateWorker(
-    worker: WorkerState,
-    reason: 'timeout' | 'forced_terminate' | 'error'
-  ): void {
-    const signature = worker.currentSignature
-    const startTime = worker.startTime
-
-    // Clear timeout
-    if (worker.timeoutId) {
-      clearTimeout(worker.timeoutId)
-      worker.timeoutId = null
     }
 
-    // Reset worker state
-    worker.busy = false
-    worker.currentSignature = null
-    worker.startTime = null
+    // Set timeout
+    processState.timeoutId = setTimeout(() => {
+      this.handleTimeout(processState)
+    }, this.config.timeout)
+
+    // Send evidence to process
+    this.adapter.send(processState.handle, evidence.bytes)
+  }
+
+  private handleProcessMessage(processState: ProcessState, payload: ArrayBuffer): void {
+    try {
+      const message = decodeHoundMessage(payload)
+
+      if (message.type === 'status' && message.state === 'complete') {
+        this.completeProcessing(processState, 'processed')
+      } else if (message.type === 'status' && message.state === 'error') {
+        this._totalErrors++
+        this.terminateProcess(processState, 'error', message.error)
+      }
+      // Ignore 'processing' status - just acknowledgment
+    } catch {
+      // Decode error - terminate
+      this._totalErrors++
+      this.terminateProcess(processState, 'error', 'ipc_decode_error')
+    }
+  }
+
+  private handleProcessExit(processState: ProcessState, code: number | null): void {
+    if (processState.busy) {
+      // Unexpected exit while busy
+      this._totalErrors++
+      this.terminateProcess(processState, 'error', `process_exit_${code}`)
+    }
+    // Reset handle - will respawn on next use
+    processState.handle = null
+    processState.pid = null
+  }
+
+  private handleTimeout(processState: ProcessState): void {
+    this._totalTimeouts++
+    this.terminateProcess(processState, 'timeout')
+  }
+
+  private terminateProcess(
+    processState: ProcessState,
+    reason: 'timeout' | 'forced_terminate' | 'error',
+    errorMessage?: string
+  ): void {
+    const signature = processState.currentSignature
+    const startTime = processState.startTime
+
+    // Clear timeout
+    if (processState.timeoutId) {
+      clearTimeout(processState.timeoutId)
+      processState.timeoutId = null
+    }
+
+    // Kill process if alive
+    if (processState.handle) {
+      this.adapter.kill(processState.handle)
+      processState.handle = null
+      processState.pid = null
+    }
+
+    // Reset state
+    processState.busy = false
+    processState.currentSignature = null
+    processState.startTime = null
 
     // Emit result
     if (signature && startTime) {
@@ -306,8 +431,8 @@ export class HoundPool implements IHoundPool {
         signature,
         status: reason === 'timeout' ? 'timeout' : 'error',
         durationMs,
-        workerId: worker.id,
-        error: reason,
+        processId: processState.id,
+        error: errorMessage ?? reason,
       }
 
       this.emitResult(result)
@@ -317,20 +442,20 @@ export class HoundPool implements IHoundPool {
     this.processNextInQueue()
   }
 
-  private completeProcessing(worker: WorkerState, status: 'processed'): void {
-    const signature = worker.currentSignature
-    const startTime = worker.startTime
+  private completeProcessing(processState: ProcessState, status: 'processed'): void {
+    const signature = processState.currentSignature
+    const startTime = processState.startTime
 
     // Clear timeout
-    if (worker.timeoutId) {
-      clearTimeout(worker.timeoutId)
-      worker.timeoutId = null
+    if (processState.timeoutId) {
+      clearTimeout(processState.timeoutId)
+      processState.timeoutId = null
     }
 
-    // Reset worker state
-    worker.busy = false
-    worker.currentSignature = null
-    worker.startTime = null
+    // Reset state (keep handle alive for reuse)
+    processState.busy = false
+    processState.currentSignature = null
+    processState.startTime = null
 
     // Emit result
     if (signature && startTime) {
@@ -346,7 +471,7 @@ export class HoundPool implements IHoundPool {
         signature,
         status,
         durationMs,
-        workerId: worker.id,
+        processId: processState.id,
       }
 
       this.emitResult(result)
@@ -359,10 +484,10 @@ export class HoundPool implements IHoundPool {
   private processNextInQueue(): void {
     if (this.pendingQueue.length === 0) return
 
-    const worker = this.findAvailableWorker()
-    if (worker) {
+    const processState = this.findAvailableProcess()
+    if (processState) {
       const evidence = this.pendingQueue.shift()!
-      this.assignToWorker(worker, evidence)
+      this.assignToProcess(processState, evidence)
     }
   }
 
@@ -389,3 +514,6 @@ export class HoundPool implements IHoundPool {
 export function createHoundPool(config: HoundPoolConfig): IHoundPool {
   return new HoundPool(config)
 }
+
+// Re-export for testing
+export { createMockAdapter }

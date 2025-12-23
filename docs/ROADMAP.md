@@ -54,7 +54,7 @@ Tracehound: Security buffer system with immune system architecture.
 
 | Component       | Description                          | Priority |
 | --------------- | ------------------------------------ | -------- |
-| Hound Pool      | Pre-spawned worker pool              | P0       |
+| Hound Pool      | Pre-spawned child processes          | P0       |
 | Purge + Replace | Non-blocking controlled destruction  | P0       |
 | Fail-Safe       | Panic threshold, developer callbacks | P0       |
 | Cold Storage    | Fire-and-forget wasteland interface  | P1       |
@@ -64,7 +64,7 @@ Tracehound: Security buffer system with immune system architecture.
 
 ```
 @tracehound/core (updated)
-├── Worker Threads support
+├── Child Process support
 ├── Atomic operations
 ├── Background purge queue
 └── Cold storage adapter interface

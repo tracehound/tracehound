@@ -46,7 +46,7 @@ export { DEFAULT_CONFIG, mergeWithDefaults } from './types/index.js'
 // Errors
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createError, Errors } from './types/index.js'
+export { Errors, createError } from './types/index.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Result type guards
@@ -89,14 +89,14 @@ export type { InsertResult, QuarantineStats } from './core/quarantine.js'
 // Core - Rate Limiter
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createRateLimiter, RateLimiter } from './core/rate-limiter.js'
-export type { IRateLimiter, RateLimiterStats, RateLimitResult } from './core/rate-limiter.js'
+export { RateLimiter, createRateLimiter } from './core/rate-limiter.js'
+export type { IRateLimiter, RateLimitResult, RateLimiterStats } from './core/rate-limiter.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Evidence Factory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createEvidenceFactory, EvidenceFactory } from './core/evidence-factory.js'
+export { EvidenceFactory, createEvidenceFactory } from './core/evidence-factory.js'
 export type {
   EvidenceCreationResult,
   EvidenceFactoryOptions,
@@ -114,20 +114,21 @@ export type { AgentConfig, AgentStats, IAgent } from './core/agent.js'
 // Core - Hound Pool
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createHoundPool, HoundPool } from './core/hound-pool.js'
+export { HoundPool, createHoundPool, createMockAdapter } from './core/hound-pool.js'
 export type {
   HoundPoolConfig,
   HoundPoolStats,
   HoundResult,
   IHoundPool,
-  SandboxConstraints,
+  PoolExhaustedAction,
 } from './core/hound-pool.js'
+export type { HoundProcessConstraints } from './core/process-adapter.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Scheduler
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createScheduler, Scheduler } from './core/scheduler.js'
+export { Scheduler, createScheduler } from './core/scheduler.js'
 export type {
   BusyChecker,
   IScheduler,
@@ -140,7 +141,7 @@ export type {
 // Core - Watcher
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createWatcher, Watcher } from './core/watcher.js'
+export { Watcher, createWatcher } from './core/watcher.js'
 export type {
   Alert,
   AlertSeverity,
@@ -174,7 +175,7 @@ export { serialize } from './utils/serialize.js'
 // Utils - Security
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createColdPathCodec, createHotPathCodec, GzipCodec } from './utils/binary-codec.js'
+export { GzipCodec, createColdPathCodec, createHotPathCodec } from './utils/binary-codec.js'
 export type { CodecStats, ColdPathCodec, HotPathCodec } from './utils/binary-codec.js'
 export { constantTimeBufferEqual, constantTimeEqual } from './utils/compare.js'
 export { encodePayload, estimatePayloadSize } from './utils/encode.js'

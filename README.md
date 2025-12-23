@@ -19,7 +19,7 @@ Tracehound follows a component-based architecture designed for high throughput a
 
 - **Agent:** Traffic cop and orchestrator.
 - **Quarantine:** Secure buffer for suspicious payloads.
-- **Hound Pool:** Sandboxed workers for forensic analysis.
+- **Hound Pool:** Sandboxed processes for forensic analysis.
 - **Watcher:** Observability engine (pull-based).
 - **Audit Chain:** Tamper-evident logging.
 

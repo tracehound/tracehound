@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - Production Ready (P0 Complete)
+
+### Added
+
+- **Binary Codec Integrity**: SHA-256 hash for cold storage evidence.
+  - `encodeWithIntegrity()`, `verify()`, `decodeWithIntegrity()`
+  - Verify-before-decode pattern enforced via docs
+  - Empty payloads valid (absence is evidence)
+- **Runtime Flags**: `--frozen-intrinsics` check added to `verifyRuntime()`.
+  - `getRuntimeInfo().intrinsicsFrozen` property
+
+### Security
+
+- Tamper detection for cold storage evidence
+- Built-in prototype modification detection
+
 ## [0.5.0] - Hound Process Isolation
 
 ### Changed

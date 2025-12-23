@@ -3,7 +3,15 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { createColdPathCodec, createHotPathCodec, GzipCodec } from '../src/utils/binary-codec.js'
+import {
+  CodecError,
+  createColdPathCodec,
+  createHotPathCodec,
+  decodeWithIntegrity,
+  encodeWithIntegrity,
+  GzipCodec,
+  verify,
+} from '../src/utils/binary-codec.js'
 
 describe('BinaryCodec', () => {
   describe('GzipCodec', () => {
@@ -134,6 +142,128 @@ describe('BinaryCodec', () => {
 
       // Gzip with same input produces same output
       expect(encoded1).toEqual(encoded2)
+    })
+  })
+
+  // ============================================================================
+  // COLD STORAGE INTEGRITY TESTS
+  // ============================================================================
+
+  describe('encodeWithIntegrity()', () => {
+    it('should compress and hash payload', () => {
+      const payload = new TextEncoder().encode('Hello, Tracehound!')
+      const encoded = encodeWithIntegrity(payload)
+
+      expect(encoded.originalSize).toBe(payload.length)
+      expect(encoded.compressedSize).toBeGreaterThan(0)
+      expect(encoded.hash).toHaveLength(64) // SHA-256 hex
+      expect(encoded.compressed).toBeInstanceOf(Uint8Array)
+    })
+
+    it('should handle empty payload (valid per policy)', () => {
+      const payload = new Uint8Array(0)
+      const encoded = encodeWithIntegrity(payload)
+
+      expect(encoded.originalSize).toBe(0)
+      expect(encoded.compressedSize).toBeGreaterThan(0) // gzip header
+      expect(encoded.hash).toHaveLength(64)
+    })
+
+    it('should produce smaller output for compressible data', () => {
+      // Highly compressible: repeated pattern
+      const payload = new TextEncoder().encode('A'.repeat(10000))
+      const encoded = encodeWithIntegrity(payload)
+
+      expect(encoded.compressedSize).toBeLessThan(encoded.originalSize)
+    })
+  })
+
+  describe('verify()', () => {
+    it('should return true for untampered payload', () => {
+      const payload = new TextEncoder().encode('Test data')
+      const encoded = encodeWithIntegrity(payload)
+
+      expect(verify(encoded)).toBe(true)
+    })
+
+    it('should return false for tampered hash', () => {
+      const payload = new TextEncoder().encode('Test data')
+      const encoded = encodeWithIntegrity(payload)
+
+      const tampered = {
+        ...encoded,
+        hash: 'a'.repeat(64), // Wrong hash
+      }
+
+      expect(verify(tampered)).toBe(false)
+    })
+
+    it('should return false for tampered compressed data', () => {
+      const payload = new TextEncoder().encode('Test data')
+      const encoded = encodeWithIntegrity(payload)
+
+      // Flip a byte
+      const tamperedCompressed = new Uint8Array(encoded.compressed)
+      tamperedCompressed[10] ^= 0xff
+
+      const tampered = {
+        ...encoded,
+        compressed: tamperedCompressed,
+      }
+
+      expect(verify(tampered)).toBe(false)
+    })
+  })
+
+  describe('decodeWithIntegrity()', () => {
+    it('should round-trip encode/decode', () => {
+      const original = new TextEncoder().encode('Round trip test!')
+      const encoded = encodeWithIntegrity(original)
+      const decoded = decodeWithIntegrity(encoded)
+
+      expect(decoded).toEqual(original)
+    })
+
+    it('should round-trip empty payload', () => {
+      const original = new Uint8Array(0)
+      const encoded = encodeWithIntegrity(original)
+      const decoded = decodeWithIntegrity(encoded)
+
+      expect(decoded).toEqual(original)
+    })
+
+    it('should throw CodecError on corrupted data', () => {
+      const payload = new TextEncoder().encode('Test')
+      const encoded = encodeWithIntegrity(payload)
+
+      // Corrupt the compressed data
+      const corrupted = {
+        ...encoded,
+        compressed: new Uint8Array([0x00, 0x01, 0x02]),
+      }
+
+      expect(() => decodeWithIntegrity(corrupted)).toThrow(CodecError)
+    })
+  })
+
+  describe('verify-before-decode pattern', () => {
+    it('should catch tampering before decode attempt', () => {
+      const payload = new TextEncoder().encode('Sensitive evidence')
+      const encoded = encodeWithIntegrity(payload)
+
+      // Tamper in transit
+      const tampered = {
+        ...encoded,
+        compressed: new Uint8Array([...encoded.compressed].map((b) => b ^ 0x01)),
+      }
+
+      // Correct pattern: verify first
+      if (verify(tampered)) {
+        expect.fail('Should have detected tampering')
+      } else {
+        // Tampering detected without wasting decode CPU
+        expect(true).toBe(true)
+      }
     })
   })
 })

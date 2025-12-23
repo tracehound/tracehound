@@ -32,6 +32,7 @@ Tracehound follows a component-based architecture designed for high throughput a
 ## RFCs
 
 - [RFC-0001: Working Memory](./docs/rfc/0001-WorkingMemory.md) - Accepted
+- [RFC-0002: Sentinel & Behavioral Signal Protocol](./docs/rfc/0002-Sentinel.md) - Draft
 
 ## License
 

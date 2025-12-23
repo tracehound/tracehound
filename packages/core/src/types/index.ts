@@ -2,6 +2,7 @@
  * Type re-exports.
  */
 
+export type { AuditRecord, IAuditChain } from './audit.js'
 export type { JsonPrimitive, JsonSerializable, Severity } from './common.js'
 export { DEFAULT_CONFIG, mergeWithDefaults } from './config.js'
 export type {
@@ -15,7 +16,7 @@ export type {
   SchedulerConfig,
   TracehoundConfig,
 } from './config.js'
-export { Errors, createError } from './errors.js'
+export { createError, Errors } from './errors.js'
 export type { ErrorState, TracehoundError } from './errors.js'
 export type {
   EvacuateRecord,
@@ -25,6 +26,8 @@ export type {
 } from './evidence.js'
 export { isClean, isError, isIgnored, isQuarantined, isRateLimited } from './result.js'
 export type { InterceptResult } from './result.js'
-export type { Scent } from './scent.js'
-export { generateSignature, validateSignature } from './signature.js'
-export type { Threat, ThreatCategory, ThreatInput } from './threat.js'
+export type { Scent, ThreatCategory, ThreatSignal } from './scent.js'
+export { compareSignatures, generateSignature, validateSignature } from './signature.js'
+export type { GenerateSignatureOptions } from './signature.js'
+export { createThreatInput } from './threat.js'
+export type { Threat, ThreatInput } from './threat.js'

@@ -17,13 +17,15 @@ import { generateSecureId } from '../utils/id.js'
 export class Evidence implements EvidenceHandle {
   private _bytes: ArrayBuffer | null
   private _disposed: boolean = false
+  private readonly _compressed: boolean
 
   constructor(
     bytes: ArrayBuffer,
     private readonly _signature: string,
     private readonly _expectedHash: string,
     private readonly _severity: Severity,
-    private readonly _captured: number
+    private readonly _captured: number,
+    compressed: boolean = false
   ) {
     // Validate bytes type
     if (!(bytes instanceof ArrayBuffer)) {
@@ -35,13 +37,17 @@ export class Evidence implements EvidenceHandle {
       throw Errors.emptyEvidence()
     }
 
-    // Verify hash matches bytes
-    const actualHash = hashBuffer(bytes)
-    if (actualHash !== _expectedHash) {
-      throw Errors.hashMismatch(_expectedHash, actualHash)
+    // Verify hash matches bytes ONLY for uncompressed evidence
+    // For compressed evidence, hash is of uncompressed content (per RFC)
+    if (!compressed) {
+      const actualHash = hashBuffer(bytes)
+      if (actualHash !== _expectedHash) {
+        throw Errors.hashMismatch(_expectedHash, actualHash)
+      }
     }
 
     this._bytes = bytes
+    this._compressed = compressed
   }
 
   // ─── Getters ────────────────────────────────────────────────────────────────

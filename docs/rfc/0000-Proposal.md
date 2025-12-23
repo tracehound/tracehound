@@ -973,6 +973,45 @@ interface TrustBoundaryConfig {
 
 ---
 
+## Implementation Notes (Phase 3 Addendum)
+
+### Encoding Authority Invariant
+
+**EvidenceFactory MUST remain the sole encoding authority.**
+
+```
+Agent → EvidenceFactory.create() → encode → compress → hash
+       ↑ Agent NEVER touches encoding/compression directly
+```
+
+When adding codec (Step 7):
+
+- Compression layer added INSIDE Factory
+- Agent interface remains unchanged
+- Factory options may include compression config
+
+**Violation of this invariant breaks Phase 3 security guarantees.**
+
+### Codec → Hound Pool Dependency
+
+Implementation order MUST be:
+
+1. Binary codec (Step 7)
+2. Hound Pool (Step 8)
+
+Reason: Workers need final binary format. Implementing Hound Pool before codec requires interface changes later.
+
+### Integration Test Coverage
+
+Before Phase 5, full flow must be tested:
+
+- Quarantine eviction during active intercept
+- Concurrent intercept from multiple sources
+- Memory pressure scenarios
+- Rate limiter cleanup timing
+
+---
+
 **Status: LOCKED**
 
 RFC bilinçli olarak dar tutulmuştur. Security-hardened. Genişleme yalnızca production kullanım ve security audit sonrası yapılmalıdır.

@@ -2,9 +2,21 @@
  * Signature generation and validation.
  */
 
-import { hash } from '../utils/hash.js'
-import { serialize } from '../utils/serialize.js'
+import { constantTimeEqual } from '../utils/compare.js'
+import { encodePayload } from '../utils/encode.js'
+import { hashBuffer } from '../utils/hash.js'
 import type { ThreatInput } from './threat.js'
+
+/** Default max payload size for signature generation (1MB) */
+const DEFAULT_MAX_PAYLOAD_SIZE = 1_000_000
+
+/**
+ * Options for signature generation.
+ */
+export interface GenerateSignatureOptions {
+  /** Maximum payload size in bytes. Default: 1MB */
+  maxPayloadSize?: number
+}
 
 /**
  * Generate a content-based, collision-resistant threat signature.
@@ -14,13 +26,40 @@ import type { ThreatInput } from './threat.js'
  * Uses deterministic serialization to ensure identical payloads
  * produce identical signatures regardless of key order.
  *
+ * SECURITY INVARIANTS:
+ * - Validates payload structure (rejects undefined, NaN, Infinity, etc.)
+ * - Checks size before hashing (memory exhaustion prevention)
+ * - Hashes UTF-8 bytes directly (split-brain prevention)
+ *
  * @param threat - Threat input (without signature)
+ * @param options - Optional configuration
  * @returns Signature string
+ * @throws TracehoundError if payload validation fails
  */
-export function generateSignature(threat: ThreatInput): string {
-  const serialized = serialize(threat.scent.payload)
-  const contentHash = hash(serialized)
+export function generateSignature(
+  threat: ThreatInput,
+  options: GenerateSignatureOptions = {}
+): string {
+  const maxSize = options.maxPayloadSize ?? DEFAULT_MAX_PAYLOAD_SIZE
+
+  // CRITICAL: Use encodePayload for full validation
+  // This enforces: structure validation, size check, canonical encoding
+  const { bytes } = encodePayload(threat.scent.payload, maxSize)
+
+  const contentHash = hashBuffer(bytes)
   return `${threat.category}:${contentHash}`
+}
+
+/**
+ * Compare two signatures in constant time.
+ * MUST be used for all signature comparisons to prevent timing attacks.
+ *
+ * @param a - First signature
+ * @param b - Second signature
+ * @returns True if signatures are equal
+ */
+export function compareSignatures(a: string, b: string): boolean {
+  return constantTimeEqual(a, b)
 }
 
 /**

@@ -3,33 +3,50 @@
  */
 
 import type { Severity } from './common.js'
-import type { Scent } from './scent.js'
+import type { Scent, ThreatCategory } from './scent.js'
 
-/** Threat category types */
-export type ThreatCategory = 'injection' | 'ddos' | 'flood' | 'spam' | 'malware' | 'unknown'
+// Re-export from scent.ts (single source of truth)
+export type { ThreatCategory, ThreatSignal } from './scent.js'
 
 /**
- * A threat is a scent that has been classified as malicious.
+ * A threat is a scent that has been classified as malicious
+ * and assigned a signature for deduplication.
  */
 export interface Threat {
   /** Content-based, collision-resistant signature */
-  signature: string
+  readonly signature: string
   /** Classification category */
-  category: ThreatCategory
+  readonly category: ThreatCategory
   /** Severity level */
-  severity: Severity
+  readonly severity: Severity
   /** Original scent */
-  scent: Scent
+  readonly scent: Scent
 }
 
 /**
  * Input for threat classification (before signature generation).
+ * Used internally by EvidenceFactory.
  */
 export interface ThreatInput {
   /** Classification category */
-  category: ThreatCategory
+  readonly category: ThreatCategory
   /** Severity level */
-  severity: Severity
+  readonly severity: Severity
   /** Original scent */
-  scent: Scent
+  readonly scent: Scent
+}
+
+/**
+ * Create ThreatInput from Scent with threat signal.
+ * Helper function for type conversion.
+ */
+export function createThreatInput(scent: Scent): ThreatInput | null {
+  if (!scent.threat) {
+    return null
+  }
+  return {
+    category: scent.threat.category,
+    severity: scent.threat.severity,
+    scent,
+  }
 }

@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.5.0] - Phase 5: Hound Process Isolation
+## [0.5.0] - Hound Process Isolation
 
 ### Changed
 
@@ -33,7 +33,7 @@ All notable changes to this project will be documented in this file.
 - Independent crash domains.
 - SIGKILL for immediate process termination.
 
-## [0.4.0] - Phase 4: Observability & Resilience
+## [0.4.0] - Observability & Resilience
 
 ### Added
 
@@ -60,7 +60,7 @@ All notable changes to this project will be documented in this file.
   - Full flow verification (Scent → Agent → Quarantine).
   - Rate limiting, eviction, and concurrent access tests.
 
-## [0.3.0] - Phase 3: Core Logic
+## [0.3.0] - Core Logic
 
 ### Added
 
@@ -76,7 +76,7 @@ All notable changes to this project will be documented in this file.
   - Secure creation of Evidence instances.
   - Payload encoding and hashing.
 
-## [0.2.0] - Phase 2: Evidence & Quarantine
+## [0.2.0] - Evidence & Quarantine
 
 ### Added
 
@@ -93,7 +93,7 @@ All notable changes to this project will be documented in this file.
   - Merkle-chain like audit logging.
   - Tamper-evident record keeping.
 
-## [0.1.0] - Phase 1: Foundation
+## [0.1.0] - Foundation
 
 ### Added
 

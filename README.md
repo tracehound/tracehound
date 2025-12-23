@@ -1,8 +1,11 @@
 # Tracehound
 
+![Tracehound Banner](.github/assets/tracehound-banner.jpg)
+
 **Cyberimmune System for Modern Applications.**
 
-Tracehound is a deterministic, observable system for threat quarantine and analysis. It acts as a security buffer layer between traffic intake and business logic.
+> Tracehound is a deterministic, observable system for threat quarantine and analysis.
+> It acts as a security buffer layer between traffic intake and business logic.
 
 ## Project Structure
 

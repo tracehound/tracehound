@@ -180,3 +180,35 @@ export type { CodecStats, ColdPathCodec, HotPathCodec } from './utils/binary-cod
 export { constantTimeBufferEqual, constantTimeEqual } from './utils/compare.js'
 export { encodePayload, estimatePayloadSize } from './utils/encode.js'
 export type { EncodeResult } from './utils/encode.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - Cold Storage
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { MemoryColdStorage, createMemoryColdStorage } from './core/cold-storage.js'
+export type {
+  ColdStorageReadResult,
+  ColdStorageWriteResult,
+  IColdStorageAdapter,
+} from './core/cold-storage.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - Trust Boundary
+// ─────────────────────────────────────────────────────────────────────────────
+
+export {
+  DEFAULT_TRUST_BOUNDARY,
+  isClusterUntrusted,
+  mergeTrustBoundary,
+  shouldVerifyDetector,
+  validateTrustBoundary,
+} from './core/trust-boundary.js'
+export type {
+  ClusterBoundaryConfig,
+  ClusterTrustLevel,
+  ColdStorageBoundaryConfig,
+  ColdStorageTrustLevel,
+  DetectorBoundaryConfig,
+  DetectorTrustLevel,
+  TrustBoundaryConfig,
+} from './core/trust-boundary.js'

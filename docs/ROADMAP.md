@@ -1,6 +1,6 @@
 # Tracehound Roadmap
 
-## Current Status: v0.6.0
+## Current Status: v0.7.0 (v1.0.0 P0 Complete)
 
 ---
 
@@ -45,16 +45,25 @@
 - [x] Runtime Flags (--frozen-intrinsics)
 - [x] Scenarios directory structure
 
+### v0.7.0 - v1.0.0 P0 Complete
+
+- [x] Cold Storage Adapter (`IColdStorageAdapter`)
+- [x] Trust Boundary Runtime
+- [x] Rename hound-worker → hound-process
+
 ---
 
 ## 🔲 Remaining for v1.0.0
 
-### P0 - Required
+### P0 - Required ✅ DONE
 
-| Component             | Status | Notes                           |
-| --------------------- | ------ | ------------------------------- |
-| Trust Boundary Config | 🔲     | RFC-defined, needs runtime impl |
-| Cold Storage Adapter  | 🔲     | Interface only, no impl         |
+### P1 - Important
+
+| Component         | Status | Notes                 |
+| ----------------- | ------ | --------------------- |
+| Express Adapter   | 🔲     | `@tracehound/express` |
+| Fastify Adapter   | 🔲     | `@tracehound/fastify` |
+| API Documentation | 🔲     | TSDoc → site          |
 
 ### P1 - Important
 

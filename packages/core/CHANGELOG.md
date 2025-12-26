@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - v1.0.0 P0 Complete
+
+### Added
+
+- **Cold Storage Adapter**: `IColdStorageAdapter` interface for fire-and-forget archival.
+  - `MemoryColdStorage` for testing
+  - `write()`, `read()`, `delete()`, `isAvailable()` methods
+- **Trust Boundary Runtime**: Developer-defined trust levels.
+  - `TrustBoundaryConfig` for cluster, coldStorage, detector boundaries
+  - `validateTrustBoundary()` validation helper
+  - `shouldVerifyDetector()`, `isClusterUntrusted()` helpers
+
+### Changed
+
+- **RENAMED**: `hound-worker.ts` → `hound-process.ts` (RFC-0000 alignment)
+
+### Tests
+
+- 324 tests passing (+17 new)
+
 ## [0.6.0] - Production Ready (P0 Complete)
 
 ### Added

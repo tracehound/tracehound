@@ -77,13 +77,13 @@
 | TUI Dashboard      | `@tracehound/cli` | MEDIUM   | Real-time threat view   |
 | Comprehensive Docs | `docs/`           | HIGH     | Getting started, guides |
 
-### P2 Features (Should Have)
+### P2 Features ✅ DONE
 
-| Item                | Notes                |
-| ------------------- | -------------------- |
-| Purge + Replace API | Explicit purge flow  |
-| Lane Queue          | Priority alert queue |
-| Fail-Safe Panic     | Threshold callbacks  |
+| Item                | Notes                                |
+| ------------------- | ------------------------------------ |
+| Purge + Replace API | ✅ `quarantine.purge()`, `replace()` |
+| Lane Queue          | ✅ Priority-based alerts             |
+| Fail-Safe Panic     | ✅ Threshold callbacks               |
 
 ---
 
@@ -115,7 +115,8 @@ After v1.0.0 stable, begin `tracehound-sentinel` development:
 
 ### v1.1.0 - Enterprise
 
-- Cold Storage: S3, R2, GCS adapters
+- Cold Storage: S3, R2, GCS adapters (`@tracehound/cold-s3`, etc.)
+- Async Codec (`@tracehound/codec-async`) - Streaming gzip for large payloads
 - Redis Cluster coordination
 - Dashboard API
 

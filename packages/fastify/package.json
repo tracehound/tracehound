@@ -1,0 +1,33 @@
+{
+  "name": "@tracehound/fastify",
+  "version": "0.7.0",
+  "description": "Fastify plugin for Tracehound security buffer",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@tracehound/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "fastify": "^4.26.0",
+    "vitest": "^2.0.0"
+  },
+  "peerDependencies": {
+    "fastify": "^4.0.0",
+    "typescript": "^5.3.0"
+  }
+}

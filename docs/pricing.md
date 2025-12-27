@@ -1,221 +1,97 @@
-# Pricing
+Evet, kesinlikle değişmeli.
 
-## Tracehound Core
+Eski fiyatlandırman (`$299 - $1499`), "Enterprise Sales" (Satış ekibiyle toplantı, sözleşme, uzun ikna süreçleri) gerektiren bir modeldi. Ancak yeni **"Growing SaaS"** stratejimiz ve **Phase 4 (Production Hardening)** hedefimizle, modelin **"Self-Service / Low-Friction"** (Kredi kartını gir, lisans anahtarını al, npm install yap) modeline dönmesi gerekiyor.
 
-**Deterministic Runtime Component**
+Kimse tek instance çalışan (henüz cluster desteği olmayan) bir Node.js kütüphanesine, denemeden ayda 300 dolar vermez. "Adoption" (benimseme) bariyerini düşürmemiz lazım.
 
-**$299 / month**
-
-Tracehound Core is licensed as a **runtime component**, not as a service.
-
-It provides a deterministic, decision-free security buffer that operates inside your application boundary. Configuration is flexible, but **behavior is not contractually frozen**.
-
-**What is guaranteed**
-
-* Deterministic execution under normal and degraded conditions
-* Explicit memory ownership and bounded degradation
-* Configurable quarantine and cold storage primitives
-* Fire-and-forget evidence persistence (write-only, no read-back)
-
-**What is intentionally not guaranteed**
-
-* Backward compatibility across minor versions
-* Stable event contracts
-* Adapter behavior consistency
-
-**Failure behavior**
-
-* System prioritizes **liveness over completeness**
-* Degradation may reduce observability, never application availability
-* No failure propagates into the request lifecycle
-
-**Who this is for**
-
-* Teams embedding Tracehound as an internal security primitive
-* Environments where operators explicitly **own upgrade and behavior risk**
-
-> You get the engine. You own the operational envelope.
+İşte Phase 4 ve Phase 7 gerçeklerine göre revize edilmiş **Monetization Stratejisi**:
 
 ---
 
-## Tracehound Production
+### 1. Yeni Fiyatlandırma Mimarisi: "Per Service" Model
 
-**Operational Stability Contract**
+Node.js dünyasında "Request Count" (İstek sayısı) üzerinden fiyatlandırma yapmak (Datadog gibi) antipatiktir; sürpriz fatura korkusu yaratır. "Per CPU/Node" ise Serverless/K8s dünyasında kafa karıştırır.
 
-**$799 / month**
+En temizi: **Per Logical Service (Uygulama Başına)** sabit ücret.
 
-Tracehound Production upgrades the core runtime into a **predictable subsystem** suitable for live SaaS environments.
+#### **A. Developer / Community (The Hook)**
 
-Here, behavior is no longer best-effort. It is **documented, versioned, and stable**.
+- **Fiyat:** **$0 (Free)**
+- **Hedef:** Developer, Hobbyist, POC.
+- **Özellikler:**
+- Tek instance (Local state).
+- Temel Korumalar (Rate Limit, Agent).
+- _Kısıtlama:_ Cold Storage yok, Notification API yok, Support yok.
+- _Lisans:_ Non-commercial veya Revenue < $5k/mo (Honor system).
 
-**What is guaranteed**
+- **Amaç:** Market penetrasyonu. İnsanların `npm install` yapıp kodlarına alışmasını sağlamak.
 
-* Backward-compatible contracts for:
+#### **B. Pro / Growth (Phase 4 Hedef Kitlesi)**
 
-  * Event taxonomy
-  * Notification semantics
-  * Official cold storage adapters
-* Defined failure behavior under memory pressure and pool exhaustion
-* Upgrade-safe releases with no silent semantic changes
+- **Fiyat:** **$49 - $99 / ay** (Servis başına)
+- **Hedef:** Growing SaaS, Bootstrapped Startups.
+- **Özellikler:**
+- Phase 4 özelliklerinin tamamı (Async Codec, Notification API, Evidence Export).
+- Email Support (24h SLA).
+- Commercial License.
 
-**Failure behavior**
+- **Mantık:** Eski $299 çok yüksekti. $49-$99 bandı, bir mühendisin "Müdüre sormadan şirket kartıyla alabileceği" (No-Approval threshold) sınırdır. Sürümden kazanılır.
 
-* Degradation is explicit and bounded
-* Adapter failures degrade safely, never silently
-* Runtime behavior remains consistent across patch upgrades
+#### **C. Enterprise / Cluster (Phase 7 Hedef Kitlesi)**
 
-**Who this is for**
+- **Fiyat:** **$499+ / ay** (veya yıllık $5k+)
+- **Hedef:** Scale-up şirketler, Fintech, Yüksek Trafikli E-ticaret.
+- **Özellikler:**
+- **Phase 7 özellikleri:** Multi-Instance (Redis), SIEM Export, Compliance Raporları.
+- SLA Garantisi.
+- Öncelikli Support.
 
-* Production SaaS systems
-* Teams that require **operational predictability** rather than raw flexibility
-
-> You are no longer testing how the system behaves. You are relying on it.
-
----
-
-## Tracehound Enterprise
-
-**Compliance & Forensics Substrate**
-
-**Starting at $1,500 / month**
-*(final pricing depends on support level and retention guarantees)*
-
-Tracehound Enterprise treats the runtime as **evidence-bearing infrastructure**.
-
-This tier exists for environments where security incidents are not just technical events, but **auditable facts**.
-
-**What is guaranteed**
-
-* Deterministic snapshot export for offline verification
-* Stable evidence descriptors suitable for audits and legal review
-* RFC-level guarantees on data shape and behavior
-* Long-term support branches with frozen semantics
-
-**Failure behavior**
-
-* Evidence integrity is preserved even under forced degradation
-* All degradation paths are explainable and reviewable
-* Operational behavior is traceable across versions
-
-**Who this is for**
-
-* Regulated environments (fintech, payments, healthcare)
-* Teams accountable to auditors, regulators, and legal review
-
-> This is not observability. This is record-keeping under pressure.
+- **Mantık:** Redis/Cluster desteği geldiğinde ürün "Mission Critical" olur. O zaman fiyatı 5-10 katına çıkarabilirsin.
 
 ---
 
-## Argos (Separate Product)
+### 2. Argos'un Konumu: "Upsell" (Ek Satış)
 
-**Behavioral Signal Runtime**
+Argos'u **$750** gibi tekil bir fiyattan satmak stratejik hataydı. Argos, Tracehound'u tamamlayan bir "Görüş Yeteneği" (Visibility).
 
-**$750 / month**
-*(licensed separately, independent contract)*
+Argos için iki yol var:
 
-Argos is licensed and operated **independently** from Tracehound.
+1. **Standalone (Bağımsız Ürün):** Eğer biri Tracehound kullanmıyorsa ama Node.js Event Loop'unu izlemek istiyorsa.
 
-It extends the observable surface of the runtime by producing **non-authoritative behavioral signals**.
+- **Fiyat:** **$49 / ay**. (APM tool fiyatlarına yakın olmalı).
+- _$750 çılgınlıktı, kimse sadece bir loop watcher için bunu vermez._
 
-**What Argos provides**
+2. **Add-on (Tracehound İçinde):** Tracehound Pro alan birine "Runtime Behavior da ister misin?" diye sorulur.
 
-* Sampling-based runtime and event-loop signals
-* No decisions, no blocking, no enforcement
-* Signals intended for external correlation and verification
+- **Fiyat:** **+$29 / ay** (Bundle indirimi).
 
-**What Argos does not guarantee**
-
-* Determinism
-* Completeness
-* Detection accuracy
-
-**Operational implication**
-
-* Introduces a new trust boundary
-* Requires explicit risk acceptance
-* Covered by a separate SLA and legal disclaimer
-
-> Argos does not make your system safer by default.
-> It makes previously invisible behavior observable.
+**Özetle:** Argos bir "Feature Module" gibi davranmalı. Fiyatı düşük tutulmalı ki, Tracehound alan herkes "Bunu da açayım, ucuzmuş" desin.
 
 ---
 
-# Why This Costs Money
+### 3. ThreatLedger (Gelecek)
 
-Tracehound is not priced on traffic, usage, or attack volume — because **none of those are the problem it solves**.
+ThreatLedger (Post-v2.2) tamamen ayrı bir lig. O bir "Data Product".
 
-You are not paying for:
-
-* Requests processed
-* Threats detected
-* Data stored
-
-You are paying for **behavioral guarantees under failure**.
+- Onu şimdilik fiyatlandırma tablolarına koyma. "Contact Sales" veya "Beta" olarak kalsın.
 
 ---
 
-## 1. Determinism is expensive
+### Karşılaştırmalı Tablo (Özet)
 
-Most security tools tolerate nondeterminism:
+| Özellik      | **Community** | **Pro (Growth)**    | **Enterprise (Scale)** |
+| ------------ | ------------- | ------------------- | ---------------------- |
+| **Fiyat**    | **Ücretsiz**  | **$79 / ay**        | **$499+ / ay**         |
+| **Hedef**    | Dev / Test    | Tekil SaaS          | Cluster / High Scale   |
+| **Instance** | Single        | Single              | **Multi (Redis)**      |
+| **State**    | In-Memory     | In-Memory           | Distributed            |
+| **Evidence** | Local Only    | **Export (S3/API)** | SIEM Integration       |
+| **Argos**    | ❌            | **+$29/ay**         | Dahil                  |
+| **Support**  | Community     | Email               | Priority / Slack       |
 
-* Garbage-collected memory
-* Retry storms
-* Best-effort async pipelines
+### SecOps / Business Tavsiyesi
 
-Tracehound does not.
+1. **Launch İndirimi:** Phase 4 ("Production Hardening") bittiğinde, "Early Adopter" programı yap. "Ömür boyu $49" gibi bir teklif sun. İlk 50 müşteriyi içeri almak, 5000 dolar kazanmaktan daha değerlidir çünkü sana "Battle-tested" rozeti verirler.
+2. **Lisans Kilidi:** Phase 4'te `License Manager` (Lisans Kontrolü) yazman şart demiştim. Bunu "Soft Lock" yap. Lisans süresi dolsa bile sistemi kapatma (Fail-Open), sadece `watcher`'a "Lisanssız kullanım" uyarısı bas ve notification API'yi durdur. Güvenlik ürünleri fatura ödenmedi diye müşterinin sitesini patlatmamalıdır.
 
-Maintaining deterministic behavior under memory pressure, pool exhaustion, and partial failure requires:
-
-* Explicit ownership models
-* Bounded degradation paths
-* Strictly constrained concurrency
-
-This engineering effort does not scale with usage.
-It scales with **correctness guarantees**.
-
----
-
-## 2. Failure semantics are designed, not assumed
-
-In Tracehound, every failure mode is intentional:
-
-* What degrades
-* What never degrades
-* What is preserved at all costs
-
-Designing and maintaining these semantics — without blocking the host application — is the core value of the system.
-
-This is not feature work.
-This is **failure engineering**.
-
----
-
-## 3. Compliance requires frozen behavior
-
-Enterprise pricing exists because:
-
-* Data shapes must remain stable
-* Evidence must remain verifiable
-* Behavior must remain explainable months or years later
-
-That requires versioned contracts and long-term support.
-Those guarantees have real cost.
-
----
-
-## 4. You are paying for risk ownership transfer
-
-* **Core**: you own the risk
-* **Production**: risk is shared
-* **Enterprise**: risk is contractually bounded
-
-The price difference reflects **who is accountable when things go wrong**.
-
----
-
-## Final line (keep this)
-
-> If your system can tolerate undefined behavior during security incidents,
-> you do not need Tracehound.
->
-> If it cannot, this is what precision costs.
+**Sonuç:** Fiyatları radikal şekilde aşağı çektik ama "Adoption" potansiyelini 100 kat artırdık. $1499'luk 1 müşteri yerine, $79'luk 20 müşteri hem daha sürdürülebilir hem de ürünü daha hızlı olgunlaştırır.

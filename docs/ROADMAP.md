@@ -77,9 +77,12 @@
 
 ---
 
-## Phase 4 — Enterprise Hardening (v1.1.0)
+## Phase 4 — Production Hardening (v1.1.0)
 
-**Goal:** Production-validated, enterprise integration ready security component
+> [!IMPORTANT] > **Scope Clarification:** This phase targets single-instance production readiness.
+> Multi-instance coordination (Redis) is Phase 7 scope for enterprise scale-out.
+
+**Goal:** Bullet-proof single instance with external observability
 **Timeline:** 4–6 weeks after v1.0.0
 
 ### Core Components
@@ -89,24 +92,35 @@
 | System Scheduler          | JitteredTickScheduler implementation (clean slate) | P0       |
 | Security State Refactor   | Unified state substrate (Thread Ledger prereq)     | P0       |
 | External Notification API | Read-only event emission (SIEM, SOC, pipelines)    | P0       |
+| License Validation        | Runtime license check (commercial tiers)           | P0       |
 | Evidence Lifecycle Policy | Declarative retention / eviction policies          | P1       |
-| Async Codec               | `@tracehound/codec-async` - Streaming gzip         | P1       |
+| Async Codec               | `@tracehound/codec-async` - Cold-path streaming    | P1       |
 | Cold Storage Adapters     | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`       | P1       |
 
-### Critic Feedback Items (NEW)
+### Critic Feedback Items
 
-| Component                | Description                                       | Priority |
-| ------------------------ | ------------------------------------------------- | -------- |
-| IPC Stress Test Suite    | stdio vs alternatives benchmark, production proof | P0       |
-| Fail-Open Behavior Doc   | Explicit panic → pass-through spec                | P0       |
-| Performance SLA Document | p50, p99, p99.9 latency guarantees                | P0       |
-| Cold Storage Security    | mTLS spec, encryption requirements                | P1       |
-| K8s Deployment Guide     | cgroups-aware pool, OOMKiller prevention          | P1       |
+| Component                 | Description                                       | Priority |
+| ------------------------- | ------------------------------------------------- | -------- |
+| IPC Stress Test Suite     | stdio vs alternatives benchmark + resilience test | P0       |
+| Fail-Open Behavior Doc    | Explicit panic → pass-through spec                | P0       |
+| Performance SLA Document  | p50, p99, p99.9 latency guarantees                | P0       |
+| Local State Semantics Doc | "Each instance owns its state" explicit warning   | P0       |
+| Cold Storage Security     | mTLS spec, encryption requirements                | P1       |
+| K8s Deployment Guide      | cgroups-aware pool, OOMKiller prevention          | P1       |
+
+### Async Codec Note
+
+> [!NOTE]
+> Async Codec is for **cold-path only** (evacuation, cold storage writes).
+> Hot-path (`intercept()`) remains **synchronous**.
+> Eviction under pressure uses "Drop on Full" or "Background Flush" — never sync cold write.
 
 ### Success Criteria
 
 - [ ] IPC handles 100k req/s without blocking
 - [ ] Fail-open behavior explicitly documented
+- [ ] **Local State Semantics** documented (no global blocklists)
+- [ ] License validation active for commercial tiers
 - [ ] Notification API introduces zero backpressure
 - [ ] Policies remain deploy-time, not runtime-interactive
 
@@ -185,20 +199,28 @@
 
 ---
 
-## Phase 7 — Enterprise Integrations (v2.0.0)
+## Phase 7 — Cluster & Enterprise Scale (v2.0.0)
 
-**Goal:** Operationalize inside enterprise security stacks
+**Goal:** Kubernetes, autoscaling, and regulatory compliance
 **Timeline:** Post Argos stabilization
 
 ### Core Components
 
-| Component            | Description                     | Priority |
-| -------------------- | ------------------------------- | -------- |
-| SIEM Exporters       | Splunk HEC, Elastic, Datadog    | P0       |
-| Multi-Instance Coord | Redis-backed, non-authoritative | P1       |
-| Compliance Reports   | SOC2 / HIPAA evidence export    | P1       |
+| Component            | Description                           | Priority |
+| -------------------- | ------------------------------------- | -------- |
+| Multi-Instance Coord | Redis-backed, non-authoritative state | P0       |
+| SIEM Exporters       | Splunk HEC, Elastic, Datadog          | P0       |
+| Compliance Reports   | SOC2 / HIPAA / ISO evidence export    | P1       |
 
-### Critic Feedback Items (NEW)
+### Infrastructure as Code
+
+| Component        | Description                           | Priority |
+| ---------------- | ------------------------------------- | -------- |
+| Helm Chart       | Official K8s deployment chart         | P0       |
+| Terraform Module | AWS/GCP/Azure reference modules       | P1       |
+| Argos Bridge     | `@argos/tracehound-bridge` production | P1       |
+
+### Critic Feedback Items
 
 | Component            | Description                              | Priority |
 | -------------------- | ---------------------------------------- | -------- |
@@ -209,6 +231,17 @@
 
 > [!NOTE] > **RFC-0004 (ResponseEngine)** and **RFC-0005 (ThreatIntel)** are optional addons.
 > They do NOT violate "decision-free" principle — external policy engines drive decisions.
+
+### Upsell Path
+
+```
+Phase 4 Customer: "Tek instance'da çalışıyorum, logları SIEM'e atıyorum"
+         │
+         ▼ Growth → Scale-out needed
+Phase 7 Customer: "Global ban istiyorum, Redis ile koordinasyon lazım"
+         │
+         ▼ Upgrade to Enterprise tier
+```
 
 ---
 

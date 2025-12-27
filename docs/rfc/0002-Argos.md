@@ -1,4 +1,4 @@
-# RFC-0002: Sentinel & Behavioral Signal Protocol
+# RFC-0002: argos & Behavioral Signal Protocol
 
 ## Metadata
 
@@ -25,9 +25,9 @@ RFC-0000 defines Tracehound as a **request-biased inbound security layer**. Howe
 
 These signals are invisible to the existing architecture.
 
-This RFC introduces **tracehound-sentinel**: a **non-authoritative, observation-only** layer that produces **behavioral signals** for external consumption.
+This RFC introduces **tracehound-argos**: a **non-authoritative, observation-only** layer that produces **behavioral signals** for external consumption.
 
-> Sentinel does not detect threats. Sentinel produces signals that MAY be consumed by external detectors.
+> argos does not detect threats. argos produces signals that MAY be consumed by external detectors.
 
 ---
 
@@ -46,10 +46,10 @@ This RFC introduces **tracehound-sentinel**: a **non-authoritative, observation-
 
 ### RFC-0000 (Core)
 
-Sentinel is **downstream** of external detectors, not upstream of Tracehound:
+argos is **downstream** of external detectors, not upstream of Tracehound:
 
 ```
-tracehound-sentinel
+tracehound-argos
        │
        │ (BehavioralSignal)
        ▼
@@ -60,23 +60,23 @@ External Detector / Policy Engine
 tracehound-core (RFC-0000)
 ```
 
-**Critical invariant:** Sentinel signals NEVER enter Tracehound directly.
+**Critical invariant:** argos signals NEVER enter Tracehound directly.
 
 ### RFC-0001 (WorkingMemory)
 
-Sentinel MAY use WorkingMemory for ephemeral state aggregation.
+argos MAY use WorkingMemory for ephemeral state aggregation.
 
 **Constraints:**
 
-- Sentinel MUST use a separate WorkingMemory namespace
-- Sentinel MUST NOT define its own state substrate
-- Sentinel state MUST have short TTL (default: 60s)
-- Sentinel MUST only store aggregate/counter data, not evidence
+- argos MUST use a separate WorkingMemory namespace
+- argos MUST NOT define its own state substrate
+- argos state MUST have short TTL (default: 60s)
+- argos MUST only store aggregate/counter data, not evidence
 
 ```
 WorkingMemory
  ├─ core (tracehound evidence metadata)
- └─ sentinel (behavioral aggregates)
+ └─ argos (behavioral aggregates)
 ```
 
 ---
@@ -91,14 +91,14 @@ RFC-0000 defines trust levels for external detectors. This RFC extends the model
 interface TrustBoundaryConfig {
   // ... existing RFC-0000 fields ...
 
-  sentinel: {
+  argos: {
     source: 'internal'
     trustLevel: 'verify' // NEVER 'trusted'
   }
 }
 ```
 
-### Why Sentinel is NOT Trusted
+### Why argos is NOT Trusted
 
 | Concern                      | Implication                             |
 | ---------------------------- | --------------------------------------- |
@@ -106,7 +106,7 @@ interface TrustBoundaryConfig {
 | Sampling-based               | Non-deterministic by design             |
 | No cryptographic attestation | Signals can be spoofed if runtime owned |
 
-**Mandatory rule:** External detectors MUST cross-validate Sentinel signals before threat escalation.
+**Mandatory rule:** External detectors MUST cross-validate argos signals before threat escalation.
 
 ---
 
@@ -114,15 +114,15 @@ interface TrustBoundaryConfig {
 
 ### BehavioralSignal
 
-Sentinel's sole output type. Explicitly distinct from RFC-0000 `Threat`.
+argos's sole output type. Explicitly distinct from RFC-0000 `Threat`.
 
 ```ts
 interface BehavioralSignal {
   /** Fixed identifier for signal source */
-  source: 'sentinel'
+  source: 'argos'
 
   /** Observation axis */
-  axis: SentinelAxis
+  axis: argosAxis
 
   /** Signal kind (namespaced, free-form) */
   kind: string
@@ -140,7 +140,7 @@ interface BehavioralSignal {
   metadata?: Record<string, number | string | boolean>
 }
 
-type SentinelAxis =
+type argosAxis =
   | 'runtime' // Node.js version, flags, intrinsics
   | 'eventloop' // Latency, starvation, microtask queue
   | 'worker' // Thread pool behavior
@@ -193,8 +193,8 @@ interface SignalSink {
 | Retry          | None             |
 | Backpressure   | Drop on overflow |
 
-> Sentinel MUST NOT depend on any specific signal transport.
-> Signal transport MUST be replaceable without affecting Sentinel semantics.
+> argos MUST NOT depend on any specific signal transport.
+> Signal transport MUST be replaceable without affecting argos semantics.
 > Consumers MUST treat each BehavioralSignal as independent, even if delivered in batches.
 
 ### Transport Examples (Non-Normative)
@@ -232,8 +232,8 @@ interface SignalSink {
 
 **Implementation:**
 
-> Sentinel MAY observe event loop latency using platform-provided instrumentation primitives.
-> Sentinel MUST NOT depend on specific Node.js API names or versions.
+> argos MAY observe event loop latency using platform-provided instrumentation primitives.
+> argos MUST NOT depend on specific Node.js API names or versions.
 
 **Constraints:** See [Sampling & Overhead SLA](#sampling--overhead-sla).
 
@@ -267,8 +267,8 @@ The following are **permanently out of scope** for RFC-0002:
 | Native addon internals | Opaque to V8                            |
 | Process memory dumps   | Security risk, not observation          |
 
-> These MAY be addressed in future "Extended Sentinel" or sidecar projects.
-> They are NOT part of tracehound-sentinel v1.
+> These MAY be addressed in future "Extended argos" or sidecar projects.
+> They are NOT part of tracehound-argos v1.
 
 ---
 
@@ -277,8 +277,8 @@ The following are **permanently out of scope** for RFC-0002:
 ### Rule 1 — Sampling Only
 
 ```
-Sentinel MUST NOT perform continuous observation.
-Sentinel MUST use periodic, jittered sampling.
+argos MUST NOT perform continuous observation.
+argos MUST use periodic, jittered sampling.
 ```
 
 ### Rule 2 — Budgeted Overhead
@@ -292,15 +292,15 @@ Sentinel MUST use periodic, jittered sampling.
 ### Rule 3 — Zero Hot-Path Coupling
 
 ```
-Sentinel MUST NOT share primitives with request lifecycle.
-Sentinel MUST NOT hook userland HTTP clients.
-Sentinel MUST NOT inject async instrumentation.
+argos MUST NOT share primitives with request lifecycle.
+argos MUST NOT hook userland HTTP clients.
+argos MUST NOT inject async instrumentation.
 ```
 
 ### Configuration
 
 ```ts
-interface SentinelConfig {
+interface argosConfig {
   /** Sampling interval (ms). Default: 5000 */
   sampleIntervalMs: number
 
@@ -313,19 +313,19 @@ interface SentinelConfig {
   /** Signal sink implementation */
   sink: SignalSink
 
-  /** WorkingMemory namespace. Default: 'sentinel' */
+  /** WorkingMemory namespace. Default: 'argos' */
   wmNamespace?: string
 
   /** Axes to observe. Default: all */
-  axes?: SentinelAxis[]
+  axes?: argosAxis[]
 }
 ```
 
 ---
 
-## Sentinel Threat Surface
+## argos Threat Surface
 
-Sentinel introduces its own attack surface. Mitigations are mandatory.
+argos introduces its own attack surface. Mitigations are mandatory.
 
 ### Threat: Signal Injection (Fake Anomaly Flood)
 
@@ -375,7 +375,7 @@ Signals exceeding rate limit are dropped silently.
 ## API
 
 ```ts
-interface Sentinel {
+interface argos {
   /** Start observation */
   start(): void
 
@@ -386,10 +386,10 @@ interface Sentinel {
   readonly state: 'idle' | 'running' | 'stopped'
 
   /** Configuration (readonly) */
-  readonly config: Readonly<SentinelConfig>
+  readonly config: Readonly<argosConfig>
 }
 
-function createSentinel(config: SentinelConfig): Sentinel
+function createargos(config: argosConfig): argos
 ```
 
 ---
@@ -408,11 +408,11 @@ When CPU budget constrains observation, priority order:
 
 ### WorkingMemory Usage
 
-> Sentinel WorkingMemory entries MUST be short-lived and prioritise recency over completeness.
+> argos WorkingMemory entries MUST be short-lived and prioritise recency over completeness.
 > Historical accuracy is not required; trend and drift detection are the primary concerns.
 
 ```ts
-// Sentinel namespace in WorkingMemory
+// argos namespace in WorkingMemory
 const wmConfig: WorkingMemoryConfig = {
   maxEntries: 1000,
   maxWeight: 10 * 1024 * 1024,
@@ -448,7 +448,7 @@ const wmConfig: WorkingMemoryConfig = {
 ## Open Questions
 
 - Reference implementation API selection (platform-specific, non-normative)
-- Sentinel namespace eviction tuning based on production telemetry
+- argos namespace eviction tuning based on production telemetry
 
 ---
 

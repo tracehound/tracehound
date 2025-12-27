@@ -1,6 +1,6 @@
 # Tracehound Roadmap
 
-## Current Status: v0.7.0 (v1.0.0 P0 Complete)
+## Current Status: v0.8.0 (P0 + P1 Complete)
 
 ---
 
@@ -51,19 +51,19 @@
 - [x] Trust Boundary Runtime
 - [x] Rename hound-worker → hound-process
 
+### v0.8.0 - v1.0.0 P1 Complete
+
+- [x] Express Adapter (`@tracehound/express`)
+- [x] Fastify Adapter (`@tracehound/fastify`)
+- [x] API Documentation
+
 ---
 
 ## 🔲 Remaining for v1.0.0
 
 ### P0 - Required ✅ DONE
 
-### P1 - Important
-
-| Component         | Status | Notes                 |
-| ----------------- | ------ | --------------------- |
-| Express Adapter   | ✅     | `@tracehound/express` |
-| Fastify Adapter   | ✅     | `@tracehound/fastify` |
-| API Documentation | ✅     | TSDoc → site          |
+### P1 - Important ✅ DONE
 
 ### P2 - Nice to Have
 

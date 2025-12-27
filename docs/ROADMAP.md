@@ -79,20 +79,34 @@
 
 ## Phase 4 — Enterprise Hardening (v1.1.0)
 
-**Goal:** Enterprise integration ready security component
+**Goal:** Production-validated, enterprise integration ready security component
 **Timeline:** 4–6 weeks after v1.0.0
+
+### Core Components
 
 | Component                 | Description                                        | Priority |
 | ------------------------- | -------------------------------------------------- | -------- |
 | System Scheduler          | JitteredTickScheduler implementation (clean slate) | P0       |
-| Working Memory Refactor   | Unified state substrate (Thread Ledger prereq)     | P0       |
+| Security State Refactor   | Unified state substrate (Thread Ledger prereq)     | P0       |
 | External Notification API | Read-only event emission (SIEM, SOC, pipelines)    | P0       |
 | Evidence Lifecycle Policy | Declarative retention / eviction policies          | P1       |
 | Async Codec               | `@tracehound/codec-async` - Streaming gzip         | P1       |
 | Cold Storage Adapters     | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`       | P1       |
 
+### Critic Feedback Items (NEW)
+
+| Component                | Description                                       | Priority |
+| ------------------------ | ------------------------------------------------- | -------- |
+| IPC Stress Test Suite    | stdio vs alternatives benchmark, production proof | P0       |
+| Fail-Open Behavior Doc   | Explicit panic → pass-through spec                | P0       |
+| Performance SLA Document | p50, p99, p99.9 latency guarantees                | P0       |
+| Cold Storage Security    | mTLS spec, encryption requirements                | P1       |
+| K8s Deployment Guide     | cgroups-aware pool, OOMKiller prevention          | P1       |
+
 ### Success Criteria
 
+- [ ] IPC handles 100k req/s without blocking
+- [ ] Fail-open behavior explicitly documented
 - [ ] Notification API introduces zero backpressure
 - [ ] Policies remain deploy-time, not runtime-interactive
 
@@ -103,6 +117,8 @@
 **Goal:** Forensic substrate and compliance enabler
 **Timeline:** 4 weeks after v1.1.0
 
+### Core Components
+
 | Component                     | Description                                    | Priority |
 | ----------------------------- | ---------------------------------------------- | -------- |
 | Incident Verification Record  | Immutable, payload-less descriptor             | P0       |
@@ -110,6 +126,15 @@
 | Evidence Cost Accounting      | Memory + cold storage cost visibility          | P1       |
 | Threat Coalescing             | Time-window aggregation for repetitive threats | P1       |
 | DPS (Payload Summary)         | Deterministic summary for explainability       | P2       |
+
+### Critic Feedback Items (NEW)
+
+| Component                    | Description                               | Priority |
+| ---------------------------- | ----------------------------------------- | -------- |
+| GDPR Erasure API             | Evidence/quarantine delete capability     | P0       |
+| Retention Policy Config      | Explicit TTL + policy documentation       | P1       |
+| Compliance Framework Mapping | PCI-DSS, SOC2, HIPAA control mapping docs | P1       |
+| Audit Log Encryption         | At-rest encryption for audit chain        | P2       |
 
 ### Explicit Non-Goals
 
@@ -120,30 +145,43 @@
 
 ---
 
-## Phase 6 — Argos & Behavioral Signals (v1.3.0)
+## Phase 6 — Argos (Separate Product Track)
 
-**Goal:** Visibility beyond request lifecycle
-**Timeline:** 6–8 weeks after v1.2.0
+> **Product Classification:** Standalone offering with independent sales cycle
+> **Specification:** RFC-0002 (v2: Production Architecture)
+> **Relationship:** Optional integration via `@argos/tracehound-bridge`
+
+**Goal:** Production-grade runtime behavioral observer
+**Timeline:** Parallel development track
 
 | Component                  | Description                                      | Priority |
 | -------------------------- | ------------------------------------------------ | -------- |
-| tracehound-argos           | Runtime behavioral observer (sampling-based)     | P0       |
-| Behavioral Signal Protocol | Confidence-tagged signals for external detectors | P0       |
-| Argos WorkingMemory        | Ephemeral aggregation substrate                  | P1       |
-| Signal Rate Limiting       | Protection against signal flood                  | P1       |
+| Worker Thread Observer     | Starvation-immune observation layer              | P0       |
+| Adaptive Sampling          | Dynamic frequency based on anomaly detection     | P0       |
+| Ring Buffer                | Retroactive analysis capability                  | P0       |
+| Behavioral Signal Protocol | Confidence-tagged signals for external detectors | P1       |
+| Native Watchdog            | Optional libuv-based failsafe                    | P2       |
 
 ### Architectural Invariants
 
-- Argos signals NEVER enter Tracehound core
-- Argos WorkingMemory is physically separate from Quarantine
-- Sampling-only, no continuous observation
+- Argos signals NEVER enter Tracehound directly (bridge is optional)
+- Worker Thread provides independent event loop
+- Sampling adapts automatically (baseline → burst → cooldown)
 - No kernel, syscall, or memory dump access
+- **Standalone product** — no Tracehound dependency
 
 ### Success Criteria
 
-- [ ] <1% CPU overhead under load
-- [ ] Zero coupling with request lifecycle
-- [ ] Core determinism guarantees preserved
+- [ ] Event loop starvation detection within 3 seconds
+- [ ] Burst attack detection (>100ms duration)
+- [ ] <1% CPU overhead (baseline mode)
+- [ ] ~85% threat coverage (vs ~30% RFC-0002)
+
+### Known Limitations (Documented)
+
+- Cannot detect issues preventing all JS execution
+- Ultra-short attacks (<100ms) partially covered
+- Requires Node.js 12+ for Worker Threads
 
 ---
 
@@ -152,11 +190,25 @@
 **Goal:** Operationalize inside enterprise security stacks
 **Timeline:** Post Argos stabilization
 
+### Core Components
+
 | Component            | Description                     | Priority |
 | -------------------- | ------------------------------- | -------- |
 | SIEM Exporters       | Splunk HEC, Elastic, Datadog    | P0       |
 | Multi-Instance Coord | Redis-backed, non-authoritative | P1       |
 | Compliance Reports   | SOC2 / HIPAA evidence export    | P1       |
+
+### Critic Feedback Items (NEW)
+
+| Component            | Description                              | Priority |
+| -------------------- | ---------------------------------------- | -------- |
+| Scent.identity       | Auth/session context in Scent (RFC-0000) | P0       |
+| RFC-0004 ResponseEng | Optional external policy-driven response | P1       |
+| RFC-0005 ThreatIntel | External threat feed integration API     | P2       |
+| Incident Response    | Ticket creation, runbook automation      | P2       |
+
+> [!NOTE] > **RFC-0004 (ResponseEngine)** and **RFC-0005 (ThreatIntel)** are optional addons.
+> They do NOT violate "decision-free" principle — external policy engines drive decisions.
 
 ---
 
@@ -174,7 +226,7 @@
 
 > **Product Classification:** Standalone offering with independent sales cycle
 > **Specification:** RFC-0003
-> **Prerequisite:** Tracehound Core v1.1.0+ (WorkingMemory substrate)
+> **Prerequisite:** Tracehound Core v1.1.0+ (Security State Substrate)
 
 ThreatLedger is a **threat metadata substrate** designed for:
 

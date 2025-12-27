@@ -2,14 +2,14 @@
 
 ## Metadata
 
-| Field            | Value                                     |
-| ---------------- | ----------------------------------------- |
-| Status           | Draft                                     |
-| Security Impact  | Low (non-authoritative)                   |
-| Operational Risk | Low (bounded memory, fire-and-forget)     |
-| Dependencies     | RFC-0000 (Core), RFC-0001 (WorkingMemory) |
-| Author           | -                                         |
-| Created          | 2024-12-27                                |
+| Field            | Value                                                |
+| ---------------- | ---------------------------------------------------- |
+| Status           | Draft                                                |
+| Security Impact  | Low (non-authoritative)                              |
+| Operational Risk | Low (bounded memory, fire-and-forget)                |
+| Dependencies     | RFC-0000 (Core), RFC-0001 (Security State Substrate) |
+| Author           | -                                                    |
+| Created          | 2024-12-27                                           |
 
 ---
 
@@ -93,7 +93,7 @@ Bu RFC, **decision-free, observation-only threat metadata substrate** tanımlar.
 
 ```
 RFC-0000 Agent → ThreatLedger.record()
-RFC-0001 WorkingMemory ← ThreatLedger (separate namespace)
+RFC-0001 Security State Substrate ← ThreatLedger (separate namespace)
 RFC-0002 Argos + ThreatLedger → External Analytics
 ```
 

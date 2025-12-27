@@ -223,12 +223,12 @@ interface TaskState {
 - External monitoring system (Watcher + DevOps) karar verir
 - Circuit breaker = karar mekanizması → Tracehound'a ait değil
 
-**3. Working Memory integration:**
+**3. Security State integration:**
 
 ```typescript
-// Scheduler kendi state tutmaz, Working Memory'ye yazar
+// Scheduler kendi state tutmaz, Security State'e yazar
 scheduler.onTaskFailure = (id, error, consecutive) => {
-  workingMemory.set(
+  securityState.set(
     `scheduler:${id}`,
     {
       consecutiveFailures: consecutive,

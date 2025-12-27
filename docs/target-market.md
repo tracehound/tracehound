@@ -131,6 +131,49 @@
 
 ---
 
+## Argos (Separate Product)
+
+> **Product Classification:** Standalone runtime observer
+> **Relationship:** Optional Tracehound integration via bridge package
+
+### Target Market
+
+| Criteria | Value                                 |
+| -------- | ------------------------------------- |
+| Role     | DevOps, SRE, Security-aware eng       |
+| Need     | Runtime visibility, anomaly detection |
+| Budget   | $500-1k/mo                            |
+
+### Positioning
+
+| Aspect     | Tracehound            | Argos                    |
+| ---------- | --------------------- | ------------------------ |
+| **Focus**  | Security forensics    | Runtime observability    |
+| **Output** | Evidence + Quarantine | Behavioral signals       |
+| **Buyer**  | CISO, Security Lead   | Engineering Manager, SRE |
+| **Budget** | Security / Compliance | R&D / Infrastructure     |
+
+### Value Proposition
+
+> "Argos gözetler, Tracehound dondurur."
+
+- **Argos:** "Uygulamanın nabzını tutmak" — Event loop, worker threads, runtime integrity
+- **Tracehound:** "Suç mahallini dondurmak" — Quarantine, evidence, audit chain
+
+### Upsell Path
+
+```
+Argos detects anomaly
+        ↓
+"Bu security threat mi?"
+        ↓
+Tracehound validates + quarantines
+        ↓
+Customer upgrades to full stack
+```
+
+---
+
 **Status:** DRAFT
 
 Bu döküman tartışmaya açıktır. Feedback bekleniyor.

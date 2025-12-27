@@ -61,17 +61,9 @@
 
 | Component         | Status | Notes                 |
 | ----------------- | ------ | --------------------- |
-| Express Adapter   | 🔲     | `@tracehound/express` |
-| Fastify Adapter   | 🔲     | `@tracehound/fastify` |
-| API Documentation | 🔲     | TSDoc → site          |
-
-### P1 - Important
-
-| Component         | Status | Notes                 |
-| ----------------- | ------ | --------------------- |
-| Express Adapter   | 🔲     | `@tracehound/express` |
-| Fastify Adapter   | 🔲     | `@tracehound/fastify` |
-| API Documentation | 🔲     | TSDoc → site          |
+| Express Adapter   | ✅     | `@tracehound/express` |
+| Fastify Adapter   | ✅     | `@tracehound/fastify` |
+| API Documentation | ✅     | TSDoc → site          |
 
 ### P2 - Nice to Have
 

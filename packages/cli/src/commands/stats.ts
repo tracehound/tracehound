@@ -2,6 +2,7 @@
  * Stats command - Show threat statistics
  */
 
+import Table from 'cli-table3'
 import { Command } from 'commander'
 
 export const statsCommand = new Command('stats')
@@ -66,29 +67,58 @@ function getStats(_since: string): ThreatStats {
 }
 
 function printStats(stats: ThreatStats): void {
-  console.log(`
-╔════════════════════════════════════════════╗
-║           THREAT STATISTICS                ║
-║           Window: ${stats.window.padEnd(23)}║
-╠════════════════════════════════════════════╣
-║  TOTAL: ${String(stats.total).padEnd(33)}║
-╠════════════════════════════════════════════╣
-║  BY SEVERITY                               ║
-║    🔴 Critical: ${String(stats.bySeverity.critical).padEnd(25)}║
-║    🟠 High:     ${String(stats.bySeverity.high).padEnd(25)}║
-║    🟡 Medium:   ${String(stats.bySeverity.medium).padEnd(25)}║
-║    🟢 Low:      ${String(stats.bySeverity.low).padEnd(25)}║
-╠════════════════════════════════════════════╣
-║  BY CATEGORY                               ║
-║    💉 Injection: ${String(stats.byCategory.injection).padEnd(24)}║
-║    🌊 DDoS:      ${String(stats.byCategory.ddos).padEnd(24)}║
-║    ❓ Other:     ${String(stats.byCategory.other).padEnd(24)}║
-╠════════════════════════════════════════════╣
-║  OUTCOMES                                  ║
-║    🔒 Quarantined:  ${String(stats.outcomes.quarantined).padEnd(22)}║
-║    ⏱️  Rate Limited: ${String(stats.outcomes.rateLimited).padEnd(21)}║
-║    ✅ Clean:        ${String(stats.outcomes.clean).padEnd(22)}║
-║    ⏭️  Ignored:      ${String(stats.outcomes.ignored).padEnd(21)}║
-╚════════════════════════════════════════════╝
-`)
+  // Header
+  console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
+  console.log(`  ║              THREAT STATISTICS (${stats.window.padEnd(24)})  ║`)
+  console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
+
+  // Summary
+  const summaryTable = new Table({
+    head: ['Metric', 'Value'],
+    style: { head: ['cyan'], border: ['gray'] },
+  })
+  summaryTable.push(['Total Threats', String(stats.total)], ['Time Window', stats.window])
+  console.log(summaryTable.toString())
+  console.log()
+
+  // By Severity
+  const severityTable = new Table({
+    head: ['Severity', 'Count'],
+    style: { head: ['red'], border: ['gray'] },
+  })
+  severityTable.push(
+    ['🔴 Critical', String(stats.bySeverity.critical)],
+    ['🟠 High', String(stats.bySeverity.high)],
+    ['🟡 Medium', String(stats.bySeverity.medium)],
+    ['🟢 Low', String(stats.bySeverity.low)]
+  )
+  console.log(severityTable.toString())
+  console.log()
+
+  // By Category
+  const categoryTable = new Table({
+    head: ['Category', 'Count'],
+    style: { head: ['yellow'], border: ['gray'] },
+  })
+  categoryTable.push(
+    ['💉 Injection', String(stats.byCategory.injection)],
+    ['🌊 DDoS', String(stats.byCategory.ddos)],
+    ['❓ Other', String(stats.byCategory.other)]
+  )
+  console.log(categoryTable.toString())
+  console.log()
+
+  // Outcomes
+  const outcomesTable = new Table({
+    head: ['Outcome', 'Count'],
+    style: { head: ['green'], border: ['gray'] },
+  })
+  outcomesTable.push(
+    ['🔒 Quarantined', String(stats.outcomes.quarantined)],
+    ['⏱️  Rate Limited', String(stats.outcomes.rateLimited)],
+    ['✅ Clean', String(stats.outcomes.clean)],
+    ['⏭️  Ignored', String(stats.outcomes.ignored)]
+  )
+  console.log(outcomesTable.toString())
+  console.log()
 }

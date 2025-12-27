@@ -2,6 +2,7 @@
  * Inspect command - Inspect quarantine contents
  */
 
+import Table from 'cli-table3'
 import { Command } from 'commander'
 
 export const inspectCommand = new Command('inspect')
@@ -42,7 +43,7 @@ function inspectSingle(signature: string, json: boolean): void {
   const entry = getEntry(signature)
 
   if (!entry) {
-    console.log(`❌ Evidence not found: ${signature}`)
+    console.log(`\n  ❌ Evidence not found: ${signature}\n`)
     return
   }
 
@@ -62,51 +63,74 @@ function inspectList(limit: number, json: boolean): void {
   }
 
   if (entries.length === 0) {
-    console.log('📭 Quarantine is empty')
+    console.log('\n  📭 Quarantine is empty\n')
     return
   }
 
-  console.log(`
-╔════════════════════════════════════════════════════════════════╗
-║                    QUARANTINE CONTENTS                         ║
-╠══════════════╦══════════╦══════════╦═══════════╦═══════════════╣
-║  Signature   ║ Severity ║ Category ║   Size    ║    Source     ║
-╠══════════════╬══════════╬══════════╬═══════════╬═══════════════╣`)
+  // Header
+  console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
+  console.log('  ║                    QUARANTINE CONTENTS                       ║')
+  console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
+
+  const table = new Table({
+    head: ['Signature', 'Severity', 'Category', 'Size', 'Source'],
+    style: { head: ['cyan'], border: ['gray'] },
+    colWidths: [16, 12, 12, 12, 18],
+  })
 
   for (const entry of entries) {
-    const sig = entry.signature.slice(0, 10) + '...'
-    const sev = entry.severity.padEnd(8)
-    const cat = entry.category.padEnd(8)
-    const size = formatBytes(entry.size).padEnd(9)
-    const src = entry.source.slice(0, 13).padEnd(13)
-    console.log(`║  ${sig}  ║ ${sev} ║ ${cat} ║ ${size} ║ ${src} ║`)
+    const severityIcon = getSeverityIcon(entry.severity)
+    table.push([
+      entry.signature.slice(0, 12) + '...',
+      `${severityIcon} ${entry.severity}`,
+      entry.category,
+      formatBytes(entry.size),
+      entry.source.slice(0, 15),
+    ])
   }
 
-  console.log('╚══════════════╩══════════╩══════════╩═══════════╩═══════════════╝')
+  console.log(table.toString())
+  console.log()
 }
 
 function printEntry(entry: QuarantineEntry): void {
-  const severityIcon =
-    entry.severity === 'critical'
-      ? '🔴'
-      : entry.severity === 'high'
-      ? '🟠'
-      : entry.severity === 'medium'
-      ? '🟡'
-      : '🟢'
+  const severityIcon = getSeverityIcon(entry.severity)
 
-  console.log(`
-╔════════════════════════════════════════════╗
-║             EVIDENCE DETAILS               ║
-╠════════════════════════════════════════════╣
-║  Signature: ${entry.signature.slice(0, 28).padEnd(28)}  ║
-║  Severity:  ${severityIcon} ${entry.severity.padEnd(25)}║
-║  Category:  ${entry.category.padEnd(28)}  ║
-║  Size:      ${formatBytes(entry.size).padEnd(28)}  ║
-║  Source:    ${entry.source.padEnd(28)}  ║
-║  Captured:  ${new Date(entry.captured).toISOString().padEnd(28)}║
-╚════════════════════════════════════════════╝
-`)
+  // Header
+  console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
+  console.log('  ║                     EVIDENCE DETAILS                         ║')
+  console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
+
+  const table = new Table({
+    style: { border: ['gray'] },
+  })
+
+  table.push(
+    { Signature: entry.signature },
+    { Severity: `${severityIcon} ${entry.severity}` },
+    { Category: entry.category },
+    { Size: formatBytes(entry.size) },
+    { Source: entry.source },
+    { Captured: new Date(entry.captured).toISOString() }
+  )
+
+  console.log(table.toString())
+  console.log()
+}
+
+function getSeverityIcon(severity: string): string {
+  switch (severity) {
+    case 'critical':
+      return '🔴'
+    case 'high':
+      return '🟠'
+    case 'medium':
+      return '🟡'
+    case 'low':
+      return '🟢'
+    default:
+      return '⚪'
+  }
 }
 
 function formatBytes(bytes: number): string {

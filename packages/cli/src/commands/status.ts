@@ -2,6 +2,7 @@
  * Status command - Show current system status
  */
 
+import Table from 'cli-table3'
 import { Command } from 'commander'
 
 export const statusCommand = new Command('status')
@@ -63,29 +64,65 @@ function getSystemStatus(): SystemStatus {
 function printStatus(status: SystemStatus): void {
   const healthIcon = status.health === 'healthy' ? '✅' : status.health === 'degraded' ? '⚠️' : '🔴'
 
-  console.log(`
-╔════════════════════════════════════════════╗
-║            TRACEHOUND STATUS               ║
-╠════════════════════════════════════════════╣
-║  Version:  ${status.version.padEnd(30)}║
-║  Uptime:   ${formatUptime(status.uptime).padEnd(30)}║
-║  Health:   ${healthIcon} ${status.health.padEnd(27)}║
-╠════════════════════════════════════════════╣
-║  QUARANTINE                                ║
-║    Count:   ${String(status.quarantine.count).padEnd(29)}║
-║    Bytes:   ${formatBytes(status.quarantine.bytes).padEnd(29)}║
-║    Cap:     ${String(status.quarantine.capacity).padEnd(29)}║
-╠════════════════════════════════════════════╣
-║  RATE LIMIT                                ║
-║    Blocked: ${String(status.rateLimit.blocked).padEnd(29)}║
-║    Active:  ${String(status.rateLimit.active).padEnd(29)}║
-╠════════════════════════════════════════════╣
-║  HOUND POOL                                ║
-║    Active:  ${String(status.houndPool.active).padEnd(29)}║
-║    Dormant: ${String(status.houndPool.dormant).padEnd(29)}║
-║    Total:   ${String(status.houndPool.total).padEnd(29)}║
-╚════════════════════════════════════════════╝
-`)
+  // Header
+  console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
+  console.log('  ║                    TRACEHOUND STATUS                         ║')
+  console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
+
+  // System Info Table
+  const systemTable = new Table({
+    head: ['Property', 'Value'],
+    style: { head: ['cyan'], border: ['gray'] },
+  })
+  systemTable.push(
+    ['Version', status.version],
+    ['Uptime', formatUptime(status.uptime)],
+    ['Health', `${healthIcon} ${status.health}`]
+  )
+  console.log(systemTable.toString())
+  console.log()
+
+  // Quarantine Table
+  const quarantineTable = new Table({
+    head: ['QUARANTINE', 'Value'],
+    style: { head: ['yellow'], border: ['gray'] },
+  })
+  const usage =
+    status.quarantine.capacity > 0
+      ? ((status.quarantine.count / status.quarantine.capacity) * 100).toFixed(1)
+      : '0.0'
+  quarantineTable.push(
+    ['Count', `${status.quarantine.count} / ${status.quarantine.capacity}`],
+    ['Usage', `${usage}%`],
+    ['Bytes', formatBytes(status.quarantine.bytes)]
+  )
+  console.log(quarantineTable.toString())
+  console.log()
+
+  // Rate Limit Table
+  const rateLimitTable = new Table({
+    head: ['RATE LIMIT', 'Value'],
+    style: { head: ['magenta'], border: ['gray'] },
+  })
+  rateLimitTable.push(
+    ['Blocked', String(status.rateLimit.blocked)],
+    ['Active', String(status.rateLimit.active)]
+  )
+  console.log(rateLimitTable.toString())
+  console.log()
+
+  // Hound Pool Table
+  const poolTable = new Table({
+    head: ['HOUND POOL', 'Value'],
+    style: { head: ['green'], border: ['gray'] },
+  })
+  poolTable.push(
+    ['Active', String(status.houndPool.active)],
+    ['Dormant', String(status.houndPool.dormant)],
+    ['Total', String(status.houndPool.total)]
+  )
+  console.log(poolTable.toString())
+  console.log()
 }
 
 function formatUptime(seconds: number): string {

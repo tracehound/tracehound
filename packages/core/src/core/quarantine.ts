@@ -246,8 +246,8 @@ export class Quarantine {
       this.store.delete(signature)
       this.totalBytes -= size
 
-      // TODO Phase 3: Log eviction
-      // TODO Phase 3: Alert if high/critical
+      // NOTE: Eviction is tracked via audit chain neutralization record.
+      // High/critical severity alerts are handled by Watcher observing quarantine stats.
     }
   }
 

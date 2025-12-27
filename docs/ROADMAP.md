@@ -87,10 +87,9 @@
 | System Scheduler          | JitteredTickScheduler implementation (clean slate) | P0       |
 | Working Memory Refactor   | Unified state substrate (Thread Ledger prereq)     | P0       |
 | External Notification API | Read-only event emission (SIEM, SOC, pipelines)    | P0       |
-
-| Evidence Lifecycle Policy | Declarative retention / eviction policies | P1 |
-| Async Codec | `@tracehound/codec-async` - Streaming gzip | P1 |
-| Cold Storage Adapters | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs` | P1 |
+| Evidence Lifecycle Policy | Declarative retention / eviction policies          | P1       |
+| Async Codec               | `@tracehound/codec-async` - Streaming gzip         | P1       |
+| Cold Storage Adapters     | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`       | P1       |
 
 ### Success Criteria
 
@@ -168,6 +167,33 @@
 | Cloudflare Workers | Edge-compatible core |
 | Vercel Edge        | Edge-compatible core |
 | Lambda@Edge        | AWS Edge integration |
+
+---
+
+## ThreatLedger — Separate Product (Post v2.2.0)
+
+> **Product Classification:** Standalone offering with independent sales cycle
+> **Specification:** RFC-0003
+> **Prerequisite:** Tracehound Core v1.1.0+ (WorkingMemory substrate)
+
+ThreatLedger is a **threat metadata substrate** designed for:
+
+- Research & cure development
+- External analytics / ML training
+- Pattern correlation & temporal analysis
+
+| Component     | Description                              |
+| ------------- | ---------------------------------------- |
+| Hot Layer     | In-memory O(1) query, 10k records        |
+| Cold Layer    | NDJSON operational logs, external tools  |
+| Archive Layer | Compressed binary, research data         |
+| Query API     | Signature, category, severity, timerange |
+
+**Architectural Invariants:**
+
+- Decision-free (observation-only)
+- No evidence storage (metadata only)
+- Separate namespace from Quarantine
 
 ---
 

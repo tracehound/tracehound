@@ -2,7 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.0.0] - 2024-12-27 - Stable Release
+
+**Milestone**: v1.0.0 Complete. Private / Premium Release.
+
+### Added - CLI & TUI (@tracehound/cli)
+
+- **Zero-Dependency Dashboard**: Pure ANSI + `cli-table3` based TUI.
+- **Commands**:
+  - `tracehound status`: System health, uptime, and memory usage.
+  - `tracehound stats`: Threat statistics by severity and category.
+  - `tracehound inspect`: Deep dive into quarantine evidence.
+  - `tracehound watch`: Live auto-refreshing dashboard.
+- **Theme**: Soft Dark Material theme for terminal UI.
+
+### Added - Documentation
+
+- **Getting Started**: Installation, Quick Start, and Framework Adapters.
+- **Configuration Reference**: Exhaustive reference for all components (Agent, Quarantine, HoundPool, etc.).
+- **License**: Updated to Commercial (Enterprise / Premium).
+
+### Core Features (Consolidated from v0.x)
+
+- **Agent**: Decision-free traffic orchestration.
+- **Quarantine**: Secure evidence buffer with `priority` eviction.
+- **Hound Pool**: Process-isolated forensic analysis sandbox.
+- **Fail-Safe**: Adaptive circuit breaker (Memory/CPU/Error rates).
+- **Audit Chain**: Tamper-evident operational log.
+
+### Tests
+
+- **Coverage**: 368+ tests across Core, CLI, Express, and Fastify packages.
+- **Scenarios**: Full lifecycle, stress testing, and fail-safe integration verified.
 
 ## [0.7.0] - v1.0.0 P0 Complete
 

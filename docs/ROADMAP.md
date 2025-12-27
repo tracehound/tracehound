@@ -86,6 +86,7 @@
 | -------------------------- | ---------------------------------------------------- | -------- |
 | External Notification API  | Read-only event emission (SIEM, SOC, pipelines)      | P0       |
 | Event Taxonomy & Contracts | Frozen event set (at-most-once, unordered, no retry) | P0       |
+| System Scheduler           | JitteredTickScheduler implementation (clean slate)   | P0       |
 | Evidence Lifecycle Policy  | Declarative retention / eviction policies            | P1       |
 | Async Codec                | `@tracehound/codec-async` - Streaming gzip           | P1       |
 | Cold Storage Adapters      | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`         | P1       |

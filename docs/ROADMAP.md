@@ -1,4 +1,4 @@
-# Tracehound Roadmap [LOCKED]
+# Tracehound Roadmap
 
 > **Scope:** Deterministic runtime security buffer & forensic substrate
 > **Core Invariants:** Decision-free, payload-less, GC-independent
@@ -82,14 +82,15 @@
 **Goal:** Enterprise integration ready security component
 **Timeline:** 4–6 weeks after v1.0.0
 
-| Component                  | Description                                          | Priority |
-| -------------------------- | ---------------------------------------------------- | -------- |
-| External Notification API  | Read-only event emission (SIEM, SOC, pipelines)      | P0       |
-| Event Taxonomy & Contracts | Frozen event set (at-most-once, unordered, no retry) | P0       |
-| System Scheduler           | JitteredTickScheduler implementation (clean slate)   | P0       |
-| Evidence Lifecycle Policy  | Declarative retention / eviction policies            | P1       |
-| Async Codec                | `@tracehound/codec-async` - Streaming gzip           | P1       |
-| Cold Storage Adapters      | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`         | P1       |
+| Component                 | Description                                        | Priority |
+| ------------------------- | -------------------------------------------------- | -------- |
+| System Scheduler          | JitteredTickScheduler implementation (clean slate) | P0       |
+| Working Memory Refactor   | Unified state substrate (Thread Ledger prereq)     | P0       |
+| External Notification API | Read-only event emission (SIEM, SOC, pipelines)    | P0       |
+
+| Evidence Lifecycle Policy | Declarative retention / eviction policies | P1 |
+| Async Codec | `@tracehound/codec-async` - Streaming gzip | P1 |
+| Cold Storage Adapters | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs` | P1 |
 
 ### Success Criteria
 

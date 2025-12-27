@@ -1,29 +1,4 @@
-İlk tasarımım Tracehound'un temel prensiplerine aykırı. Düzeltmeliyim.
-
-## Yanlış Varsayımlarım
-
-**1. Persistent state eklenmeli değilmiş:**
-
-- Tracehound'un felsefesi: "GC-independent, deterministic" + "explicit lifecycle"
-- Security layer crash = clean slate olmalı, historical state corruption riski taşımak yerine
-- Background task miss = acceptable loss, catch-up yapılmaz
-- Token cleanup miss oldu → bir sonraki schedule'da normal devam
-- Hound rotation miss oldu → sonraki tick'te yapılır
-
-**2. Over-engineering yaptım:**
-
-- Circuit breaker ekledim → decision-making, Tracehound **decision-free** olmalı
-- Metrics tracking ekledim → RFC-0001 Working Memory'nin işi
-- Audit trail ekledim → zaten RFC-0000'da AuditChain var
-- WAL + checkpoint → unnecessary complexity, against clean-slate principle
-
-**3. Missed execution handling yanlış:**
-
-- Fintech security layer'da background task için "geçen saat çalışmadı, şimdi telafi et" yaklaşımı YANLIŞ
-- Task miss = acceptable, sistem degraded mode'da çalışır
-- Recovery logic eklemek sistem complexity'sini artırır, security için risk
-
-## Tracehound İçin Doğru Tasarım
+## Tracehound System Scheduler Proposal
 
 ```typescript
 interface TickSchedulerConfig {
@@ -273,5 +248,3 @@ scheduler.onTaskFailure = (id, error, consecutive) => {
 - "GC-independent" → file I/O yok, hrtime kullan
 - "Decision-free" → alert only, decision yok
 - "Explicit lifecycle" → shutdown() çağrılır, implicit recovery yok
-
-İlk tasarımım bir **generic persistent task scheduler** için iyiydi, ama **Tracehound security layer'ı** için yanlıştı. Security systemlerde basitlik ve determinism critical importance taşıyor.

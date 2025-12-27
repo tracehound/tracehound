@@ -10,9 +10,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "declarationMap": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "react"
+    "declarationMap": true
   },
   "include": [
     "src/**/*"

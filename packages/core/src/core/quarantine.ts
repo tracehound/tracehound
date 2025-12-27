@@ -4,7 +4,7 @@
 
 import type { Severity } from '../types/common.js'
 import type { QuarantineConfig } from '../types/config.js'
-import type { EvidenceHandle, NeutralizationRecord } from '../types/evidence.js'
+import type { EvidenceHandle, NeutralizationRecord, PurgeRecord } from '../types/evidence.js'
 import type { AuditChain } from './audit-chain.js'
 
 /** Result of insert operation */
@@ -18,6 +18,14 @@ export interface QuarantineStats {
   count: number
   bytes: number
   bySeverity: Record<Severity, number>
+}
+
+/** Result of replace operation */
+export interface ReplaceResult {
+  status: 'replaced' | 'inserted_only'
+  neutralized?: NeutralizationRecord
+  inserted: boolean
+  duplicate?: EvidenceHandle
 }
 
 /** Severity ranking for eviction priority */
@@ -119,6 +127,83 @@ export class Quarantine {
     this.totalBytes = 0
 
     return records
+  }
+
+  /**
+   * Purge evidence by signature with explicit reason.
+   * Unlike neutralize, purge creates a PurgeRecord with reason metadata.
+   *
+   * @param signature - Evidence signature to purge
+   * @param reason - Reason for purge
+   * @returns PurgeRecord if found, null if not found
+   */
+  purge(signature: string, reason: 'timeout' | 'error' | 'abort' | 'panic'): PurgeRecord | null {
+    const evidence = this.store.get(signature)
+    if (!evidence) {
+      return null
+    }
+
+    const size = evidence.size
+    const hash = evidence.hash
+
+    // Create purge record before disposing
+    const record: PurgeRecord = {
+      id: `prg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      reason,
+      scent: {
+        id: evidence.signature, // Using signature as proxy for scent ID
+        source: 'unknown', // Not available from evidence handle
+        timestamp: evidence.captured,
+        payloadHash: hash,
+        payloadSize: size,
+      },
+      purgeTimestamp: Date.now(),
+    }
+
+    // Dispose evidence (force cleanup without audit chain)
+    try {
+      evidence.transfer() // Transfer ownership to force disposal
+    } catch {
+      // Already disposed, ignore
+    }
+
+    // Remove from store
+    this.store.delete(signature)
+    this.totalBytes -= size
+
+    return record
+  }
+
+  /**
+   * Replace evidence with new evidence atomically.
+   * Old evidence is neutralized and new evidence is inserted.
+   *
+   * @param oldSignature - Signature of evidence to replace
+   * @param newEvidence - New evidence to insert
+   * @returns Result with old neutralization record and new insert status
+   */
+  replace(oldSignature: string, newEvidence: EvidenceHandle): ReplaceResult {
+    // First, neutralize old evidence
+    const neutralized = this.neutralize(oldSignature)
+
+    if (!neutralized) {
+      // Old evidence not found, just insert new
+      const insertResult = this.insert(newEvidence)
+      return {
+        status: 'inserted_only',
+        inserted: insertResult.status === 'inserted',
+      }
+    }
+
+    // Insert new evidence
+    const insertResult = this.insert(newEvidence)
+
+    return {
+      status: 'replaced',
+      neutralized,
+      inserted: insertResult.status === 'inserted',
+      ...(insertResult.status === 'duplicate' && { duplicate: insertResult.existing }),
+    }
   }
 
   /**

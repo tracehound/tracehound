@@ -1,6 +1,6 @@
 # Tracehound Roadmap
 
-## Current Status: v0.8.0 (P0 + P1 Complete)
+## Current Status: v0.8.0 → v1.0.0 Stable
 
 ---
 
@@ -59,50 +59,77 @@
 
 ---
 
-## 🔲 Remaining for v1.0.0
+## 🔲 v1.0.0 Stable Requirements
 
-### P0 - Required ✅ DONE
+### Tech Debt (Must Fix)
 
-### P1 - Important ✅ DONE
+| Item                 | Location             | Priority | Notes                   |
+| -------------------- | -------------------- | -------- | ----------------------- |
+| Granular Error Codes | `errors.ts`          | HIGH     | Categorize by domain    |
+| Windows Constraints  | `process-adapter.ts` | MEDIUM   | Enforce or document     |
+| Scenario Tests       | `scenarios/`         | HIGH     | Full lifecycle coverage |
 
-### P2 - Nice to Have
+### New Features (Must Have)
 
-| Component           | Status | Notes                |
-| ------------------- | ------ | -------------------- |
-| Purge + Replace API | 🔲     | Explicit purge flow  |
-| Lane Queue          | 🔲     | Priority alert queue |
-| Fail-Safe Panic     | 🔲     | Threshold callbacks  |
+| Item               | Package           | Priority | Notes                   |
+| ------------------ | ----------------- | -------- | ----------------------- |
+| CLI Interface      | `@tracehound/cli` | HIGH     | Status, stats, inspect  |
+| TUI Dashboard      | `@tracehound/cli` | MEDIUM   | Real-time threat view   |
+| Comprehensive Docs | `docs/`           | HIGH     | Getting started, guides |
+
+### P2 Features (Should Have)
+
+| Item                | Notes                |
+| ------------------- | -------------------- |
+| Purge + Replace API | Explicit purge flow  |
+| Lane Queue          | Priority alert queue |
+| Fail-Safe Panic     | Threshold callbacks  |
 
 ---
 
-## Future Phases
+## Success Criteria for v1.0.0 Stable
 
-### v1.1.0 - Enterprise (Commercial)
+| Criterion           | Status | Target                |
+| ------------------- | ------ | --------------------- |
+| intercept() latency | 🔲     | < 1ms p99             |
+| Memory stability    | 🔲     | 100k threats          |
+| Error codes         | 🔲     | Granular, documented  |
+| Scenario tests      | 🔲     | Full lifecycle        |
+| CLI basic           | 🔲     | `tracehound status`   |
+| Documentation       | 🔲     | Getting started guide |
+| npm publish         | 🔲     | 3 packages ready      |
+
+---
+
+## Post v1.0.0: Sentinel Integration
+
+After v1.0.0 stable, begin `tracehound-sentinel` development:
+
+- RFC-0002 implementation
+- Behavioral signal protocol
+- Detector integration
+
+---
+
+## Future Phases (Commercial)
+
+### v1.1.0 - Enterprise
 
 - Cold Storage: S3, R2, GCS adapters
 - Redis Cluster coordination
 - Dashboard API
 
-### v2.0.0 - Edge (Commercial)
+### v2.0.0 - Edge
 
 - Cloudflare Workers
 - Vercel Edge
 - Lambda@Edge
 
-### v2.1.0 - SIEM (Commercial)
+### v2.1.0 - SIEM
 
 - Splunk, Elastic, Datadog
 - SOC2/HIPAA compliance
 
 ---
 
-## Success Criteria for v1.0.0
-
-- [ ] intercept() < 1ms (p99)
-- [ ] Memory stable under 100k threats
-- [ ] Production deployment guide
-- [ ] npm publish ready
-
----
-
-**Last Updated:** 2024-12-23
+**Last Updated:** 2024-12-27

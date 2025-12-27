@@ -212,3 +212,29 @@ export type {
   DetectorTrustLevel,
   TrustBoundaryConfig,
 } from './core/trust-boundary.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - Lane Queue
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { DEFAULT_LANE_CONFIG, LaneQueue, createLaneQueue } from './core/lane-queue.js'
+export type {
+  Alert as LaneAlert,
+  LaneConfig,
+  LaneQueueConfig,
+  LaneStats,
+} from './core/lane-queue.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - Fail-Safe
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { DEFAULT_FAIL_SAFE_CONFIG, FailSafe, createFailSafe } from './core/fail-safe.js'
+export type {
+  FailSafeConfig,
+  PanicCallback,
+  PanicEvent,
+  PanicLevel,
+  PanicReason,
+  ThresholdConfig,
+} from './core/fail-safe.js'

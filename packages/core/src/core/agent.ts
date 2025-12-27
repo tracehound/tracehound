@@ -124,7 +124,7 @@ export class Agent implements IAgent {
 
       if (!creationResult.ok) {
         // Check if it's a payload size error
-        if (creationResult.error.code === 'PAYLOAD_TOO_LARGE') {
+        if (creationResult.error.code === 'AGENT_PAYLOAD_TOO_LARGE') {
           this.stats.validationFailures++
           return {
             status: 'payload_too_large',

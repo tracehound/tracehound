@@ -6,6 +6,26 @@
  * - Independent crash domain
  * - SIGKILL on kill()
  * - No fork-specific semantics (spawn + pipe baseline)
+ *
+ * PLATFORM SUPPORT:
+ *
+ * | Feature              | Linux/macOS | Windows          |
+ * |----------------------|-------------|------------------|
+ * | Memory limit (V8)    | ✓ Enforced  | ✓ Enforced       |
+ * | SIGKILL              | ✓ Native    | ✓ TerminateProcess |
+ * | CPU limit            | ✗ N/A       | ✗ N/A            |
+ * | Network isolation    | Declared    | Declared         |
+ * | Filesystem isolation | Declared    | Declared         |
+ *
+ * WINDOWS LIMITATIONS:
+ * - Process constraints (network, filesystem, child spawn) are DECLARATIVE ONLY
+ * - No OS-level enforcement without external tools (Job Objects, containers)
+ * - Production recommendation: Use WSL2 or Docker for full isolation
+ *
+ * SECURITY MODEL:
+ * - Constraints are defense-in-depth, not security boundaries
+ * - Core security relies on: process separation, SIGKILL, timeout
+ * - Do NOT rely on constraint enforcement for security-critical isolation
  */
 
 import { ChildProcess, spawn } from 'node:child_process'

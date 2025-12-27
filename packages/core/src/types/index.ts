@@ -16,8 +16,8 @@ export type {
   SchedulerConfig,
   TracehoundConfig,
 } from './config.js'
-export { createError, Errors } from './errors.js'
-export type { ErrorState, TracehoundError } from './errors.js'
+export { ErrorCodes, Errors, createError } from './errors.js'
+export type { ErrorCode, ErrorState, TracehoundError } from './errors.js'
 export type {
   EvacuateRecord,
   EvidenceHandle,

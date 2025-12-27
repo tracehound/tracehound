@@ -122,7 +122,7 @@ Working Memory operates in a single-threaded execution context per Tracehound in
 
 This is a deliberate design choice to preserve determinism, bounded memory guarantees, and predictable failure behavior under attack.
 
-Cross-instance correlation is explicitly out of scope and delegated to Sentinel or external collectors.
+Cross-instance correlation is explicitly out of scope and delegated to Argos or external collectors.
 
 ---
 

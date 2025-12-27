@@ -57,7 +57,7 @@ All notable changes to this project will be documented in this file.
 - **Process Adapter**: Platform-agnostic spawn/kill abstraction.
 - **Mock Adapter**: For testing without real child processes.
 - **PoolExhaustedAction**: `'drop' | 'escalate' | 'defer'` for pool exhaustion handling.
-- **RFC-0002**: Sentinel & Behavioral Signal Protocol.
+- **RFC-0002**: Argos & Behavioral Signal Protocol.
 
 ### Removed
 

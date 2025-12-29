@@ -1,97 +1,122 @@
-Evet, kesinlikle değişmeli.
+# Tracehound Pricing Model
 
-Eski fiyatlandırman (`$299 - $1499`), "Enterprise Sales" (Satış ekibiyle toplantı, sözleşme, uzun ikna süreçleri) gerektiren bir modeldi. Ancak yeni **"Growing SaaS"** stratejimiz ve **Phase 4 (Production Hardening)** hedefimizle, modelin **"Self-Service / Low-Friction"** (Kredi kartını gir, lisans anahtarını al, npm install yap) modeline dönmesi gerekiyor.
-
-Kimse tek instance çalışan (henüz cluster desteği olmayan) bir Node.js kütüphanesine, denemeden ayda 300 dolar vermez. "Adoption" (benimseme) bariyerini düşürmemiz lazım.
-
-İşte Phase 4 ve Phase 7 gerçeklerine göre revize edilmiş **Monetization Stratejisi**:
+> **Philosophy:** No request counting. No surprise bills. One price per logical service.
 
 ---
 
-### 1. Yeni Fiyatlandırma Mimarisi: "Per Service" Model
+## Tier Structure
 
-Node.js dünyasında "Request Count" (İstek sayısı) üzerinden fiyatlandırma yapmak (Datadog gibi) antipatiktir; sürpriz fatura korkusu yaratır. "Per CPU/Node" ise Serverless/K8s dünyasında kafa karıştırır.
-
-En temizi: **Per Logical Service (Uygulama Başına)** sabit ücret.
-
-#### **A. Developer / Community (The Hook)**
-
-- **Fiyat:** **$0 (Free)**
-- **Hedef:** Developer, Hobbyist, POC.
-- **Özellikler:**
-- Tek instance (Local state).
-- Temel Korumalar (Rate Limit, Agent).
-- _Kısıtlama:_ Cold Storage yok, Notification API yok, Support yok.
-- _Lisans:_ Non-commercial veya Revenue < $5k/mo (Honor system).
-
-- **Amaç:** Market penetrasyonu. İnsanların `npm install` yapıp kodlarına alışmasını sağlamak.
-
-#### **B. Pro / Growth (Phase 4 Hedef Kitlesi)**
-
-- **Fiyat:** **$49 - $99 / ay** (Servis başına)
-- **Hedef:** Growing SaaS, Bootstrapped Startups.
-- **Özellikler:**
-- Phase 4 özelliklerinin tamamı (Async Codec, Notification API, Evidence Export).
-- Email Support (24h SLA).
-- Commercial License.
-
-- **Mantık:** Eski $299 çok yüksekti. $49-$99 bandı, bir mühendisin "Müdüre sormadan şirket kartıyla alabileceği" (No-Approval threshold) sınırdır. Sürümden kazanılır.
-
-#### **C. Enterprise / Cluster (Phase 7 Hedef Kitlesi)**
-
-- **Fiyat:** **$499+ / ay** (veya yıllık $5k+)
-- **Hedef:** Scale-up şirketler, Fintech, Yüksek Trafikli E-ticaret.
-- **Özellikler:**
-- **Phase 7 özellikleri:** Multi-Instance (Redis), SIEM Export, Compliance Raporları.
-- SLA Garantisi.
-- Öncelikli Support.
-
-- **Mantık:** Redis/Cluster desteği geldiğinde ürün "Mission Critical" olur. O zaman fiyatı 5-10 katına çıkarabilirsin.
+| Tier           | Price    | Instances | Enforcement         |
+| -------------- | -------- | --------- | ------------------- |
+| **Community**  | Free     | 1         | None (honor system) |
+| **Pro**        | $79/mo   | 1         | Trust-based         |
+| **Enterprise** | $499+/mo | Unlimited | Telemetry-tracked   |
 
 ---
 
-### 2. Argos'un Konumu: "Upsell" (Ek Satış)
+## Community (Free)
 
-Argos'u **$750** gibi tekil bir fiyattan satmak stratejik hataydı. Argos, Tracehound'u tamamlayan bir "Görüş Yeteneği" (Visibility).
+**Target:** Developers, Hobbyists, POC
+**Features:**
 
-Argos için iki yol var:
+- Agent, Quarantine, Rate Limiter
+- Local state only (no Cold Storage)
+- Community support
 
-1. **Standalone (Bağımsız Ürün):** Eğer biri Tracehound kullanmıyorsa ama Node.js Event Loop'unu izlemek istiyorsa.
+**Restrictions:**
 
-- **Fiyat:** **$49 / ay**. (APM tool fiyatlarına yakın olmalı).
-- _$750 çılgınlıktı, kimse sadece bir loop watcher için bunu vermez._
-
-2. **Add-on (Tracehound İçinde):** Tracehound Pro alan birine "Runtime Behavior da ister misin?" diye sorulur.
-
-- **Fiyat:** **+$29 / ay** (Bundle indirimi).
-
-**Özetle:** Argos bir "Feature Module" gibi davranmalı. Fiyatı düşük tutulmalı ki, Tracehound alan herkes "Bunu da açayım, ucuzmuş" desin.
+- Non-commercial or Revenue < $5k/mo (Honor system)
+- No Notification API, no Export
 
 ---
 
-### 3. ThreatLedger (Gelecek)
+## Pro ($79/mo per service)
 
-ThreatLedger (Post-v2.2) tamamen ayrı bir lig. O bir "Data Product".
+**Target:** Growing SaaS, Bootstrapped Startups
+**Features:**
 
-- Onu şimdilik fiyatlandırma tablolarına koyma. "Contact Sales" veya "Beta" olarak kalsın.
+- All Community features
+- Cold Storage (S3/R2/GCS)
+- Notification API
+- Email Support (24h SLA)
+- Commercial License
+
+**Instance Model:**
+
+- Single production instance
+- Unlimited dev/staging instances
+- **Trust-based enforcement** (no policing)
 
 ---
 
-### Karşılaştırmalı Tablo (Özet)
+## Enterprise ($499+/mo)
 
-| Özellik      | **Community** | **Pro (Growth)**    | **Enterprise (Scale)** |
-| ------------ | ------------- | ------------------- | ---------------------- |
-| **Fiyat**    | **Ücretsiz**  | **$79 / ay**        | **$499+ / ay**         |
-| **Hedef**    | Dev / Test    | Tekil SaaS          | Cluster / High Scale   |
-| **Instance** | Single        | Single              | **Multi (Redis)**      |
-| **State**    | In-Memory     | In-Memory           | Distributed            |
-| **Evidence** | Local Only    | **Export (S3/API)** | SIEM Integration       |
-| **Argos**    | ❌            | **+$29/ay**         | Dahil                  |
-| **Support**  | Community     | Email               | Priority / Slack       |
+**Target:** Scale-ups, Fintech, High-traffic E-commerce
+**Features:**
 
-### SecOps / Business Tavsiyesi
+- All Pro features
+- Multi-instance (Redis coordination)
+- SIEM Export (Splunk, Elastic, Datadog)
+- Compliance Reports (SOC2, HIPAA, ISO)
+- Priority Support (Slack, 4h SLA)
 
-1. **Launch İndirimi:** Phase 4 ("Production Hardening") bittiğinde, "Early Adopter" programı yap. "Ömür boyu $49" gibi bir teklif sun. İlk 50 müşteriyi içeri almak, 5000 dolar kazanmaktan daha değerlidir çünkü sana "Battle-tested" rozeti verirler.
-2. **Lisans Kilidi:** Phase 4'te `License Manager` (Lisans Kontrolü) yazman şart demiştim. Bunu "Soft Lock" yap. Lisans süresi dolsa bile sistemi kapatma (Fail-Open), sadece `watcher`'a "Lisanssız kullanım" uyarısı bas ve notification API'yi durdur. Güvenlik ürünleri fatura ödenmedi diye müşterinin sitesini patlatmamalıdır.
+**Instance Model:**
 
-**Sonuç:** Fiyatları radikal şekilde aşağı çektik ama "Adoption" potansiyelini 100 kat artırdık. $1499'luk 1 müşteri yerine, $79'luk 20 müşteri hem daha sürdürülebilir hem de ürünü daha hızlı olgunlaştırır.
+- Unlimited production instances
+- **Telemetry-tracked** (heartbeat monitoring)
+- SLA guarantee
+
+---
+
+## License Key (JWT)
+
+| Claim          | Description                         |
+| -------------- | ----------------------------------- |
+| `sub`          | Customer ID                         |
+| `tier`         | community / pro / enterprise        |
+| `exp`          | Expiration timestamp                |
+| `maxInstances` | 1 (Pro) / -1 unlimited (Enterprise) |
+| `features`     | Enabled feature list                |
+
+---
+
+## Enforcement Matrix
+
+| Tier       | Instance Limit | Enforcement | Grace Period |
+| ---------- | -------------- | ----------- | ------------ |
+| Community  | 1              | None        | N/A          |
+| Pro        | 1              | Trust-based | 7 days       |
+| Enterprise | Unlimited      | Telemetry   | 7 days       |
+
+**Pro (Trust-Based):**
+
+- No active policing
+- Violation detected via manual audit
+- Friendly reminder email
+
+**Enterprise (Telemetry-Tracked):**
+
+- Anonymous heartbeat on startup
+- Instance count visible in Admin Panel
+- Over-limit triggers automated email
+- Persistent over-limit → License suspension
+
+---
+
+## Argos Pricing (Add-on)
+
+| Standalone | Bundle (with Pro) |
+| ---------- | ----------------- |
+| $49/mo     | +$29/mo           |
+
+---
+
+## Self-Hosted vs Cloud
+
+| Feature  | Self-Hosted       | Cloud                |
+| -------- | ----------------- | -------------------- |
+| Price    | License cost      | License + Cloud tier |
+| Instance | Customer-managed  | Tracehound-managed   |
+| Data     | Customer premises | Tracehound Cloud     |
+
+Cloud pricing TBD in Phase 5.5.

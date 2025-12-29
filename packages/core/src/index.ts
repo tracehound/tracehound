@@ -46,7 +46,7 @@ export { DEFAULT_CONFIG, mergeWithDefaults } from './types/index.js'
 // Errors
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { Errors, createError } from './types/index.js'
+export { createError, Errors } from './types/index.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Result type guards
@@ -89,14 +89,14 @@ export type { InsertResult, QuarantineStats } from './core/quarantine.js'
 // Core - Rate Limiter
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { RateLimiter, createRateLimiter } from './core/rate-limiter.js'
-export type { IRateLimiter, RateLimitResult, RateLimiterStats } from './core/rate-limiter.js'
+export { createRateLimiter, RateLimiter } from './core/rate-limiter.js'
+export type { IRateLimiter, RateLimiterStats, RateLimitResult } from './core/rate-limiter.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Evidence Factory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { EvidenceFactory, createEvidenceFactory } from './core/evidence-factory.js'
+export { createEvidenceFactory, EvidenceFactory } from './core/evidence-factory.js'
 export type {
   EvidenceCreationResult,
   EvidenceFactoryOptions,
@@ -114,7 +114,7 @@ export type { AgentConfig, AgentStats, IAgent } from './core/agent.js'
 // Core - Hound Pool
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { HoundPool, createHoundPool, createMockAdapter } from './core/hound-pool.js'
+export { createHoundPool, createMockAdapter, HoundPool } from './core/hound-pool.js'
 export type {
   HoundPoolConfig,
   HoundPoolStats,
@@ -128,7 +128,7 @@ export type { HoundProcessConstraints } from './core/process-adapter.js'
 // Core - Scheduler
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { Scheduler, createScheduler } from './core/scheduler.js'
+export { createScheduler, Scheduler } from './core/scheduler.js'
 export type {
   BusyChecker,
   IScheduler,
@@ -141,7 +141,7 @@ export type {
 // Core - Watcher
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { Watcher, createWatcher } from './core/watcher.js'
+export { createWatcher, Watcher } from './core/watcher.js'
 export type {
   Alert,
   AlertSeverity,
@@ -175,7 +175,7 @@ export { serialize } from './utils/serialize.js'
 // Utils - Security
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { GzipCodec, createColdPathCodec, createHotPathCodec } from './utils/binary-codec.js'
+export { createColdPathCodec, createHotPathCodec, GzipCodec } from './utils/binary-codec.js'
 export type { CodecStats, ColdPathCodec, HotPathCodec } from './utils/binary-codec.js'
 export { constantTimeBufferEqual, constantTimeEqual } from './utils/compare.js'
 export { encodePayload, estimatePayloadSize } from './utils/encode.js'
@@ -185,7 +185,7 @@ export type { EncodeResult } from './utils/encode.js'
 // Core - Cold Storage
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { MemoryColdStorage, createMemoryColdStorage } from './core/cold-storage.js'
+export { createMemoryColdStorage, MemoryColdStorage } from './core/cold-storage.js'
 export type {
   ColdStorageReadResult,
   ColdStorageWriteResult,
@@ -217,7 +217,7 @@ export type {
 // Core - Lane Queue
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { DEFAULT_LANE_CONFIG, LaneQueue, createLaneQueue } from './core/lane-queue.js'
+export { createLaneQueue, DEFAULT_LANE_CONFIG, LaneQueue } from './core/lane-queue.js'
 export type {
   Alert as LaneAlert,
   LaneConfig,
@@ -229,7 +229,7 @@ export type {
 // Core - Fail-Safe
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { DEFAULT_FAIL_SAFE_CONFIG, FailSafe, createFailSafe } from './core/fail-safe.js'
+export { createFailSafe, DEFAULT_FAIL_SAFE_CONFIG, FailSafe } from './core/fail-safe.js'
 export type {
   FailSafeConfig,
   PanicCallback,
@@ -238,3 +238,61 @@ export type {
   PanicReason,
   ThresholdConfig,
 } from './core/fail-safe.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - License Manager
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { createLicenseManager, LicenseManager, TIER_FEATURES } from './core/license-manager.js'
+export type {
+  ILicenseManager,
+  LicenseManagerConfig,
+  LicensePayload,
+  LicenseStatus,
+  LicenseTier,
+  LicenseValidationResult,
+} from './core/license-manager.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - Tracehound Factory
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { createTracehound } from './core/tracehound.js'
+export type { ITracehound, TracehoundOptions } from './core/tracehound.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - Notification Emitter
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { createNotificationEmitter, NotificationEmitter } from './core/notification-emitter.js'
+export type {
+  EventCallback,
+  EventType,
+  EvidenceEvictedPayload,
+  EvidenceQuarantinedPayload,
+  INotificationEmitter,
+  LicenseExpiredPayload,
+  LicenseValidatedPayload,
+  NotificationEmitterStats,
+  RateLimitExceededPayload,
+  SystemPanicPayload,
+  ThreatDetectedPayload,
+  TracehoundEvent,
+  WebhookConfig,
+} from './core/notification-emitter.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - Security State
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { createSecurityState, SecurityState } from './core/security-state.js'
+export type {
+  ISecurityState,
+  LicenseState,
+  QuarantineStateStats,
+  RateLimitStats,
+  SecurityHistoryEntry,
+  SecuritySnapshot,
+  SecurityStateConfig,
+  SecurityStateStats,
+} from './core/security-state.js'

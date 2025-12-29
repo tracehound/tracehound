@@ -87,15 +87,15 @@
 
 ### Core Components
 
-| Component                 | Description                                        | Priority |
-| ------------------------- | -------------------------------------------------- | -------- |
-| System Scheduler          | JitteredTickScheduler implementation (clean slate) | P0       |
-| Security State Refactor   | Unified state substrate (Thread Ledger prereq)     | P0       |
-| External Notification API | Read-only event emission (SIEM, SOC, pipelines)    | P0       |
-| License Validation        | Runtime license check (commercial tiers)           | P0       |
-| Evidence Lifecycle Policy | Declarative retention / eviction policies          | P1       |
-| Async Codec               | `@tracehound/codec-async` - Cold-path streaming    | P1       |
-| Cold Storage Adapters     | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`       | P1       |
+| Component                 | Description                                     | Priority |
+| ------------------------- | ----------------------------------------------- | -------- |
+| System Scheduler          | JitteredTickScheduler implementation ✅         | Done     |
+| Security State Refactor   | Unified state substrate ✅                      | Done     |
+| External Notification API | Universal event emission ✅                     | Done     |
+| License Validation        | Runtime license check (commercial tiers) ✅     | Done     |
+| Evidence Lifecycle Policy | Declarative retention / eviction policies       | P1       |
+| Async Codec               | `@tracehound/codec-async` - Cold-path streaming | P1       |
+| Cold Storage Adapters     | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`    | P1       |
 
 ### Critic Feedback Items
 
@@ -123,6 +123,32 @@
 - [ ] License validation active for commercial tiers
 - [ ] Notification API introduces zero backpressure
 - [ ] Policies remain deploy-time, not runtime-interactive
+
+---
+
+## Phase 4.5 — Internal Admin Panel (v1.1.5)
+
+> **Classification:** Internal infrastructure (not customer-facing)
+> **Access:** Tracehound team only
+
+**Goal:** License generation and customer management system
+**Timeline:** Parallel with Phase 4
+
+### Core Components
+
+| Component          | Description                            | Priority |
+| ------------------ | -------------------------------------- | -------- |
+| License Generation | JWT signing with RS256 private key     | P0       |
+| Customer Registry  | Basic customer/organization management | P0       |
+| Tier Management    | Pro/Enterprise tier assignment         | P0       |
+| Revocation List    | License invalidation capability        | P1       |
+| Usage Analytics    | Anonymous telemetry aggregation        | P2       |
+
+### Technical Notes
+
+- Private key **never** leaves this system
+- Runs only on internal infrastructure
+- Separate from customer-facing Cloud Dashboard
 
 ---
 
@@ -156,6 +182,33 @@
 - Interactive dashboards
 - Content inspection or mutation
 - ML-based scoring
+
+---
+
+## Phase 5.5 — Cloud Dashboard (v1.3.0)
+
+> **Classification:** Customer-facing SaaS
+> **Access:** Paying customers (self-service)
+
+**Goal:** Threat visualization and cold storage access for customers
+**Timeline:** Post Phase 5
+
+### Core Components
+
+| Component           | Description                      | Priority |
+| ------------------- | -------------------------------- | -------- |
+| Threat Dashboard    | Real-time threat visualization   | P0       |
+| Evidence Browser    | Cold storage evidence access     | P0       |
+| Team Management     | Per-tenant user/role management  | P0       |
+| Alert Configuration | Webhook/email notification setup | P1       |
+| Billing Integration | Stripe subscription management   | P1       |
+
+### Architecture Notes
+
+- Each tenant has own root admin
+- Consumes data from @tracehound/core Notification API
+- Separate from Internal Admin Panel
+- Public cloud deployment (Vercel/AWS)
 
 ---
 
@@ -206,11 +259,12 @@
 
 ### Core Components
 
-| Component            | Description                           | Priority |
-| -------------------- | ------------------------------------- | -------- |
-| Multi-Instance Coord | Redis-backed, non-authoritative state | P0       |
-| SIEM Exporters       | Splunk HEC, Elastic, Datadog          | P0       |
-| Compliance Reports   | SOC2 / HIPAA / ISO evidence export    | P1       |
+| Component              | Description                                     | Priority |
+| ---------------------- | ----------------------------------------------- | -------- |
+| Multi-Instance Coord   | Redis-backed, non-authoritative state           | P0       |
+| SIEM Exporters         | Splunk HEC, Elastic, Datadog                    | P0       |
+| **Instance Telemetry** | **Enterprise heartbeat tracking + enforcement** | **P0**   |
+| Compliance Reports     | SOC2 / HIPAA / ISO evidence export              | P1       |
 
 ### Infrastructure as Code
 

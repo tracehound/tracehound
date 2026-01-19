@@ -71,11 +71,11 @@ External Detector (WAF, SIEM, ML)
 
 ## Commercial Tiers
 
-| Tier           | Price    | Features                                   |
-| -------------- | -------- | ------------------------------------------ |
-| **Community**  | Free     | Core features, local state                 |
-| **Pro**        | $79/mo   | Cold Storage, Notifications, Email Support |
-| **Enterprise** | $499+/mo | Multi-instance, SIEM Export, SLA           |
+| Tier           | Price    | Features                                      |
+| -------------- | -------- | --------------------------------------------- |
+| **Starter**    | $9/mo    | Full security, HoundPool (1 proc, 64MB)       |
+| **Pro**        | $99/mo   | Scaled HoundPool, Cold Storage, Notifications |
+| **Enterprise** | $499+/mo | Unlimited, Multi-instance, SIEM, SLA          |
 
 See [pricing.md](./docs/pricing.md) for details.
 

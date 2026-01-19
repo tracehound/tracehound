@@ -1,105 +1,101 @@
 # Tracehound Pricing Model
 
-> **Philosophy:** No request counting. No surprise bills. One price per logical service.
+> **Philosophy:** One security model. Different capacity.
+> All tiers include full isolation — no tier is "less secure."
+
+---
+
+## Core Principle
+
+| Security Invariants (All Tiers) | Capacity Features (Tier-Based) |
+| ------------------------------- | ------------------------------ |
+| Agent.intercept()               | HoundPool scaling              |
+| Quarantine                      | Cold Storage                   |
+| AuditChain                      | Notification API               |
+| RateLimiter                     | Scheduler                      |
+| HoundPool (isolation)           | Retention Policy               |
 
 ---
 
 ## Tier Structure
 
-| Tier           | Price    | Instances | Enforcement         |
-| -------------- | -------- | --------- | ------------------- |
-| **Community**  | Free     | 1         | None (honor system) |
-| **Pro**        | $79/mo   | 1         | Trust-based         |
-| **Enterprise** | $499+/mo | Unlimited | Telemetry-tracked   |
+| Tier           | Price    | HoundPool          | Capacity    |
+| -------------- | -------- | ------------------ | ----------- |
+| **Starter**    | $9/mo    | 1 process, 64MB    | Constrained |
+| **Pro**        | $99/mo   | 8 processes, 512MB | Scaled      |
+| **Enterprise** | $499+/mo | Unlimited          | Full + SLA  |
 
 ---
 
-## Community (Free)
+## Starter ($9/mo per service)
 
-**Target:** Developers, Hobbyists, POC
-**Features:**
+**Target:** Solo Developers, Small Projects
 
-- Agent, Quarantine, Rate Limiter
-- Local state only (no Cold Storage)
-- Community support
+**Security (Full):**
 
-**Restrictions:**
+- Agent, Quarantine, AuditChain, RateLimiter
+- HoundPool isolation (1 process, 64MB, 5s timeout)
 
-- Non-commercial or Revenue < $5k/mo (Honor system)
-- No Notification API, no Export
+**Locked (Capacity Features):**
+
+- Cold Storage, Notifications, Scheduler, Retention Policy
 
 ---
 
-## Pro ($79/mo per service)
+## Pro ($99/mo per service)
 
 **Target:** Growing SaaS, Bootstrapped Startups
-**Features:**
 
-- All Community features
+**Security (Full):**
+
+- All Starter security features
+- HoundPool scaling (8 processes, 512MB, 30s timeout)
+
+**Unlocked:**
+
 - Cold Storage (S3/R2/GCS)
 - Notification API
+- Scheduler (jittered)
+- Retention & Eviction Policies
 - Email Support (24h SLA)
-- Commercial License
-
-**Instance Model:**
-
-- Single production instance
-- Unlimited dev/staging instances
-- **Trust-based enforcement** (no policing)
 
 ---
 
 ## Enterprise ($499+/mo)
 
 **Target:** Scale-ups, Fintech, High-traffic E-commerce
-**Features:**
+
+**Full:**
 
 - All Pro features
+- HoundPool unlimited scaling
 - Multi-instance (Redis coordination)
 - SIEM Export (Splunk, Elastic, Datadog)
-- Compliance Reports (SOC2, HIPAA, ISO)
+- Compliance Reports (SOC2, HIPAA)
 - Priority Support (Slack, 4h SLA)
-
-**Instance Model:**
-
-- Unlimited production instances
-- **Telemetry-tracked** (heartbeat monitoring)
 - SLA guarantee
 
 ---
 
 ## License Key (JWT)
 
-| Claim          | Description                         |
-| -------------- | ----------------------------------- |
-| `sub`          | Customer ID                         |
-| `tier`         | community / pro / enterprise        |
-| `exp`          | Expiration timestamp                |
-| `maxInstances` | 1 (Pro) / -1 unlimited (Enterprise) |
-| `features`     | Enabled feature list                |
+| Claim          | Description                |
+| -------------- | -------------------------- |
+| `sub`          | Customer ID                |
+| `tier`         | starter / pro / enterprise |
+| `exp`          | Expiration timestamp       |
+| `houndPoolMax` | 1 / 8 / -1 (unlimited)     |
+| `features`     | Enabled feature list       |
 
 ---
 
 ## Enforcement Matrix
 
-| Tier       | Instance Limit | Enforcement | Grace Period |
-| ---------- | -------------- | ----------- | ------------ |
-| Community  | 1              | None        | N/A          |
-| Pro        | 1              | Trust-based | 7 days       |
-| Enterprise | Unlimited      | Telemetry   | 7 days       |
-
-**Pro (Trust-Based):**
-
-- No active policing
-- Violation detected via manual audit
-- Friendly reminder email
-
-**Enterprise (Telemetry-Tracked):**
-
-- Anonymous heartbeat on startup
-- Instance count visible in Admin Panel
-- Over-limit triggers automated email
-- Persistent over-limit → License suspension
+| Tier       | HoundPool   | Enforcement          |
+| ---------- | ----------- | -------------------- |
+| Starter    | 1 process   | Init-time validation |
+| Pro        | 8 processes | Config-time check    |
+| Enterprise | Unlimited   | Telemetry-tracked    |
 
 ---
 

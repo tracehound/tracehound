@@ -10,9 +10,10 @@
     "clean": "pnpm -r clean"
   },
   "devDependencies": {
+    "@types/node": "^25.0.9",
+    "@vitest/coverage-v8": "^2.0.0",
     "typescript": "^5.3.0",
-    "vitest": "^2.0.0",
-    "@vitest/coverage-v8": "^2.0.0"
+    "vitest": "^2.0.0"
   },
   "engines": {
     "node": ">=20.0.0"

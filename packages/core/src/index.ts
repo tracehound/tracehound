@@ -240,20 +240,6 @@ export type {
 } from './core/fail-safe.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Core - License Manager
-// ─────────────────────────────────────────────────────────────────────────────
-
-export { createLicenseManager, LicenseManager, TIER_FEATURES } from './core/license-manager.js'
-export type {
-  ILicenseManager,
-  LicenseManagerConfig,
-  LicensePayload,
-  LicenseStatus,
-  LicenseTier,
-  LicenseValidationResult,
-} from './core/license-manager.js'
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Core - Tracehound Factory
 // ─────────────────────────────────────────────────────────────────────────────
 

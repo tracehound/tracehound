@@ -1,32 +1,17 @@
 /**
  * Tracehound - Global factory and runtime instance.
  *
- * Provides a single entry point for initializing Tracehound with license validation.
+ * Provides a single entry point for initializing Tracehound.
  */
 
 import { createAgent, type IAgent } from './agent.js'
 import { AuditChain } from './audit-chain.js'
 import { EvidenceFactory, type IEvidenceFactory } from './evidence-factory.js'
-import {
-  createLicenseManager,
-  TIER_FEATURES,
-  type ILicenseManager,
-  type LicenseTier,
-} from './license-manager.js'
+import { createHoundPool, type HoundPoolConfig, type IHoundPool } from './hound-pool.js'
 import { createNotificationEmitter, type INotificationEmitter } from './notification-emitter.js'
 import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
 import { createWatcher, type IWatcher } from './watcher.js'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Environment Variable Name
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Environment variable name for public key.
- * Can be overridden via options.publicKey.
- */
-const PUBLIC_KEY_ENV = 'TRACEHOUND_PUBLIC_KEY'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -36,19 +21,6 @@ const PUBLIC_KEY_ENV = 'TRACEHOUND_PUBLIC_KEY'
  * Tracehound initialization options.
  */
 export interface TracehoundOptions {
-  /**
-   * License key (JWT format).
-   * If omitted, runs in Community mode.
-   */
-  licenseKey?: string
-
-  /**
-   * Public key for license verification (PEM format).
-   * If omitted, reads from TRACEHOUND_PUBLIC_KEY environment variable.
-   * If neither provided, license validation is skipped (Community mode).
-   */
-  publicKey?: string
-
   /**
    * Maximum payload size in bytes.
    * @default 1_000_000
@@ -80,6 +52,11 @@ export interface TracehoundOptions {
     alertWindowMs?: number
     quarantineHighWatermark?: number
   }
+
+  /**
+   * Hound pool configuration.
+   */
+  houndPool?: Partial<HoundPoolConfig>
 }
 
 /**
@@ -94,27 +71,28 @@ export interface ITracehound {
   readonly rateLimiter: IRateLimiter
   /** The Watcher for observability */
   readonly watcher: IWatcher
-  /** The License Manager */
-  readonly license: ILicenseManager
   /** The Audit Chain */
   readonly auditChain: AuditChain
   /** The Notification Emitter */
   readonly notifications: INotificationEmitter
-
-  /**
-   * Current license tier.
-   */
-  readonly tier: LicenseTier
-
-  /**
-   * Check if a feature is enabled.
-   */
-  isFeatureEnabled(feature: string): boolean
+  /** The Hound Pool */
+  readonly houndPool: IHoundPool
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Implementation
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Default HoundPool configuration.
+ */
+const DEFAULT_POOL_CONFIG: HoundPoolConfig = {
+  poolSize: 4,
+  timeout: 30_000,
+  rotationJitterMs: 1000,
+  onPoolExhausted: 'defer',
+  deferQueueLimit: 100,
+}
 
 /**
  * Tracehound runtime implementation.
@@ -124,30 +102,13 @@ class Tracehound implements ITracehound {
   readonly quarantine: Quarantine
   readonly rateLimiter: IRateLimiter
   readonly watcher: IWatcher
-  readonly license: ILicenseManager
   readonly auditChain: AuditChain
   readonly notifications: INotificationEmitter
+  readonly houndPool: IHoundPool
 
   private readonly evidenceFactory: IEvidenceFactory
 
   constructor(options: TracehoundOptions = {}) {
-    // Resolve public key: options > env > none (Community mode)
-    const publicKey = options.publicKey ?? process.env[PUBLIC_KEY_ENV]
-
-    // Initialize license manager (only if public key available)
-    if (publicKey) {
-      this.license = createLicenseManager({ publicKey })
-
-      // Validate license if key provided
-      if (options.licenseKey) {
-        this.license.validate(options.licenseKey)
-      }
-    } else {
-      // No public key = Community mode (creates a "dummy" license manager)
-      this.license = createLicenseManager({ publicKey: '' })
-      // Note: Empty publicKey will fail validation, resulting in Community tier
-    }
-
     // Initialize components
     this.auditChain = new AuditChain()
     this.notifications = createNotificationEmitter()
@@ -158,7 +119,7 @@ class Tracehound implements ITracehound {
         maxBytes: options.quarantine?.maxBytes ?? 100_000_000,
         evictionPolicy: 'priority',
       },
-      this.auditChain
+      this.auditChain,
     )
 
     this.rateLimiter = createRateLimiter({
@@ -180,16 +141,15 @@ class Tracehound implements ITracehound {
       { maxPayloadSize: options.maxPayloadSize ?? 1_000_000 },
       this.quarantine,
       this.rateLimiter,
-      this.evidenceFactory
+      this.evidenceFactory,
     )
-  }
 
-  get tier(): LicenseTier {
-    return this.license.tier
-  }
-
-  isFeatureEnabled(feature: string): boolean {
-    return this.license.isFeatureEnabled(feature)
+    // Create HoundPool
+    const poolConfig: HoundPoolConfig = {
+      ...DEFAULT_POOL_CONFIG,
+      ...options.houndPool,
+    }
+    this.houndPool = createHoundPool(poolConfig)
   }
 }
 
@@ -204,15 +164,10 @@ class Tracehound implements ITracehound {
  * ```typescript
  * import { createTracehound } from '@tracehound/core'
  *
- * const tracehound = createTracehound({
- *   licenseKey: process.env.TRACEHOUND_LICENSE_KEY,
- * })
+ * const tracehound = createTracehound()
  *
  * // Use agent
  * const result = tracehound.agent.intercept(scent)
- *
- * // Check license
- * console.log(`Running in ${tracehound.tier} mode`)
  * ```
  *
  * @param options - Initialization options
@@ -220,5 +175,3 @@ class Tracehound implements ITracehound {
 export function createTracehound(options: TracehoundOptions = {}): ITracehound {
   return new Tracehound(options)
 }
-
-export { TIER_FEATURES }

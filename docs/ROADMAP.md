@@ -2,7 +2,7 @@
 
 > **Scope:** Deterministic runtime security buffer & forensic substrate
 > **Core Invariants:** Decision-free, payload-less, GC-independent
-> **License:** Commercial (Enterprise / Premium)
+> **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
 ---
 
@@ -93,7 +93,7 @@
 | Security State Refactor   | Unified state substrate ✅                      | Done     |
 | External Notification API | Universal event emission ✅                     | Done     |
 | License Validation        | Runtime license check (commercial tiers) ✅     | Done     |
-| Evidence Lifecycle Policy | Declarative retention / eviction policies       | P1       |
+| Evidence Lifecycle Policy | Declarative retention / eviction policies ✅    | Done     |
 | Async Codec               | `@tracehound/codec-async` - Cold-path streaming | P1       |
 | Cold Storage Adapters     | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`    | P1       |
 
@@ -101,11 +101,11 @@
 
 | Component                 | Description                                       | Priority |
 | ------------------------- | ------------------------------------------------- | -------- |
-| IPC Stress Test Suite     | stdio vs alternatives benchmark + resilience test | P0       |
-| Fail-Open Behavior Doc    | Explicit panic → pass-through spec                | P0       |
-| Performance SLA Document  | p50, p99, p99.9 latency guarantees                | P0       |
-| Local State Semantics Doc | "Each instance owns its state" explicit warning   | P0       |
-| Cold Storage Security     | mTLS spec, encryption requirements                | P1       |
+| IPC Stress Test Suite     | stdio vs alternatives benchmark + resilience test | Done ✅  |
+| Fail-Open Behavior Doc    | Explicit panic → pass-through spec                | Done ✅  |
+| Performance SLA Document  | p50, p99, p99.9 latency guarantees                | Done ✅  |
+| Local State Semantics Doc | "Each instance owns its state" explicit warning   | Done ✅  |
+| Cold Storage Security     | mTLS spec, encryption requirements                | Done ✅  |
 | K8s Deployment Guide      | cgroups-aware pool, OOMKiller prevention          | P1       |
 
 ### Async Codec Note
@@ -117,12 +117,12 @@
 
 ### Success Criteria
 
-- [ ] IPC handles 100k req/s without blocking
-- [ ] Fail-open behavior explicitly documented
-- [ ] **Local State Semantics** documented (no global blocklists)
-- [ ] License validation active for commercial tiers
-- [ ] Notification API introduces zero backpressure
-- [ ] Policies remain deploy-time, not runtime-interactive
+- [x] IPC handles 100k req/s without blocking
+- [x] Fail-open behavior explicitly documented
+- [x] **Local State Semantics** documented (no global blocklists)
+- [x] License validation active for commercial tiers
+- [x] Notification API introduces zero backpressure
+- [x] Policies remain deploy-time, not runtime-interactive
 
 ---
 
@@ -358,4 +358,4 @@ These are **permanently excluded** to preserve product identity:
 
 ---
 
-**Last Updated:** 2024-12-27
+**Last Updated:** 2026-01-19

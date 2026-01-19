@@ -1,118 +1,157 @@
 # Tracehound Pricing Model
 
-> **Philosophy:** One security model. Different capacity.
-> All tiers include full isolation — no tier is "less secure."
+> **Model:** Open-Core + Paid Satellites
+> **Core Principle:** Monetize capability, not safety.
 
 ---
 
-## Core Principle
+## Architecture Layers
 
-| Security Invariants (All Tiers) | Capacity Features (Tier-Based) |
-| ------------------------------- | ------------------------------ |
-| Agent.intercept()               | HoundPool scaling              |
-| Quarantine                      | Cold Storage                   |
-| AuditChain                      | Notification API               |
-| RateLimiter                     | Scheduler                      |
-| HoundPool (isolation)           | Retention Policy               |
-
----
-
-## Tier Structure
-
-| Tier           | Price    | HoundPool          | Capacity    |
-| -------------- | -------- | ------------------ | ----------- |
-| **Starter**    | $9/mo    | 1 process, 64MB    | Constrained |
-| **Pro**        | $99/mo   | 8 processes, 512MB | Scaled      |
-| **Enterprise** | $499+/mo | Unlimited          | Full + SLA  |
+| Layer          | Access           | Packages                                | Purpose                                            |
+| -------------- | ---------------- | --------------------------------------- | -------------------------------------------------- |
+| **Substrate**  | Open Source      | @tracehound/core, express, fastify, cli | Deterministic evidence, interception, containment. |
+| **Satellites** | Paid ($49)       | Argos, Talos, Huginn, Muninn            | Enrichment, policy, threat intel, ledger.          |
+| **Advanced**   | Enterprise ($99) | Norns, Furies                           | Readiness synthesis, adversarial stress.           |
+| **Cockpit**    | Commercial       | Watchtower                              | Visualization, management panel.                   |
 
 ---
 
-## Starter ($9/mo per service)
+## Substrate (Open Source)
 
-**Target:** Solo Developers, Small Projects
+**Packages:**
 
-**Security (Full):**
+- `@tracehound/core` — Deterministic security buffer
+- `@tracehound/express` — Express.js adapter
+- `@tracehound/fastify` — Fastify adapter
+- `@tracehound/cli` — Command-line interface
 
-- Agent, Quarantine, AuditChain, RateLimiter
-- HoundPool isolation (1 process, 64MB, 5s timeout)
+**Invariants:**
 
-**Locked (Capacity Features):**
+- No hot-path licensing
+- No degradation based on payment state
+- Fully inspectable source code
+- Operates regardless of commercial status
 
-- Cold Storage, Notifications, Scheduler, Retention Policy
+**Includes:**
 
----
-
-## Pro ($99/mo per service)
-
-**Target:** Growing SaaS, Bootstrapped Startups
-
-**Security (Full):**
-
-- All Starter security features
-- HoundPool scaling (8 processes, 512MB, 30s timeout)
-
-**Unlocked:**
-
-- Cold Storage (S3/R2/GCS)
-- Notification API
-- Scheduler (jittered)
-- Retention & Eviction Policies
-- Email Support (24h SLA)
+- Agent.intercept()
+- Quarantine buffer
+- AuditChain (Merkle)
+- RateLimiter
+- HoundPool (process isolation)
+- Evidence Factory
+- Fail-Safe
 
 ---
 
-## Enterprise ($499+/mo)
+## Satellites ($49/mo per package)
 
-**Target:** Scale-ups, Fintech, High-traffic E-commerce
+**Target:** Teams needing enrichment and operational intelligence.
 
-**Full:**
+### @tracehound/argos
 
-- All Pro features
-- HoundPool unlimited scaling
-- Multi-instance (Redis coordination)
-- SIEM Export (Splunk, Elastic, Datadog)
-- Compliance Reports (SOC2, HIPAA)
-- Priority Support (Slack, 4h SLA)
-- SLA guarantee
+Runtime behavioral observation. Detects event loop starvation, anomalies, and burst attacks.
 
----
+### @tracehound/talos
 
-## License Key (JWT)
+External policy execution. Connects to external policy engines (OPA, custom) for decision making.
 
-| Claim          | Description                |
-| -------------- | -------------------------- |
-| `sub`          | Customer ID                |
-| `tier`         | starter / pro / enterprise |
-| `exp`          | Expiration timestamp       |
-| `houndPoolMax` | 1 / 8 / -1 (unlimited)     |
-| `features`     | Enabled feature list       |
+### @tracehound/huginn
+
+Threat intelligence ingestion. Consumes external threat feeds and correlates with local evidence.
+
+### @tracehound/muninn
+
+Historical ledger & aggregation. Time-series analysis and long-term pattern storage.
 
 ---
 
-## Enforcement Matrix
+## Advanced ($99/mo per package)
 
-| Tier       | HoundPool   | Enforcement          |
-| ---------- | ----------- | -------------------- |
-| Starter    | 1 process   | Init-time validation |
-| Pro        | 8 processes | Config-time check    |
-| Enterprise | Unlimited   | Telemetry-tracked    |
+**Target:** Enterprise teams requiring validation and readiness.
+
+### @tracehound/norns
+
+Deterministic readiness synthesis. Pre-deployment security posture validation.
+
+### @tracehound/furies
+
+Adversarial validation & stress harness. Chaos engineering for security infrastructure.
 
 ---
 
-## Argos Pricing (Add-on)
+## Cockpit (Commercial — TBD)
 
-| Standalone | Bundle (with Pro) |
-| ---------- | ----------------- |
-| $49/mo     | +$29/mo           |
+### @tracehound/watchtower
+
+**What it is:**
+
+- Forensic cockpit
+- Operational visualization layer
+- Workflow accelerator
+
+**What it is NOT:**
+
+- Does not create evidence
+- Does not make security decisions
+- Not a security authority
+
+**Value:** Makes humans effective at using Tracehound substrate.
+
+---
+
+## Pricing Philosophy
+
+### Why Flat Pricing
+
+Per-seat and usage-based pricing:
+
+- Creates procurement friction
+- Encourages under-deployment
+- Penalizes correct security posture
+
+Flat pricing communicates: _This is infrastructure, not SaaS trivia._
+
+### Why No Runtime License Enforcement
+
+We explicitly reject:
+
+- Feature gates inside core security paths
+- License checks in hot paths
+- Expiration-driven behavior changes
+
+**Payment affects what you can add, not what you can see.**
+
+---
+
+## License Enforcement
+
+### Core Substrate
+
+**No enforcement.** Open source, MIT licensed.
+
+### Paid Satellites
+
+Standard commercial licensing:
+
+- License key via environment variable
+- No hot-path validation
+- Graceful degradation to substrate-only
 
 ---
 
 ## Self-Hosted vs Cloud
 
-| Feature  | Self-Hosted       | Cloud                |
-| -------- | ----------------- | -------------------- |
-| Price    | License cost      | License + Cloud tier |
-| Instance | Customer-managed  | Tracehound-managed   |
-| Data     | Customer premises | Tracehound Cloud     |
+| Aspect     | Self-Hosted       | Cloud (Future)    |
+| ---------- | ----------------- | ----------------- |
+| Substrate  | Free (OSS)        | Free (OSS)        |
+| Satellites | License cost      | SaaS subscription |
+| Data       | Customer premises | Tracehound Cloud  |
+| Support    | Community         | Priority SLA      |
 
-Cloud pricing TBD in Phase 5.5.
+---
+
+## Related Documents
+
+- [tracehound_open_core_product_licensing_rationale.md](./tracehound_open_core_product_licensing_rationale.md) — Strategic rationale
+- [GETTING-STARTED.md](./GETTING-STARTED.md) — Quick start guide

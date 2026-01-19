@@ -97,14 +97,17 @@
 
 ---
 
-## Pricing Strategy (Draft)
+## Pricing Strategy
 
-| Tier        | Target                   | Price    |
-| ----------- | ------------------------ | -------- |
-| Open Source | Indie devs, startups     | Free     |
-| Pro         | Growing SaaS             | $299/mo  |
-| Enterprise  | High-traffic, compliance | $999/mo  |
-| Edge Bundle | CF/Vercel users          | $1999/mo |
+> **Updated:** 2026-01-19
+
+| Tier       | Target                    | Price    |
+| ---------- | ------------------------- | -------- |
+| Starter    | Solo devs, small projects | $9/mo    |
+| Pro        | Growing SaaS              | $99/mo   |
+| Enterprise | High-traffic, compliance  | $499+/mo |
+
+See [pricing.md](./pricing.md) for full details.
 
 ---
 

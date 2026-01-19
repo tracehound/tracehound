@@ -22,7 +22,7 @@ describe('SecurityState', () => {
 
       expect(snapshot.threats.total).toBe(0)
       expect(snapshot.quarantine.count).toBe(0)
-      expect(snapshot.license.tier).toBe('community')
+      expect(snapshot.license.tier).toBe('starter')
       expect(snapshot.health).toBe('healthy')
     })
   })

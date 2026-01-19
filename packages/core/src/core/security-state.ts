@@ -44,7 +44,7 @@ export interface RateLimitStats {
  * License state.
  */
 export interface LicenseState {
-  tier: 'community' | 'pro' | 'enterprise'
+  tier: 'starter' | 'pro' | 'enterprise'
   status: 'valid' | 'expired' | 'grace' | 'invalid' | 'none'
   daysRemaining?: number | undefined
 }
@@ -128,7 +128,7 @@ export interface ISecurityState {
   updateLicense(
     tier: LicenseState['tier'],
     status: LicenseState['status'],
-    daysRemaining?: number
+    daysRemaining?: number,
   ): void
 
   /**
@@ -188,7 +188,7 @@ export class SecurityState implements ISecurityState {
   private _blockedSources = 0
 
   // License tracking
-  private _licenseTier: LicenseState['tier'] = 'community'
+  private _licenseTier: LicenseState['tier'] = 'starter'
   private _licenseStatus: LicenseState['status'] = 'none'
   private _licenseDaysRemaining: number | undefined = undefined
 
@@ -286,7 +286,7 @@ export class SecurityState implements ISecurityState {
   updateLicense(
     tier: LicenseState['tier'],
     status: LicenseState['status'],
-    daysRemaining?: number
+    daysRemaining?: number,
   ): void {
     this._licenseTier = tier
     this._licenseStatus = status

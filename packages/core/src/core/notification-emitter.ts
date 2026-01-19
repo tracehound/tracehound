@@ -71,12 +71,12 @@ export interface SystemPanicPayload {
 }
 
 export interface LicenseValidatedPayload {
-  tier: 'community' | 'pro' | 'enterprise'
+  tier: 'starter' | 'pro' | 'enterprise'
   daysRemaining?: number
 }
 
 export interface LicenseExpiredPayload {
-  tier: 'community' | 'pro' | 'enterprise'
+  tier: 'starter' | 'pro' | 'enterprise'
   gracePeriod: boolean
 }
 

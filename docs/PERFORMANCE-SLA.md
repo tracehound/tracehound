@@ -1,6 +1,6 @@
 # Performance SLA Specification
 
-> **Version:** 1.0
+> **Version:** 1.1
 > **Status:** Normative
 > **Applies to:** @tracehound/core v1.0.0+
 
@@ -89,11 +89,13 @@ Evidence is evicted based on:
 
 ### Process-Based Isolation
 
-| Tier       | Max Active | Memory Limit | Timeout      |
-| ---------- | ---------- | ------------ | ------------ |
-| Starter    | 1          | 64MB         | 5s           |
-| Pro        | 8          | 512MB        | 30s          |
-| Enterprise | Unlimited  | Configurable | Configurable |
+| Configuration    | Max Active | Memory Limit | Timeout      |
+| ---------------- | ---------- | ------------ | ------------ |
+| **Core Default** | 8          | 512MB        | 30s          |
+| **+ Horizon**    | Unlimited  | Configurable | Configurable |
+
+> **Note:** Core defaults are sensible for most workloads. Teams requiring
+> unlimited process pools should add `@tracehound/horizon` ($9, perpetual).
 
 ### IPC Overhead
 
@@ -110,7 +112,30 @@ Evidence is evicted based on:
 1. **Cold Storage writes** — Fire-and-forget, async
 2. **Notification delivery** — Async, may be throttled
 3. **HoundPool analysis** — Async, bounded by pool config
-4. **Multi-instance coordination** — Network-dependent
+4. **Multi-instance coordination** — Requires Horizon (see below)
+
+---
+
+## Horizon Extension
+
+`@tracehound/horizon` ($9, perpetual use) unlocks:
+
+| Capability                | Core Default | + Horizon |
+| ------------------------- | ------------ | --------- |
+| HoundPool processes       | 8 max        | Unlimited |
+| Multi-instance (Redis)    | ❌           | ✅        |
+| mTLS enforcement          | ❌           | ✅        |
+| Policy broker integration | ❌           | ✅        |
+
+Usage:
+
+```typescript
+// Import Horizon FIRST to inject extended config
+import '@tracehound/horizon'
+import { Agent } from '@tracehound/core'
+
+// Core now operates with extended limits
+```
 
 ---
 
@@ -121,7 +146,7 @@ All latency measurements assume:
 - Node.js 18+ LTS
 - Single-core normalized
 - Warm JIT (after 1000+ calls)
-- No GC pressure (< 70% heap usage)
+- No GC pressure (<70% heap usage)
 
 ---
 
@@ -129,3 +154,4 @@ All latency measurements assume:
 
 - [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md) — Failure behavior
 - [LOCAL-STATE-SEMANTICS.md](./LOCAL-STATE-SEMANTICS.md) — Instance isolation
+- [PRICING.md](./PRICING.md) — Package pricing

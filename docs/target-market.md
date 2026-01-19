@@ -100,14 +100,23 @@
 ## Pricing Strategy
 
 > **Updated:** 2026-01-19
+> **Model:** Open-Core + Paid Satellites
 
-| Tier       | Target                    | Price    |
-| ---------- | ------------------------- | -------- |
-| Starter    | Solo devs, small projects | $9/mo    |
-| Pro        | Growing SaaS              | $99/mo   |
-| Enterprise | High-traffic, compliance  | $499+/mo |
+| Layer      | Target                      | Price          |
+| ---------- | --------------------------- | -------------- |
+| Substrate  | Everyone                    | FREE (OSS)     |
+| Horizon    | Teams needing scale         | $9 (perpetual) |
+| Satellites | Enrichment & intelligence   | $49/pkg/mo     |
+| Advanced   | Validation & stress testing | $99/pkg/mo     |
+| Watchtower | Operational visualization   | Subscription   |
 
-See [pricing.md](./pricing.md) for full details.
+**Key Points:**
+
+- Core security features are FREE and open source
+- Flat per-package pricing, no per-seat or usage-based
+- Perpetual use with 12-month update entitlement
+
+See [PRICING.md](./PRICING.md) for full details.
 
 ---
 

@@ -119,7 +119,39 @@ These packages:
 - produce evidence
 - must remain operational regardless of payment
 
-### 4.2 Why This Must Be Open
+### 4.2 Horizon: The Config Extender ($9, Perpetual)
+
+`@tracehound/horizon` is a special package within the Substrate layer:
+
+- **Price:** $9 one-time, perpetual use
+- **Purpose:** Config injection for scale-out scenarios
+- **Distribution:** Private npm (same as satellites)
+
+**What Horizon Unlocks:**
+
+| Capability                | Core Default | + Horizon |
+| ------------------------- | ------------ | --------- |
+| HoundPool processes       | 8 max        | Unlimited |
+| Multi-instance (Redis)    | ❌           | ✅        |
+| mTLS enforcement          | ❌           | ✅        |
+| Policy broker integration | ❌           | ✅        |
+
+**Why This Pattern:**
+
+- Core defaults are sensible for 90% of workloads
+- Teams that need scale buy Horizon once
+- No runtime enforcement — config injection only
+- Codebase consumers don't see limits unless they hit them
+
+```typescript
+// Magic import pattern
+import '@tracehound/horizon'
+import { Agent } from '@tracehound/core'
+
+// Core now operates with extended limits
+```
+
+### 4.3 Why This Must Be Open
 
 Because Tracehound claims to be:
 

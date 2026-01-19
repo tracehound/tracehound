@@ -92,7 +92,6 @@
 | System Scheduler          | JitteredTickScheduler implementation ✅         | Done     |
 | Security State Refactor   | Unified state substrate ✅                      | Done     |
 | External Notification API | Universal event emission ✅                     | Done     |
-| License Validation        | Runtime license check (commercial tiers) ✅     | Done     |
 | Evidence Lifecycle Policy | Declarative retention / eviction policies ✅    | Done     |
 | Async Codec               | `@tracehound/codec-async` - Cold-path streaming | P1       |
 | Cold Storage Adapters     | `@tracehound/cold-s3`, `cold-r2`, `cold-gcs`    | P1       |
@@ -120,35 +119,35 @@
 - [x] IPC handles 100k req/s without blocking
 - [x] Fail-open behavior explicitly documented
 - [x] **Local State Semantics** documented (no global blocklists)
-- [x] License validation active for commercial tiers
 - [x] Notification API introduces zero backpressure
 - [x] Policies remain deploy-time, not runtime-interactive
 
 ---
 
-## Phase 4.5 — Internal Admin Panel (v1.1.5)
+## Phase 4.5 — Package Distribution Infrastructure (v1.1.5)
 
 > **Classification:** Internal infrastructure (not customer-facing)
 > **Access:** Tracehound team only
 
-**Goal:** License generation and customer management system
+**Goal:** Commercial satellite package distribution and access management
 **Timeline:** Parallel with Phase 4
 
 ### Core Components
 
-| Component          | Description                            | Priority |
-| ------------------ | -------------------------------------- | -------- |
-| License Generation | JWT signing with RS256 private key     | P0       |
-| Customer Registry  | Basic customer/organization management | P0       |
-| Tier Management    | Pro/Enterprise tier assignment         | P0       |
-| Revocation List    | License invalidation capability        | P1       |
-| Usage Analytics    | Anonymous telemetry aggregation        | P2       |
+| Component            | Description                                    | Priority |
+| -------------------- | ---------------------------------------------- | -------- |
+| npm Organization     | @tracehound scoped packages on npm             | P0       |
+| Private Registry     | Satellite packages via private npm (Verdaccio) | P0       |
+| Access Token System  | Per-customer npm auth tokens (time-bounded)    | P0       |
+| Distribution Webhook | Payment → token generation automation          | P1       |
+| Update Entitlement   | 12-month update window tracking                | P1       |
 
 ### Technical Notes
 
-- Private key **never** leaves this system
-- Runs only on internal infrastructure
-- Separate from customer-facing Cloud Dashboard
+- Satellites distributed via private npm, NOT runtime-locked
+- Access token grants package download, NOT runtime enforcement
+- Perpetual use of downloaded version (per OPEN_CORE_STRATEGY)
+- No kill-switches, no runtime license checks
 
 ---
 

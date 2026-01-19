@@ -1,12 +1,16 @@
-# Tracehound — White-Hat Presentation Prep
+# Tracehound — Presentation Prep
 
-## Quick Links (Show These)
+> **Updated:** 2026-01-19
+> **Model:** Open-Core + Paid Satellites
 
-| Resource | URL                   |
-| -------- | --------------------- |
-| Website  | tracehound.co         |
-| Pricing  | tracehound.co/pricing |
-| Docs     | tracehound/docs/      |
+## Quick Links
+
+| Resource | URL                    |
+| -------- | ---------------------- |
+| Website  | tracehound.co          |
+| Pricing  | tracehound.co/pricing  |
+| Packages | tracehound.co/packages |
+| Docs     | tracehound.co/docs     |
 
 ---
 
@@ -22,7 +26,7 @@
 
 ---
 
-## Core Value Props (White-Hat Angle)
+## Core Value Props
 
 ### 1. Fail-Open Semantics
 
@@ -50,15 +54,34 @@
 
 ---
 
-## Pricing Model (Capacity-Gating)
+## Open-Core Pricing Model
 
-| Tier       | Price    | Security | Capacity         |
-| ---------- | -------- | -------- | ---------------- |
-| Starter    | $9/mo    | Full ✓   | 1 process, 64MB  |
-| Pro        | $99/mo   | Full ✓   | 8 process, 512MB |
-| Enterprise | $499+/mo | Full ✓   | Unlimited + SLA  |
+| Layer          | Price              | Distribution |
+| -------------- | ------------------ | ------------ |
+| **Substrate**  | FREE (OSS)         | Public npm   |
+| **Satellites** | $49/mo per package | Private npm  |
+| **Advanced**   | $99/mo per package | Private npm  |
+| **Watchtower** | Subscription       | SaaS         |
 
-> **Key Point:** Güvenlik özellikleri tüm tier'larda aynı. Fark sadece kapasite.
+> **Key Points:**
+>
+> - Core security features are FREE and open source
+> - Payment unlocks capability, not safety
+> - Perpetual use with 12-month update entitlement
+> - No runtime license enforcement
+
+---
+
+## Satellite Packages
+
+| Package | Purpose                         | Status         |
+| ------- | ------------------------------- | -------------- |
+| Argos   | Runtime behavioral observation  | In Development |
+| Talos   | External policy execution       | Q2 2026        |
+| Huginn  | Threat intelligence ingestion   | Q2 2026        |
+| Muninn  | Historical ledger & aggregation | Q2 2026        |
+| Norns   | Readiness synthesis             | Q3 2026        |
+| Furies  | Adversarial stress harness      | Q3 2026        |
 
 ---
 
@@ -87,8 +110,8 @@
 ## Demo Flow (Önerilen)
 
 1. **Website Tour** (2 min)
-   - Pricing page — tier comparison
-   - Checkout flow
+   - Packages page — all satellites
+   - Pricing page — open-core model
 
 2. **Architecture Diagram** (3 min)
    - RFC-0000 flow chart
@@ -102,16 +125,24 @@
 4. **Docs Review** (5 min)
    - FAIL-OPEN-SPEC.md
    - PERFORMANCE-SLA.md
-   - LICENSE-ENFORCEMENT-SPEC.md
+   - OPEN_CORE_STRATEGY.md
 
 ---
 
 ## Q&A Prep (Olası Sorular)
 
-| Soru                   | Cevap                                              |
-| ---------------------- | -------------------------------------------------- |
-| "WAF'tan farkı ne?"    | WAF detect eder, biz quarantine + evidence         |
-| "Neden decision-free?" | Policy = external. Biz buffer'ız                   |
-| "Crack riski?"         | Ed25519 signing + machine fingerprint + heartbeat  |
-| "Free tier neden yok?" | Security product = sürekli çalışmalı. Free = sorun |
-| "Multi-instance?"      | Local state. Global = Enterprise (Redis)           |
+| Soru                   | Cevap                                                      |
+| ---------------------- | ---------------------------------------------------------- |
+| "WAF'tan farkı ne?"    | WAF detect eder, biz quarantine + evidence                 |
+| "Neden decision-free?" | Policy = external. Biz buffer'ız                           |
+| "Neden open-core?"     | Security substrate must be trustworthy. Open = inspectable |
+| "Multi-instance?"      | Local state. Global coordination = satellite package       |
+| "Perpetual use?"       | Evet, indirilen versiyon sonsuza kadar çalışır             |
+
+---
+
+## Related Documents
+
+- [OPEN_CORE_STRATEGY.md](./OPEN_CORE_STRATEGY.md) — Licensing rationale
+- [PRICING.md](./PRICING.md) — Pricing details
+- [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md) — Failure semantics

@@ -1,6 +1,6 @@
 # Local State Semantics
 
-> **Version:** 1.0
+> **Version:** 1.1
 > **Status:** Normative
 > **Applies to:** @tracehound/core v1.0.0+
 
@@ -68,18 +68,20 @@ Each Tracehound instance maintains:
 
 If you need cross-instance coordination:
 
-| Requirement          | Solution             | Tier       |
-| -------------------- | -------------------- | ---------- |
-| Shared blocklist     | Redis coordination   | Enterprise |
-| Global rate limiting | Redis coordination   | Enterprise |
-| Evidence aggregation | Cold Storage + query | Pro+       |
-| Unified audit trail  | SIEM integration     | Enterprise |
+| Requirement          | Solution             | Package         |
+| -------------------- | -------------------- | --------------- |
+| Shared blocklist     | Redis coordination   | Horizon         |
+| Global rate limiting | Redis coordination   | Horizon         |
+| Evidence aggregation | Cold Storage + query | Core (async)    |
+| Unified audit trail  | SIEM integration     | Core (notifier) |
+
+> **Note:** Multi-instance coordination requires `@tracehound/horizon` ($9, perpetual).
 
 ---
 
 ## Why Local-First?
 
-1. **Simplicity** — No distributed systems complexity at lower tiers
+1. **Simplicity** — No distributed systems complexity by default
 2. **Performance** — No network round-trips for core operations
 3. **Reliability** — No Redis/network dependencies for basic security
 4. **Isolation** — Instance failure doesn't cascade to others
@@ -102,23 +104,38 @@ If you need cross-instance coordination:
            └───────────────┼───────────────┘
                            ▼
                     ┌─────────────┐
-                    │ Cold Storage│  ← Shared (Pro+)
+                    │ Cold Storage│  ← Shared
                     │ (S3/R2/GCS) │
                     └─────────────┘
 ```
 
-### Starter/Pro Pattern
+### Core Pattern (Default)
 
 - Each instance operates independently
 - Export to shared Cold Storage for aggregation
 - Query Cold Storage for cross-instance analysis
 
-### Enterprise Pattern
+### Horizon Pattern (Scale)
 
-- Redis coordination layer
-- Shared blocklist
+With `@tracehound/horizon`:
+
+- Redis/KeyDB coordination layer
+- Shared blocklist across instances
 - Global rate limiting
 - Real-time cross-instance sync
+
+```typescript
+import '@tracehound/horizon'
+import { Agent } from '@tracehound/core'
+
+// Configure coordination
+Agent.configure({
+  horizon: {
+    redis: 'redis://cluster:6379',
+    sync: ['blocklist', 'rateLimit'],
+  },
+})
+```
 
 ---
 
@@ -126,3 +143,4 @@ If you need cross-instance coordination:
 
 - [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md) — Failure behavior
 - [PERFORMANCE-SLA.md](./PERFORMANCE-SLA.md) — Latency guarantees
+- [PRICING.md](./PRICING.md) — Package pricing

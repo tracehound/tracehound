@@ -2,21 +2,24 @@
 
 > **Model:** Open-Core + Paid Satellites
 > **Core Principle:** Monetize capability, not safety.
+> **Licensing:** Perpetual use with time-bounded update entitlement (12 months)
 
 ---
 
 ## Architecture Layers
 
-| Layer          | Access           | Packages                                | Purpose                                            |
-| -------------- | ---------------- | --------------------------------------- | -------------------------------------------------- |
-| **Substrate**  | Open Source      | @tracehound/core, express, fastify, cli | Deterministic evidence, interception, containment. |
-| **Satellites** | Paid ($49)       | Argos, Talos, Huginn, Muninn            | Enrichment, policy, threat intel, ledger.          |
-| **Advanced**   | Enterprise ($99) | Norns, Furies                           | Readiness synthesis, adversarial stress.           |
-| **Cockpit**    | Commercial       | Watchtower                              | Visualization, management panel.                   |
+| Layer          | Access             | Packages                                         | Purpose                                            |
+| -------------- | ------------------ | ------------------------------------------------ | -------------------------------------------------- |
+| **Substrate**  | Free & Open Source | @tracehound/core, express, fastify, cli, horizon | Deterministic evidence, interception, containment. |
+| **Satellites** | $49/mo per package | Argos, Talos, Huginn, Muninn                     | Enrichment, policy, threat intel, ledger.          |
+| **Advanced**   | $99/mo per package | Norns, Furies                                    | Readiness synthesis, adversarial stress.           |
+| **Watchtower** | Subscription       | Watchtower                                       | Visualization, workflow acceleration.              |
+
+> **Note:** Horizon ($9 perpetual) is part of the Substrate layer. It extends core defaults for scale-out scenarios.
 
 ---
 
-## Substrate (Open Source)
+## Substrate (Free & Open Source)
 
 **Packages:**
 
@@ -27,7 +30,7 @@
 
 **Invariants:**
 
-- No hot-path licensing
+- No runtime licensing
 - No degradation based on payment state
 - Fully inspectable source code
 - Operates regardless of commercial status
@@ -38,9 +41,39 @@
 - Quarantine buffer
 - AuditChain (Merkle)
 - RateLimiter
-- HoundPool (process isolation)
+- HoundPool (8 processes max by default)
 - Evidence Factory
 - Fail-Safe
+
+---
+
+## Horizon ($9 perpetual)
+
+**What it is:** Config extender for scale-out scenarios.
+
+`@tracehound/horizon` unlocks:
+
+| Capability                | Core Default | + Horizon |
+| ------------------------- | ------------ | --------- |
+| HoundPool processes       | 8 max        | Unlimited |
+| Multi-instance (Redis)    | ❌           | ✅        |
+| mTLS enforcement          | ❌           | ✅        |
+| Policy broker integration | ❌           | ✅        |
+
+**Why $9 Perpetual:**
+
+- One-time purchase, use forever
+- Low barrier for teams that need to scale
+- No monthly commitment for infrastructure extension
+
+**Usage:**
+
+```typescript
+import '@tracehound/horizon' // Must be FIRST
+import { Agent } from '@tracehound/core'
+
+// Core now operates with extended limits
+```
 
 ---
 
@@ -68,7 +101,7 @@ Historical ledger & aggregation. Time-series analysis and long-term pattern stor
 
 ## Advanced ($99/mo per package)
 
-**Target:** Enterprise teams requiring validation and readiness.
+**Target:** Teams requiring validation and stress testing.
 
 ### @tracehound/norns
 
@@ -80,7 +113,7 @@ Adversarial validation & stress harness. Chaos engineering for security infrastr
 
 ---
 
-## Cockpit (Commercial — TBD)
+## Watchtower (Subscription)
 
 ### @tracehound/watchtower
 
@@ -96,13 +129,13 @@ Adversarial validation & stress harness. Chaos engineering for security infrastr
 - Does not make security decisions
 - Not a security authority
 
-**Value:** Makes humans effective at using Tracehound substrate.
+**Why Subscription?** Watchtower is an operational interface, not a security substrate. Its value derives from continuous evolution, schema alignment, and UX iteration.
 
 ---
 
 ## Pricing Philosophy
 
-### Why Flat Pricing
+### Flat Per-Package Pricing
 
 Per-seat and usage-based pricing:
 
@@ -112,46 +145,54 @@ Per-seat and usage-based pricing:
 
 Flat pricing communicates: _This is infrastructure, not SaaS trivia._
 
-### Why No Runtime License Enforcement
+### Perpetual Use with Time-Bounded Updates
+
+When a satellite package is purchased:
+
+1. Customer receives **perpetual right to use the acquired version**
+2. Updates and security fixes provided for **12 months**
+3. After 12 months, existing version continues working indefinitely
+4. Renewal grants access to new releases
+
+### No Runtime Enforcement
 
 We explicitly reject:
 
 - Feature gates inside core security paths
-- License checks in hot paths
+- Runtime license checks
 - Expiration-driven behavior changes
+- Kill-switches
 
-**Payment affects what you can add, not what you can see.**
+**Payment affects what you can download, not what you can run.**
 
 ---
 
-## License Enforcement
+## Distribution Model
 
 ### Core Substrate
 
-**No enforcement.** Open source, MIT licensed.
+**Public npm.** Open source, MIT licensed.
+
+```bash
+npm install @tracehound/core
+```
 
 ### Paid Satellites
 
-Standard commercial licensing:
+**Private npm registry.** Access via per-customer auth token.
 
-- License key via environment variable
-- No hot-path validation
-- Graceful degradation to substrate-only
+```bash
+npm login --registry=https://npm.tracehound.co
+npm install @tracehound/argos
+```
 
----
-
-## Self-Hosted vs Cloud
-
-| Aspect     | Self-Hosted       | Cloud (Future)    |
-| ---------- | ----------------- | ----------------- |
-| Substrate  | Free (OSS)        | Free (OSS)        |
-| Satellites | License cost      | SaaS subscription |
-| Data       | Customer premises | Tracehound Cloud  |
-| Support    | Community         | Priority SLA      |
+- Token grants download access for 12 months
+- Downloaded packages work forever (perpetual use)
+- No runtime phone-home or validation
 
 ---
 
 ## Related Documents
 
-- [tracehound_open_core_product_licensing_rationale.md](./tracehound_open_core_product_licensing_rationale.md) — Strategic rationale
+- [OPEN_CORE_STRATEGY.md](./OPEN_CORE_STRATEGY.md) — Strategic rationale
 - [GETTING-STARTED.md](./GETTING-STARTED.md) — Quick start guide

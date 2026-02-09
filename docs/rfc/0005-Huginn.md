@@ -1,4 +1,4 @@
-# RFC-0005: ThreatIntelAdapter — External Threat Feed Integration
+# RFC-0005: Huginn — External Threat Feed Integration
 
 ## Metadata
 
@@ -32,13 +32,13 @@ This RFC introduces **optional** threat intelligence enrichment.
 
 ## Core Principle: Enrichment, Not Detection
 
-**ThreatIntelAdapter does NOT detect threats.**
+**Huginn does NOT detect threats.**
 
 ```
 ThreatEntry (from quarantine)
         │
         ▼
-ThreatIntelAdapter (lookup)
+Huginn (lookup)
         │
         ▼
 EnrichedThreat (metadata added)
@@ -77,7 +77,7 @@ interface EnrichedThreat extends ThreatEntry {
   }
 }
 
-interface ThreatIntelAdapterConfig {
+interface HuginnConfig {
   /** Intel sources to query */
   sources: ThreatIntelSource[]
 
@@ -109,7 +109,7 @@ interface ThreatIntelAdapterConfig {
 ## Integration Pattern
 
 ```ts
-const intelAdapter = createThreatIntelAdapter({
+const intelAdapter = cueateHUginn({
   sources: [abuseIPDBSource({ apiKey: '...' }), projectHoneypotSource({ accessKey: '...' })],
   cacheTTL: 3600_000, // 1 hour
   queryTimeout: 5000,

@@ -1,4 +1,4 @@
-# Tracehound – RFC-0000 [Locked]
+# RFC-0000: Tracehound – Core [Locked]
 
 ## Özet
 
@@ -156,7 +156,7 @@ intercept({
 // → Quarantine
 ```
 
-2. **Raw scent** (no threat signal)
+1. **Raw scent** (no threat signal)
 
 ```ts
 intercept({ id, payload, source, timestamp })

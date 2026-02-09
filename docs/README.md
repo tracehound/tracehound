@@ -1,6 +1,6 @@
 # Documentation Index
 
-> **Last Updated:** 2026-01-19
+> **Last Updated:** 2026-02-10
 > **Version:** v1.0.0 Stable
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
@@ -37,19 +37,23 @@
 | [0000-Proposal.md](./rfc/0000-Proposal.md)             | 🔒 Locked      | Core architecture (normative)       |
 | [0001-SecurityState.md](./rfc/0001-SecurityState.md)   | ✅ Implemented | Unified state substrate             |
 | [0002-Argos.md](./rfc/0002-Argos.md)                   | 📋 Planned     | Runtime observer (separate product) |
-| [0003-ThreatLedger.md](./rfc/0003-ThreatLedger.md)     | 📋 Planned     | Muninn - threat metadata archive    |
-| [0004-ResponseEngine.md](./rfc/0004-ResponseEngine.md) | 📋 Planned     | Talos - policy-driven response      |
-| [0005-ThreatIntel.md](./rfc/0005-ThreatIntel.md)       | 📋 Planned     | Huginn - external threat feeds      |
+| [0003-Talos.md](./rfc/0003-Talos.md)                   | 📋 Planned     | Talos — policy-driven response      |
+| [0004-Muninn.md](./rfc/0004-Muninn.md)                 | 📋 Planned     | Muninn — threat metadata substrate  |
+| [0005-Huginn.md](./rfc/0005-Huginn.md)                 | 📋 Planned     | Huginn — external threat feeds      |
+| [0006-Heimdall.md](./rfc/0006-Heimdall.md)             | 📋 Planned     | Heimdall — supply chain security    |
+| [0007-Loki.md](./rfc/0007-Loki.md)                     | 📋 Planned     | Loki — passive deception & tarpit   |
+| [0008-RustCorePivot.md](./rfc/0008-RustCorePivot.md)   | 📋 Planned     | Rust core pivot strategy            |
 
 ---
 
 ## Planning & Strategy
 
-| Document                               | Status       | Description                        |
-| -------------------------------------- | ------------ | ---------------------------------- |
-| [ROADMAP.md](./ROADMAP.md)             | ✅ Active    | Development phases & timeline      |
-| [TARGET-MARKET.md](./TARGET-MARKET.md) | ⚠️ Draft     | Market analysis (pricing outdated) |
-| [NAMING.md](./NAMING.md)               | 📚 Reference | Product naming convention          |
+| Document                                         | Status       | Description                          |
+| ------------------------------------------------ | ------------ | ------------------------------------ |
+| [ROADMAP.md](./ROADMAP.md)                       | ✅ Active    | Development phases & timeline        |
+| [STRATEGY.md](./STRATEGY.md)                     | ✅ Active    | GTM strategy & market analysis       |
+| [NAMING.md](./NAMING.md)                         | 📚 Reference | Product naming convention            |
+| [PRESENTATION-PREP.md](./PRESENTATION-PREP.md)   | 📚 Reference | Investor/demo preparation notes      |
 
 ---
 

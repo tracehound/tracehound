@@ -1,4 +1,4 @@
-# RFC-0004: ResponseEngine — External Policy-Driven Response
+# RFC-0003: Talos — External Policy-Driven Response
 
 ## Metadata
 
@@ -30,7 +30,7 @@ This RFC introduces an **optional** response capability that remains **decision-
 **ResponseEngine does NOT make decisions.**
 
 ```
-ThreatLedger statistics
+Talos statistics
         │
         ▼
 External Policy Engine (customer-controlled)
@@ -109,7 +109,7 @@ const tracehound = createTracehound({
 
 // Policy evaluation loop (external)
 setInterval(() => {
-  const stats = tracehound.threatLedger.getStats()
+  const stats = tracehound.Talos.getStats()
   const actions = policyEngine.evaluate(stats)
 
   for (const action of actions) {

@@ -1,0 +1,62 @@
+---
+description: RFC authoring standards, lifecycle management, and governance rules for Tracehound design documents.
+globs: "docs/rfc/**"
+alwaysApply: false
+---
+
+# RFC Governance
+
+## Numbering
+
+- Sequential 4-digit zero-padded: `0009`, `0010`, `0011`...
+- Check existing RFCs before assigning. No gaps, no reuse of retired numbers.
+- Filename format: `NNNN-ShortName.md` (e.g., `0009-DistributedSync.md`)
+
+## RFC Status Lifecycle
+
+```
+Draft -> Review -> Approved -> Implemented -> Locked
+```
+
+- **Draft:** Initial proposal. Open for major structural changes.
+- **Review:** Design frozen. Only clarifications and security fixes.
+- **Approved:** Ready for implementation. No design changes without new RFC.
+- **Implemented:** Code exists and tests pass. Reference commit/PR.
+- **Locked:** Normative and immutable. NEVER edit a Locked RFC (e.g., RFC-0000).
+
+Status MUST be declared in RFC header. Backward transitions (e.g., Approved -> Draft) require explicit justification.
+
+## Required Sections
+
+Every RFC MUST contain these sections in order:
+
+1. **Title and Metadata** -- RFC number, status, author, date
+2. **Motivation** -- Why this change is needed. What problem it solves.
+3. **Design** -- Technical specification. Data structures, APIs, algorithms.
+4. **Security Considerations** -- Threat model specific to this RFC:
+   - Attack vectors introduced or mitigated
+   - Trust boundary changes
+   - Cryptographic implications
+   - Fail-open / fail-closed behavior
+5. **Performance Impact** -- Latency, memory, CPU estimates. Benchmarks if available.
+6. **Backward Compatibility** -- Breaking changes, migration path, deprecation timeline.
+7. **Test Plan** -- What tests validate this RFC. Coverage expectations.
+8. **Alternatives Considered** -- What was rejected and why.
+
+## Cross-Reference Rules
+
+- If an RFC depends on another RFC, include explicit link: `Depends on: RFC-NNNN`
+- If an RFC supersedes another: `Supersedes: RFC-NNNN`
+- Implementation references: `Implemented in: packages/core/src/core/<file>.ts`
+
+## Security Review Gate
+
+- Every RFC MUST have a "Security Considerations" section. Empty = rejected.
+- RFCs introducing new IPC, network, or storage mechanisms require explicit threat model.
+- RFCs modifying evidence lifecycle, hash chain, or signature generation are HIGH RISK and require extra scrutiny.
+
+## Naming in RFCs
+
+- Use Tracehound domain terminology (Scent, Evidence, Quarantine, Hound, Agent).
+- New domain terms introduced in an RFC become canon upon Approved status.
+- Do not redefine existing terms. Extend via composition, not redefinition.

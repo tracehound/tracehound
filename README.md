@@ -12,7 +12,7 @@
 - **[Getting Started](./docs/GETTING-STARTED.md)** - Installation and quick start
 - **[Configuration Reference](./docs/CONFIGURATION.md)** - All configuration options
 - **[API Documentation](./docs/API.md)** - Complete API reference
-- **[Roadmap](./docs/roadmap.md)** - Development phases and timeline
+- **[Roadmap](./docs/ROADMAP.md)** - Development phases and timeline
 
 ## Installation
 
@@ -69,16 +69,6 @@ External Detector (WAF, SIEM, ML)
 3. **Payload-Less:** No raw payload exposure outside quarantine.
 4. **GC-Independent:** Explicit lifecycle management.
 
-## Commercial Tiers
-
-| Tier           | Price    | Features                                      |
-| -------------- | -------- | --------------------------------------------- |
-| **Starter**    | $9/mo    | Full security, HoundPool (1 proc, 64MB)       |
-| **Pro**        | $99/mo   | Scaled HoundPool, Cold Storage, Notifications |
-| **Enterprise** | $499+/mo | Unlimited, Multi-instance, SIEM, SLA          |
-
-See [pricing.md](./docs/pricing.md) for details.
-
 ## Project Structure
 
 - **[`@tracehound/core`](./packages/core)**: The core logic engine
@@ -89,12 +79,15 @@ See [pricing.md](./docs/pricing.md) for details.
 ## RFCs
 
 - [RFC-0000: Core Architecture](./docs/rfc/0000-Proposal.md) - Locked
-- [RFC-0001: SecurityState](./docs/rfc/0001-SecurityState.md) - ✅ Implemented
+- [RFC-0001: Core SecurityState](./docs/rfc/0001-SecurityState.md) - ✅ Implemented
 - [RFC-0002: Argos](./docs/rfc/0002-Argos.md) - Draft
-- [RFC-0003: ThreatLedger](./docs/rfc/0003-ThreatLedger.md) - Draft
-- [RFC-0004: ResponseEngine](./docs/rfc/0004-ResponseEngine.md) - Draft
-- [RFC-0005: ThreatIntel](./docs/rfc/0005-ThreatIntel.md) - Draft
+- [RFC-0003: Talos](./docs/rfc/0003-Talos.md) - Draft
+- [RFC-0004: Muninn](./docs/rfc/0004-Muninn.md) - Draft
+- [RFC-0005: Huginn](./docs/rfc/0005-Huginn.md) - Draft
+- [RFC-0006: Heimdall](./docs/rfc/0006-Heimdall.md) - Draft
+- [RFC-0007: Loki](./docs/rfc/0007-Loki.md) - Draft
+- [RFC-0008: Rust Core Pivot](./docs/rfc/0008-RustCorePivot.md) - Draft
 
 ## License
 
-Commercial (Community / Pro / Enterprise)
+Open-Core (Substrate: OSS, Satellites: Commercial). See [PRICING.md](./docs/PRICING.md).

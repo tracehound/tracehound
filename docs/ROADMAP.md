@@ -11,9 +11,9 @@
 
 | Initiative               | Description                                              | Target Phase |
 | ------------------------ | -------------------------------------------------------- | ------------ |
-| **@tracehound/heimdall** | Supply chain security: CI/CD izleme, paket tarama, rapor | Phase 5.5    |
-| **AI Detection Engine**  | Cluster.127 stack ile threat detection modeli            | Phase 7+     |
-| **Multi-Runtime Ports**  | Rust, Python, Go adaptasyonu                             | Phase 8+     |
+| **@tracehound/heimdall** | Supply chain security: CI/CD monitoring, package scanning, reporting | Phase 5.5    |
+| **AI Detection Engine**  | Threat detection model via Cluster.127 stack             | Phase 7+     |
+| **Multi-Runtime Ports**  | Rust, Python, Go adaptation                              | Phase 8+     |
 | **Influencer Strategy**  | White-hat hacker spokesperson                            | GTM Phase 1  |
 | **Partnership Track**    | Datadog, Cloudflare API-first SLA                        | Phase 7+     |
 
@@ -101,7 +101,7 @@
 | Report Generator       | PDF/JSON compliance-ready reports            | P1       |
 | Quarantine Integration | Flag suspicious deps → Tracehound quarantine | P2       |
 
-**Rationale:** Supply chain attacks = %55+ of Node.js security incidents by 2026
+**Rationale:** Supply chain attacks = 55%+ of Node.js security incidents by 2026
 
 ---
 
@@ -220,7 +220,7 @@
 
 - [ ] Open source launch (npm, GitHub)
 - [ ] Dev.to / HackerNews presence
-- [ ] "WAF Sonrası Ne Oldu?" blog series
+- [ ] "What Happens After WAF?" blog series
 - [ ] White-hat hacker spokesperson deal
 
 ### Phase G2: Startup Sales (Q3-Q4 2026)
@@ -244,7 +244,7 @@
 | Tier              | Price        | Classification            |
 | ----------------- | ------------ | ------------------------- |
 | **Substrate**     | FREE         | Open source core          |
-| **Horizon**       | $9 perpetual | Filter (caydırıcı)        |
+| **Horizon**       | $9 perpetual | Filter (deterrent)        |
 | **Role-Based**    | $49/mo       | Task-specific satellites  |
 | **Control-Based** | $99/mo       | Runtime manipulation      |
 | **Watchtower**    | $299/mo      | Dashboard + Control Plane |

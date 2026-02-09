@@ -1,4 +1,4 @@
-# RFC-0003: ThreatLedger — Threat Metadata Substrate
+# RFC-0004: Muninn — Threat Metadata Substrate
 
 ## Metadata
 
@@ -80,7 +80,7 @@ Bu RFC, **decision-free, observation-only threat metadata substrate** tanımlar.
                            ↓
         ┌──────────────────┼──────────────────┐
         ↓                  ↓                  ↓
-    ThreatLedger       Agent          Quarantine
+    Muninn       Agent          Quarantine
     (metadata)      (routing)         (evidence)
         ↓
     ┌───┴────┐
@@ -92,9 +92,9 @@ Bu RFC, **decision-free, observation-only threat metadata substrate** tanımlar.
 **Integration Points:**
 
 ```
-RFC-0000 Agent → ThreatLedger.record()
-RFC-0001 Security State Substrate ← ThreatLedger (separate namespace)
-RFC-0002 Argos + ThreatLedger → External Analytics
+RFC-0000 Agent → Muninn.record()
+RFC-0001 Security State Substrate ← Muninn (separate namespace)
+RFC-0002 Argos + Muninn → External Analytics
 ```
 
 ### Layer Model
@@ -133,10 +133,10 @@ RFC-0002 Argos + ThreatLedger → External Analytics
 
 ## Type Definitions
 
-### ThreatLedger Interface
+### Muninn Interface
 
 ```ts
-interface ThreatLedger {
+interface Muninn {
   /** Record threat metadata (sync, non-blocking) */
   record(entry: ThreatEntry): void
 
@@ -147,7 +147,7 @@ interface ThreatLedger {
   stats(): ThreatStats
 
   /** Observable snapshot (readonly) */
-  snapshot(): ThreatLedgerSnapshot
+  snapshot(): MuninnSnapshot
 
   /** Manual archive trigger */
   archive(signature: string): void
@@ -242,7 +242,7 @@ interface ArchivedThreatRecord {
 ### Configuration
 
 ```ts
-interface ThreatLedgerConfig {
+interface MuninnConfig {
   // HOT LAYER
   hot: {
     maxRecords: number // default: 10_000
@@ -350,7 +350,7 @@ const result = agent.intercept(scent)
 
 if (result.status === 'quarantined') {
   // Parallel recording (non-blocking)
-  threatLedger.record({
+  Muninn.record({
     signature: result.handle.signature,
     category: scent.threat.category,
     severity: scent.threat.severity,
@@ -752,9 +752,9 @@ class ThreatArchiveReader {
 ### Watcher Integration (RFC-0001)
 
 ```ts
-// Watcher observes ThreatLedger stats
+// Watcher observes Muninn stats
 watcher.on('snapshot', () => {
-  const stats = threatLedger.stats()
+  const stats = Muninn.stats()
 
   if (stats.recentBurst) {
     watcher.alert({
@@ -825,7 +825,7 @@ class ThreatMLTrainer {
 // Pattern extraction for cure development
 class CureDeveloper {
   async extractPatterns(category: ThreatCategory): Promise<CurePattern[]> {
-    const ledger = createThreatLedger(config)
+    const ledger = createMuninn(config)
     const records = ledger.query({
       category,
       minOccurrences: 10,
@@ -930,7 +930,7 @@ stats(): ThreatStats {
 
 | Aspect           | Guarantee                               |
 | ---------------- | --------------------------------------- |
-| Decision-making  | NONE - ThreatLedger is observation-only |
+| Decision-making  | NONE - Muninn is observation-only |
 | Authorization    | Query API is read-only                  |
 | Evidence access  | NO - evidence in Quarantine, not Ledger |
 | Payload exposure | NO - only metadata, no payload          |
@@ -939,7 +939,7 @@ stats(): ThreatStats {
 
 **Trust model:**
 
-- ThreatLedger metadata is **non-authoritative**
+- Muninn metadata is **non-authoritative**
 - External analytics MUST verify before decision
 - Archive integrity hash prevents silent corruption
 - No security decisions based solely on Ledger
@@ -963,7 +963,7 @@ stats(): ThreatStats {
 ## Configuration Example
 
 ```ts
-const ledgerConfig: ThreatLedgerConfig = {
+const ledgerConfig: MuninnConfig = {
   hot: {
     maxRecords: 10_000,
     maxSources: 1_000,
@@ -1003,7 +1003,7 @@ const ledgerConfig: ThreatLedgerConfig = {
   auditLog: (entry) => securityLogger.log(entry),
 }
 
-const threatLedger = createThreatLedger(ledgerConfig)
+const Muninn = createMuninn(ledgerConfig)
 ```
 
 ---

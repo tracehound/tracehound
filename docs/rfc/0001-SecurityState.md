@@ -1,4 +1,4 @@
-# RFC-0001: Security State Substrate (SecurityState)
+# RFC-0001: Core Security State Substrate (SecurityState)
 
 ## Metadata
 
@@ -29,9 +29,9 @@ Bu modül (`SecurityState`), standart JavaScript `Map` yapısını sarmalayarak 
 
 **Yeni Yaklaşım:**
 
-1.  **Pragmatizm:** V8 Heap ve JS Map kullanılarak hızlı implementasyon sağlanacak.
-2.  **Safety:** Standart Map yerine, `ISecurityState` arayüzü ile erişim kısıtlanacak.
-3.  **Governance:** PII tespiti, Audit Log ve Threat-Aware Eviction özellikleri "Logic Layer"da çözülecek.
+1. **Pragmatizm:** V8 Heap ve JS Map kullanılarak hızlı implementasyon sağlanacak.
+2. **Safety:** Standart Map yerine, `ISecurityState` arayüzü ile erişim kısıtlanacak.
+3. **Governance:** PII tespiti, Audit Log ve Threat-Aware Eviction özellikleri "Logic Layer"da çözülecek.
 
 ---
 

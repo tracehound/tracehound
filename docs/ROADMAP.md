@@ -53,9 +53,9 @@
 | Security State Refactor             | ✅ Done |
 | External Notification API           | ✅ Done |
 | Evidence Lifecycle Policy           | ✅ Done |
-| Async Codec                         | 🔄 P1   |
-| Cold Storage Adapters (S3, R2, GCS) | 🔄 P1   |
-| K8s Deployment Guide                | 🔄 P1   |
+| Async Codec                         | ✅ Done |
+| Cold Storage Adapters (S3, R2, GCS) | ✅ Done |
+| K8s Deployment Guide                | ✅ Done |
 
 ---
 

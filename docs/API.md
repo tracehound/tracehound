@@ -171,7 +171,7 @@ import {
   decodeWithIntegrity,
 } from '@tracehound/core'
 
-// Compression
+// Compression (sync — hot-path)
 const codec = createColdPathCodec()
 const compressed = codec.encode(buffer)
 const decompressed = codec.decode(compressed)
@@ -181,6 +181,68 @@ const encoded = encodeWithIntegrity(data)
 if (verify(encoded)) {
   const decoded = decodeWithIntegrity(encoded)
 }
+```
+
+### Async Codec (v1.1.0+)
+
+Non-blocking codec for cold storage and background operations.
+
+```ts
+import {
+  createAsyncColdPathCodec,
+  encodeWithIntegrityAsync,
+  decodeWithIntegrityAsync,
+  verify,
+} from '@tracehound/core'
+
+// Async compression (non-blocking — cold-path)
+const asyncCodec = createAsyncColdPathCodec()
+const compressed = await asyncCodec.encode(buffer)
+const decompressed = await asyncCodec.decode(compressed)
+
+// Async integrity (cold storage write/read)
+const encoded = await encodeWithIntegrityAsync(data)
+if (verify(encoded)) {
+  const decoded = await decodeWithIntegrityAsync(encoded)
+}
+```
+
+**Note:** Async codec produces byte-identical output to sync codec. Sync and async encoded payloads are fully interoperable.
+
+---
+
+### S3 Cold Storage (v1.1.0+)
+
+S3-compatible cold storage adapter. Supports AWS S3, Cloudflare R2, GCS, MinIO.
+
+```ts
+import { createS3ColdStorage } from '@tracehound/core'
+import type { S3LikeClient } from '@tracehound/core'
+
+// Provide your own S3-compatible client (zero AWS SDK dependency in core)
+const client: S3LikeClient = {
+  putObject: (p) => s3.send(new PutObjectCommand(p)).then(() => {}),
+  getObject: (p) => s3.send(new GetObjectCommand(p)).then(r => ({
+    Body: new Uint8Array(await r.Body!.transformToByteArray())
+  })),
+  deleteObject: (p) => s3.send(new DeleteObjectCommand(p)).then(() => {}),
+  headBucket: (p) => s3.send(new HeadBucketCommand(p)).then(() => {}),
+}
+
+const coldStorage = createS3ColdStorage({
+  client,
+  bucket: 'tracehound-evidence',
+  prefix: 'prod/evidence/',
+})
+
+// Write evidence
+const result = await coldStorage.write('ev-001', encodedPayload)
+
+// Read evidence
+const readResult = await coldStorage.read('ev-001')
+
+// Check availability
+const available = await coldStorage.isAvailable()
 ```
 
 ---

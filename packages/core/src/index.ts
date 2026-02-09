@@ -175,8 +175,22 @@ export { serialize } from './utils/serialize.js'
 // Utils - Security
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createColdPathCodec, createHotPathCodec, GzipCodec } from './utils/binary-codec.js'
-export type { CodecStats, ColdPathCodec, HotPathCodec } from './utils/binary-codec.js'
+export {
+  AsyncGzipCodec,
+  createAsyncColdPathCodec,
+  createColdPathCodec,
+  createHotPathCodec,
+  decodeWithIntegrityAsync,
+  encodeWithIntegrityAsync,
+  GzipCodec,
+} from './utils/binary-codec.js'
+export type {
+  AsyncColdPathCodec,
+  AsyncHotPathCodec,
+  CodecStats,
+  ColdPathCodec,
+  HotPathCodec,
+} from './utils/binary-codec.js'
 export { constantTimeBufferEqual, constantTimeEqual } from './utils/compare.js'
 export { encodePayload, estimatePayloadSize } from './utils/encode.js'
 export type { EncodeResult } from './utils/encode.js'
@@ -191,6 +205,13 @@ export type {
   ColdStorageWriteResult,
   IColdStorageAdapter,
 } from './core/cold-storage.js'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core - S3 Cold Storage
+// ─────────────────────────────────────────────────────────────────────────────
+
+export { createS3ColdStorage, S3ColdStorage } from './core/s3-cold-storage.js'
+export type { S3ColdStorageConfig, S3LikeClient } from './core/s3-cold-storage.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Trust Boundary

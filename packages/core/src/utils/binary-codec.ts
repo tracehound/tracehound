@@ -12,8 +12,12 @@
  * - Empty payloads are VALID (originalSize=0, compressedSize>0)
  */
 
-import { gunzipSync, gzipSync } from 'node:zlib'
+import { promisify } from 'node:util'
+import { gunzip, gunzipSync, gzip, gzipSync } from 'node:zlib'
 import { hashBuffer } from './hash.js'
+
+const gzipAsync = promisify(gzip)
+const gunzipAsync = promisify(gunzip)
 
 /**
  * Hot-path codec interface.
@@ -141,6 +145,98 @@ export function createColdPathCodec(): ColdPathCodec {
 }
 
 // ============================================================================
+// ASYNC CODEC (Phase 4 P1 - Cold Storage / Background Operations)
+// ============================================================================
+
+/**
+ * Async hot-path codec interface.
+ * Non-blocking encode for background operations.
+ */
+export interface AsyncHotPathCodec {
+  /** Async encode bytes to compressed format. */
+  encode(bytes: Uint8Array): Promise<Uint8Array>
+}
+
+/**
+ * Async cold-path codec interface.
+ * Non-blocking encode + decode for cold storage operations.
+ * Extends AsyncHotPathCodec with decode capability.
+ */
+export interface AsyncColdPathCodec extends AsyncHotPathCodec {
+  /** Async decode compressed bytes back to original. */
+  decode(bytes: Uint8Array): Promise<Uint8Array>
+}
+
+/**
+ * Async gzip codec implementation.
+ * Uses Node.js non-blocking zlib for cold storage and background operations.
+ *
+ * USAGE:
+ * - Cold storage write/read (never blocks the event loop)
+ * - Batch evidence evacuation
+ * - Background forensic analysis
+ *
+ * NOT for hot-path — use GzipCodec (sync) for Agent/EvidenceFactory.
+ */
+export class AsyncGzipCodec implements AsyncColdPathCodec {
+  private _encodeCount = 0
+  private _decodeCount = 0
+  private _totalInputBytes = 0
+  private _totalOutputBytes = 0
+
+  /**
+   * Async encode bytes using gzip compression.
+   * Non-blocking — yields to event loop during compression.
+   */
+  async encode(bytes: Uint8Array): Promise<Uint8Array> {
+    this._encodeCount++
+    this._totalInputBytes += bytes.length
+
+    const compressed = await gzipAsync(bytes, { level: 6 })
+    const result = new Uint8Array(compressed)
+    this._totalOutputBytes += result.length
+
+    return result
+  }
+
+  /**
+   * Async decode gzip compressed bytes.
+   * Non-blocking — yields to event loop during decompression.
+   */
+  async decode(bytes: Uint8Array): Promise<Uint8Array> {
+    this._decodeCount++
+
+    const decompressed = await gunzipAsync(bytes)
+    return new Uint8Array(decompressed)
+  }
+
+  /**
+   * Get codec statistics (immutable snapshot).
+   */
+  get stats(): Readonly<CodecStats> {
+    const ratio = this._totalInputBytes > 0 ? this._totalOutputBytes / this._totalInputBytes : 0
+
+    return Object.freeze({
+      encodeCount: this._encodeCount,
+      decodeCount: this._decodeCount,
+      totalInputBytes: this._totalInputBytes,
+      totalOutputBytes: this._totalOutputBytes,
+      compressionRatio: ratio,
+    })
+  }
+}
+
+/**
+ * Create an async cold-path codec (encode + decode).
+ * Use for cold storage operations where blocking is unacceptable.
+ *
+ * @returns AsyncColdPathCodec with non-blocking encode/decode
+ */
+export function createAsyncColdPathCodec(): AsyncColdPathCodec {
+  return new AsyncGzipCodec()
+}
+
+// ============================================================================
 // COLD STORAGE INTEGRITY (RFC-0000 Binary Codec: gzip + SHA-256)
 // ============================================================================
 
@@ -227,5 +323,55 @@ export function decodeWithIntegrity(encoded: EncodedPayload): Uint8Array {
     // Decompression failure = integrity violation or storage corruption
     // NEVER swallow this error - propagate for Fail-Safe handling
     throw new CodecError('Decompression failed - possible storage corruption', 'DECODE_FAILED', err)
+  }
+}
+
+// ============================================================================
+// ASYNC COLD STORAGE INTEGRITY (Non-blocking encode/decode for cold storage)
+// ============================================================================
+
+/**
+ * Async encode payload for cold storage with integrity hash.
+ * Non-blocking version of encodeWithIntegrity().
+ *
+ * Use for cold storage write operations where event loop must not stall.
+ *
+ * @param payload - Raw bytes to encode
+ * @returns Encoded payload with hash
+ * @throws CodecError if compression fails
+ */
+export async function encodeWithIntegrityAsync(payload: Uint8Array): Promise<EncodedPayload> {
+  try {
+    const compressed = await gzipAsync(payload, { level: 6 })
+    const compressedBytes = new Uint8Array(compressed)
+    const hash = hashBuffer(compressedBytes)
+
+    return {
+      compressed: compressedBytes,
+      hash,
+      originalSize: payload.length,
+      compressedSize: compressedBytes.length,
+    }
+  } catch (err) {
+    throw new CodecError('Async compression failed', 'ENCODE_FAILED', err)
+  }
+}
+
+/**
+ * Async decode payload from cold storage.
+ * Non-blocking version of decodeWithIntegrity().
+ *
+ * CRITICAL: Call verify() first. Decoding untrusted data wastes CPU.
+ *
+ * @param encoded - Verified encoded payload
+ * @returns Original uncompressed bytes
+ * @throws CodecError if decompression fails (storage corruption)
+ */
+export async function decodeWithIntegrityAsync(encoded: EncodedPayload): Promise<Uint8Array> {
+  try {
+    const decompressed = await gunzipAsync(encoded.compressed)
+    return new Uint8Array(decompressed)
+  } catch (err) {
+    throw new CodecError('Async decompression failed - possible storage corruption', 'DECODE_FAILED', err)
   }
 }

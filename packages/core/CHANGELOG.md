@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - Phase 4 P1
+## [1.1.0] - 2026-02-10 - Production Hardening (Phase 4 P1)
 
 ### Added
 
@@ -41,7 +41,9 @@ All notable changes to this project will be documented in this file.
 
 ### Tests
 
-- 437 tests passing (+33 new: 19 async codec, 14 S3 adapter)
+- 479 tests passing across 32 test files (+75 new)
+  - 19 async codec, 14 S3 adapter
+  - 10 async codec stress, 7 cold storage pipeline, 25 envelope integrity
 
 ---
 

@@ -242,4 +242,4 @@ type InterceptResult =
 
 ## License
 
-Commercial (Enterprise / Premium)
+Apache 2.0 (Substrate). See [LICENSE](../LICENSE) and [Pricing](./PRICING.md) for commercial tiers.

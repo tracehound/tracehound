@@ -88,6 +88,11 @@ External Detector (WAF, SIEM, ML)
 - [RFC-0007: Loki](./docs/rfc/0007-Loki.md) - Draft
 - [RFC-0008: Rust Core Pivot](./docs/rfc/0008-RustCorePivot.md) - Draft
 
+## Security
+
+See [SECURITY.md](./SECURITY.md) for vulnerability reporting policy.
+See [Security Audit Roadmap](./docs/SECURITY-AUDIT.md) for audit plan.
+
 ## License
 
-Open-Core (Substrate: OSS, Satellites: Commercial). See [PRICING.md](./docs/PRICING.md).
+Apache 2.0 (Substrate: OSS, Satellites: Commercial). See [LICENSE](./LICENSE) and [PRICING.md](./docs/PRICING.md).

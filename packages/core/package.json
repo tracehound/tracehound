@@ -1,6 +1,28 @@
 {
   "name": "@tracehound/core",
   "version": "1.0.0",
+  "description": "Deterministic runtime security buffer for high-velocity APIs",
+  "license": "Apache-2.0",
+  "author": "Tracehound <hello@tracehound.dev>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tracehound/tracehound.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/tracehound/tracehound#readme",
+  "bugs": {
+    "url": "https://github.com/tracehound/tracehound/issues"
+  },
+  "keywords": [
+    "security",
+    "runtime",
+    "quarantine",
+    "evidence",
+    "forensics",
+    "waf",
+    "audit",
+    "deterministic"
+  ],
   "type": "module",
   "exports": {
     ".": {

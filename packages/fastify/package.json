@@ -1,6 +1,6 @@
 {
   "name": "@tracehound/fastify",
-  "version": "0.7.0",
+  "version": "1.1.0",
   "description": "Fastify plugin for Tracehound security buffer",
   "type": "module",
   "exports": {

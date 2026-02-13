@@ -1,6 +1,6 @@
 # Tracehound Roadmap v2
 
-> **Updated:** 2026-01-19
+> **Updated:** 2026-02-14
 > **Scope:** Deterministic runtime security buffer & forensic substrate
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 > **Stack Synergy:** Cluster.127 (Nabu, Mindfry, Atrion, TIR.js)
@@ -9,17 +9,17 @@
 
 ## Strategic Additions (From Market Analysis)
 
-| Initiative               | Description                                              | Target Phase |
-| ------------------------ | -------------------------------------------------------- | ------------ |
+| Initiative               | Description                                                          | Target Phase |
+| ------------------------ | -------------------------------------------------------------------- | ------------ |
 | **@tracehound/heimdall** | Supply chain security: CI/CD monitoring, package scanning, reporting | Phase 5.5    |
-| **AI Detection Engine**  | Threat detection model via Cluster.127 stack             | Phase 7+     |
-| **Multi-Runtime Ports**  | Rust, Python, Go adaptation                              | Phase 8+     |
-| **Influencer Strategy**  | White-hat hacker spokesperson                            | GTM Phase 1  |
-| **Partnership Track**    | Datadog, Cloudflare API-first SLA                        | Phase 7+     |
+| **AI Detection Engine**  | Threat detection model via Cluster.127 stack                         | Phase 7+     |
+| **Multi-Runtime Ports**  | Rust, Python, Go adaptation                                          | Phase 8+     |
+| **Influencer Strategy**  | White-hat hacker spokesperson                                        | GTM Phase 1  |
+| **Partnership Track**    | Datadog, Cloudflare API-first SLA                                    | Phase 7+     |
 
 ---
 
-## Current Status: v1.0.0 Stable ✅
+## Current Status: v1.1.0 Stable ✅
 
 ---
 
@@ -44,8 +44,7 @@
 
 ## Phase 4 — Production Hardening (v1.1.0)
 
-**Status:** In Progress
-**ETA:** 4-6 weeks
+**Status:** Complete ✅
 
 | Component                           | Status  |
 | ----------------------------------- | ------- |
@@ -61,8 +60,7 @@
 
 ## Phase 4.5 — Package Distribution (v1.1.5)
 
-**Status:** Planned
-**Scope:** Internal infrastructure
+**Status:** Complete ✅
 
 | Component                     | Priority |
 | ----------------------------- | -------- |
@@ -269,4 +267,4 @@
 
 ---
 
-**Next Review:** 2026-02-01
+**Next Review:** 2026-03-01

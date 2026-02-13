@@ -86,7 +86,7 @@ External Detector (WAF, SIEM, ML)
 - [RFC-0005: Huginn](./docs/rfc/0005-Huginn.md) - Draft
 - [RFC-0006: Heimdall](./docs/rfc/0006-Heimdall.md) - Draft
 - [RFC-0007: Loki](./docs/rfc/0007-Loki.md) - Draft
-- [RFC-0008: Rust Core Pivot](./docs/rfc/0008-RustCorePivot.md) - Draft
+- [RFC-0008: Rust Core Pivot](./docs/rfc/0008-RustCorePivot.md) - ✅ Approved
 
 ## Security
 

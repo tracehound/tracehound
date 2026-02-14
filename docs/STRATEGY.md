@@ -11,12 +11,12 @@
 
 Tracehound occupies a **unique category** in the application security market: **Security Buffer / Forensic Evidence Layer**. It fills a gap that no existing WAF, SIEM, or APM tool fully addresses.
 
-| Factor                | Assessment                                                    |
-| --------------------- | ------------------------------------------------------------- |
-| **Market Opportunity**| High (WAF market ~$7.65B in 2026, App Security $22B+)        |
-| **Competition**       | Low (no direct competitor, complementary positioning)         |
-| **Differentiation**   | Very Strong (fail-open, decision-free, forensic-first)        |
-| **Entry Barrier**     | Medium (Node.js niche, but growing segment + Rust pivot)      |
+| Factor                 | Assessment                                               |
+| ---------------------- | -------------------------------------------------------- |
+| **Market Opportunity** | High (WAF market ~$7.65B in 2026, App Security $22B+)    |
+| **Competition**        | Low (no direct competitor, complementary positioning)    |
+| **Differentiation**    | Very Strong (fail-open, decision-free, forensic-first)   |
+| **Entry Barrier**      | Medium (Node.js niche, but growing segment + Rust pivot) |
 
 ---
 
@@ -43,12 +43,12 @@ Tracehound occupies a **unique category** in the application security market: **
 WAF detects → Tracehound quarantines → SIEM aggregates
 ```
 
-| Existing Category | What It Does         | Tracehound Difference           |
-| ----------------- | -------------------- | ------------------------------- |
-| **WAF**           | Detect + Block       | Buffer + Evidence               |
-| **SIEM**          | Aggregate logs       | Quarantine threats              |
-| **APM**           | Observe performance  | Isolate malicious               |
-| **IDS/IPS**       | Network-level detect | Application-level forensics     |
+| Existing Category | What It Does         | Tracehound Difference       |
+| ----------------- | -------------------- | --------------------------- |
+| **WAF**           | Detect + Block       | Buffer + Evidence           |
+| **SIEM**          | Aggregate logs       | Quarantine threats          |
+| **APM**           | Observe performance  | Isolate malicious           |
+| **IDS/IPS**       | Network-level detect | Application-level forensics |
 
 **Our Category:**
 
@@ -70,19 +70,19 @@ This is a new category. Creating a market category is challenging but provides *
 | Sales Cycle         | 2-4 weeks                         |
 
 **Pain:** Bot fraud eating ad budgets, milliseconds = money
-**Value:** Sub-millisecond detection, Rust core performance
-**Pitch:** "Sub-millisecond bot detection. Rust core adds <500us, not 50ms."
+**Value:** High-throughput performance (Node.js/TS) with future Rust optimization path
+**Pitch:** "High-velocity bot detection. Built for RTB-grade sub-millisecond windows."
 
 ---
 
 ### Tier 1: Gaming / eSports Backend
 
-| Criteria            | Value                            |
-| ------------------- | -------------------------------- |
-| Industry            | Game studios, esports platforms  |
-| Traffic             | High-burst, DDoS targets        |
-| Stack               | C++, C#, Go                      |
-| Sales Cycle         | 4-8 weeks                        |
+| Criteria    | Value                           |
+| ----------- | ------------------------------- |
+| Industry    | Game studios, esports platforms |
+| Traffic     | High-burst, DDoS targets        |
+| Stack       | C++, C#, Go                     |
+| Sales Cycle | 4-8 weeks                       |
 
 **Pain:** DDoS attacks, cheat detection, server anomalies
 **Value:** Argos behavioral analysis + Tracehound forensics
@@ -92,12 +92,12 @@ This is a new category. Creating a market category is challenging but provides *
 
 ### Tier 1: API Gateway / Headless Commerce
 
-| Criteria            | Value                                     |
-| ------------------- | ----------------------------------------- |
-| Industry            | Commerce platforms, payment orchestration |
-| Model               | B2B2B (sell once, deploy to thousands)    |
-| Stack               | Mixed (Java, Go, Node)                    |
-| Sales Cycle         | 4-12 weeks                                |
+| Criteria    | Value                                     |
+| ----------- | ----------------------------------------- |
+| Industry    | Commerce platforms, payment orchestration |
+| Model       | B2B2B (sell once, deploy to thousands)    |
+| Stack       | Mixed (Java, Go, Node)                    |
+| Sales Cycle | 4-12 weeks                                |
 
 **Pain:** Security as customer differentiator
 **Value:** White-label security middleware
@@ -107,12 +107,12 @@ This is a new category. Creating a market category is challenging but provides *
 
 ### Tier 2 (2027+): Fintech / HealthTech
 
-| Criteria            | Value                                       |
-| ------------------- | ------------------------------------------- |
-| Industry            | Banks, payment processors, health platforms |
-| Sales Cycle         | 9-18 months                                 |
-| Requirements        | SOC2 Type II, ISO 27001                     |
-| Status              | **North Star, not GTM target**              |
+| Criteria     | Value                                       |
+| ------------ | ------------------------------------------- |
+| Industry     | Banks, payment processors, health platforms |
+| Sales Cycle  | 9-18 months                                 |
+| Requirements | SOC2 Type II, ISO 27001                     |
+| Status       | **North Star, not GTM target**              |
 
 **Why Deferred:** Compliance barriers, reference requirements, legacy systems.
 
@@ -149,13 +149,13 @@ There is **no** open-source project building a deterministic security buffer for
 
 ### Indirect Competition
 
-| Category             | Players                             | Strengths               | Weaknesses                            |
-| -------------------- | ----------------------------------- | ----------------------- | ------------------------------------- |
-| **Cloud WAF**        | Cloudflare, AWS WAF, Akamai         | Scale, edge native      | No app-level evidence, black-box      |
-| **RASP**             | Sqreen (Datadog), Contrast Security | In-app protection       | Runtime overhead, decision-making     |
-| **Open-source WAF**  | ModSecurity, NAXSI                  | Free, battle-tested     | Not Node.js native, config hell       |
-| **Node.js Security** | Snyk, Socket.dev                    | Dependency scanning     | No runtime protection                 |
-| **SIEM**             | Splunk, Elastic, Datadog            | Log aggregation         | No quarantine/isolation               |
+| Category             | Players                             | Strengths           | Weaknesses                        |
+| -------------------- | ----------------------------------- | ------------------- | --------------------------------- |
+| **Cloud WAF**        | Cloudflare, AWS WAF, Akamai         | Scale, edge native  | No app-level evidence, black-box  |
+| **RASP**             | Sqreen (Datadog), Contrast Security | In-app protection   | Runtime overhead, decision-making |
+| **Open-source WAF**  | ModSecurity, NAXSI                  | Free, battle-tested | Not Node.js native, config hell   |
+| **Node.js Security** | Snyk, Socket.dev                    | Dependency scanning | No runtime protection             |
+| **SIEM**             | Splunk, Elastic, Datadog            | Log aggregation     | No quarantine/isolation           |
 
 ### Competitive Positioning Matrix
 
@@ -191,21 +191,21 @@ There is **no** open-source project building a deterministic security buffer for
 
 ### Segment-Specific Messaging
 
-| Message                     | Target         | Detail                                                        |
-| --------------------------- | -------------- | ------------------------------------------------------------- |
-| **Zero Latency Tax**        | AdTech, Gaming | "Security without slowdown. Rust core adds <500us."           |
-| **Infrastructure Agnostic** | Microservices  | "Java, Go, Node, C#. Sidecar works everywhere."              |
-| **Deterministic Defense**   | CTOs           | "No AI hallucinations. No false positives blocking customers."|
+| Message                     | Target         | Detail                                                               |
+| --------------------------- | -------------- | -------------------------------------------------------------------- |
+| **Zero Latency Tax**        | AdTech, Gaming | "Security without slowdown. Optimized for high-throughput backends." |
+| **Infrastructure Agnostic** | Microservices  | "Java, Go, Node, C#. Sidecar works everywhere."                      |
+| **Deterministic Defense**   | CTOs           | "No AI hallucinations. No false positives blocking customers."       |
 
 ### Differentiation Factors
 
-| Factor              | Competitors                       | Tracehound                        |
-| ------------------- | --------------------------------- | --------------------------------- |
-| **Decision-Making** | WAF/RASP decide at runtime        | Decision-free, trusts external WAF|
-| **Failure Mode**    | Fail-closed (service stops)       | **Fail-open (service continues)** |
-| **Memory Model**    | Unbounded logging                 | **Deterministic bounded memory**  |
-| **Forensics**       | Event logs                        | **Merkle-chained evidence**       |
-| **Cold Storage**    | Manual export                     | **Automatic archival**            |
+| Factor              | Competitors                 | Tracehound                         |
+| ------------------- | --------------------------- | ---------------------------------- |
+| **Decision-Making** | WAF/RASP decide at runtime  | Decision-free, trusts external WAF |
+| **Failure Mode**    | Fail-closed (service stops) | **Fail-open (service continues)**  |
+| **Memory Model**    | Unbounded logging           | **Deterministic bounded memory**   |
+| **Forensics**       | Event logs                  | **Merkle-chained evidence**        |
+| **Cold Storage**    | Manual export               | **Automatic archival**             |
 
 ---
 
@@ -261,12 +261,12 @@ There is **no** open-source project building a deterministic security buffer for
 
 ### Threats → Strategic Plays
 
-| Threat                          | Strategic Play                                                                                |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| **Datadog/Cloudflare enters**   | Partnership target. Become an integration layer, not a competitor.                            |
-| **Category not understood**     | Influencer strategy. White-hat hacker spokesperson for mainstream visibility.                 |
-| **Deno/Bun growth**             | Expansion opportunity. Both runtimes depend on Node.js ecosystem. Cross-runtime support.     |
-| **OSS sustainability**          | Prestige product. Cluster.127 brand showcase, community-driven growth, portfolio value.      |
+| Threat                        | Strategic Play                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------- |
+| **Datadog/Cloudflare enters** | Partnership target. Become an integration layer, not a competitor.                       |
+| **Category not understood**   | Influencer strategy. White-hat hacker spokesperson for mainstream visibility.            |
+| **Deno/Bun growth**           | Expansion opportunity. Both runtimes depend on Node.js ecosystem. Cross-runtime support. |
+| **OSS sustainability**        | Prestige product. Cluster.127 brand showcase, community-driven growth, portfolio value.  |
 
 ---
 
@@ -274,30 +274,30 @@ There is **no** open-source project building a deterministic security buffer for
 
 ### Phase G1: Developer Adoption (Q1-Q2 2026)
 
-| Activity                         | Channel                |
-| -------------------------------- | ---------------------- |
-| Open source launch               | npm, GitHub            |
-| Developer content                | Dev.to, HackerNews     |
-| "What Happens After WAF?" series | Blog                   |
-| White-hat hacker spokesperson    | Partnership            |
+| Activity                         | Channel            |
+| -------------------------------- | ------------------ |
+| Open source launch               | npm, GitHub        |
+| Developer content                | Dev.to, HackerNews |
+| "What Happens After WAF?" series | Blog               |
+| White-hat hacker spokesperson    | Partnership        |
 
 ### Phase G2: Startup Sales (Q3-Q4 2026)
 
-| Activity                    | Channel           |
-| --------------------------- | ----------------- |
-| Product Hunt launch         | Product Hunt      |
-| Y Combinator outreach       | Direct sales      |
-| First 10 paying customers   | Outbound          |
-| First case study published  | Content marketing |
+| Activity                   | Channel           |
+| -------------------------- | ----------------- |
+| Product Hunt launch        | Product Hunt      |
+| Y Combinator outreach      | Direct sales      |
+| First 10 paying customers  | Outbound          |
+| First case study published | Content marketing |
 
 ### Phase G3: Enterprise & Partners (2027+)
 
-| Activity                      | Channel        |
-| ----------------------------- | -------------- |
-| SOC2 Type 1 certification     | Compliance     |
-| Cloudflare/Vercel partnership | Partnership    |
-| Channel partnerships          | Channel sales  |
-| Enterprise tier launch        | Direct sales   |
+| Activity                      | Channel       |
+| ----------------------------- | ------------- |
+| SOC2 Type 1 certification     | Compliance    |
+| Cloudflare/Vercel partnership | Partnership   |
+| Channel partnerships          | Channel sales |
+| Enterprise tier launch        | Direct sales  |
 
 ### Sales Cycle Comparison
 
@@ -326,33 +326,33 @@ There is **no** open-source project building a deterministic security buffer for
 
 ### Content Strategy
 
-| Content Type   | Topic                             | Frequency   |
-| -------------- | --------------------------------- | ----------- |
-| **Blog**       | "What Happens After WAF?" series  | Weekly      |
-| **Tutorial**   | Framework integrations            | Per adapter |
-| **Case Study** | Beta user stories                 | Monthly     |
-| **Video**      | "5 Minutes to Tracehound"         | Launch +    |
-| **Whitepaper** | "Deterministic Security Buffers"  | One-time    |
+| Content Type   | Topic                            | Frequency   |
+| -------------- | -------------------------------- | ----------- |
+| **Blog**       | "What Happens After WAF?" series | Weekly      |
+| **Tutorial**   | Framework integrations           | Per adapter |
+| **Case Study** | Beta user stories                | Monthly     |
+| **Video**      | "5 Minutes to Tracehound"        | Launch +    |
+| **Whitepaper** | "Deterministic Security Buffers" | One-time    |
 
-### Rust Pivot Alignment
+### Rust Pivot (Strategic Roadmap)
 
-The Rust core pivot (RFC-0008) directly enables this market strategy:
+The Rust core pivot (RFC-0008) is a strategic expansion target to be prioritized based on post-market feedback from the Node.js + TS ecosystem:
 
-| Market Need             | Rust Benefit                     |
-| ----------------------- | -------------------------------- |
-| Sub-millisecond latency | Native performance, no GC        |
-| Go/Java/C# backends     | gRPC sidecar, no Node dependency |
-| Scale-out deployments   | Single binary, Redis-backed      |
-| Enterprise credibility  | "Rust = serious engineering"     |
+| Market Need            | Potential Rust Benefit           |
+| ---------------------- | -------------------------------- |
+| Ultra-low latency      | Native performance, no GC        |
+| Go/Java/C# backends    | gRPC sidecar, no Node dependency |
+| Scale-out deployments  | Single binary, Redis-backed      |
+| Enterprise credibility | "Rust = serious engineering"     |
 
 ### Influencer & Spokesperson Strategy
 
-| Type                     | Target Profile                              | Value                                     |
-| ------------------------ | ------------------------------------------- | ----------------------------------------- |
-| **White-Hat Hacker**     | Bug bounty hunter, security researcher      | Credibility, technical trust              |
-| **DevSecOps Influencer** | YouTube/Twitter security content creator    | Reach, category education, video demos    |
-| **Framework Maintainer** | Express, Fastify, Next.js core contributors | Organic integration, community trust      |
-| **Security Podcaster**   | Darknet Diaries, Security Now style         | Niche audience, deep engagement           |
+| Type                     | Target Profile                              | Value                                  |
+| ------------------------ | ------------------------------------------- | -------------------------------------- |
+| **White-Hat Hacker**     | Bug bounty hunter, security researcher      | Credibility, technical trust           |
+| **DevSecOps Influencer** | YouTube/Twitter security content creator    | Reach, category education, video demos |
+| **Framework Maintainer** | Express, Fastify, Next.js core contributors | Organic integration, community trust   |
+| **Security Podcaster**   | Darknet Diaries, Security Now style         | Niche audience, deep engagement        |
 
 **Priority:** One recognized white-hat hacker spokesperson deal. This is the fastest way to answer "why do I need this?" for the market.
 
@@ -383,12 +383,12 @@ The Rust core pivot (RFC-0008) directly enables this market strategy:
 
 ## Trends to Watch
 
-| Trend                           | Market Signal                               | Tracehound Strategy                                                          |
-| ------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Supply chain attacks**        | 55%+ of Node.js security incidents by 2026  | New package: `@tracehound/heimdall` — CI/CD monitoring, package scanning     |
-| **AI-powered threat detection** | ML-based detectors on the rise              | Cluster.127 stack: Train proprietary detection model. Stay WAF-agnostic.     |
-| **WAF market growth**           | $7.65B in 2026                              | WAF integration, partnership opportunities                                   |
-| **App Security market**         | $22B+ in 2026                               | Growing pie, carve out the evidence/forensics slice                          |
+| Trend                           | Market Signal                              | Tracehound Strategy                                                      |
+| ------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
+| **Supply chain attacks**        | 55%+ of Node.js security incidents by 2026 | New package: `@tracehound/heimdall` — CI/CD monitoring, package scanning |
+| **AI-powered threat detection** | ML-based detectors on the rise             | Cluster.127 stack: Train proprietary detection model. Stay WAF-agnostic. |
+| **WAF market growth**           | $7.65B in 2026                             | WAF integration, partnership opportunities                               |
+| **App Security market**         | $22B+ in 2026                              | Growing pie, carve out the evidence/forensics slice                      |
 
 ---
 

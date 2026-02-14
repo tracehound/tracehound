@@ -1,13 +1,13 @@
 # RFC-0008: Tracehound Rust Core Pivot
 
-> **Status:** Approved
+> **Status:** On-Hold / Deferred (Pending Feedback)
 > **Author:** Cluster.127
 > **Created:** 2026-01-23
 > **Target Version:** v2.0.0
 
 ## Abstract
 
-Complete rewrite of Tracehound's core logic from TypeScript to Rust, enabling multi-runtime deployment through three distinct modes: embedded library (napi-rs), standalone daemon (gRPC/UDS), and transparent proxy.
+Complete rewrite of Tracehound's core logic from TypeScript to Rust. **Note (Feb 2026):** This initiative is currently deferred. The primary focus is the Node.js + TypeScript market launch. Implementation of the Rust pivot will be re-evaluated based on feedback from the v1.x cycle.
 
 ---
 
@@ -237,4 +237,4 @@ tracehound/
 - [ ] Rust workspace scaffolding
 - [ ] Implementation begins
 
-**Decision:** GO 🚀
+**Decision:** DEFERRED (Post-Launch Feedback Loop) ⏸️

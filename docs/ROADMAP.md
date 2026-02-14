@@ -184,14 +184,14 @@
 
 ## Phase 8 — Multi-Runtime Expansion (v2.1.0) 🆕
 
-| Runtime | Language   | Priority               |
-| ------- | ---------- | ---------------------- |
-| Node.js | TypeScript | ✅ Done                |
-| Deno    | TypeScript | P1 (ecosystem overlap) |
-| Bun     | TypeScript | P1 (ecosystem overlap) |
-| Native  | Rust       | P2 (core port)         |
-| Python  | Python     | P3                     |
-| Go      | Go         | P3                     |
+| Runtime | Language   | Priority                  |
+| ------- | ---------- | ------------------------- |
+| Node.js | TypeScript | ✅ Done                   |
+| Deno    | TypeScript | P1 (ecosystem overlap)    |
+| Bun     | TypeScript | P1 (ecosystem overlap)    |
+| Native  | Rust       | P2 (Post-Launch Feedback) |
+| Python  | Python     | P3                        |
+| Go      | Go         | P3                        |
 
 **Rationale:** Deno/Bun share Node.js ecosystem = easy adaptation, TAM expansion
 

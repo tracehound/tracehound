@@ -1,0 +1,68 @@
+# Testing and QA Gates
+
+## Coverage Thresholds (Non-Negotiable)
+
+These thresholds are enforced in `vitest.config.ts` and MUST NOT be lowered:
+
+- Lines: 90%
+- Functions: 90%
+- Statements: 90%
+- Branches: 85%
+
+If a change drops coverage below thresholds, the change is REJECTED until tests are added.
+
+## Test Requirements by Change Type
+
+| Change Type             | Required Tests                                   |
+| ----------------------- | ------------------------------------------------ |
+| New public API / export | Unit test for every code path + edge cases       |
+| Bug fix                 | Regression test that fails without the fix       |
+| Security-sensitive code | Positive + negative + boundary + injection tests |
+| Agent intercept flow    | Update `integration.test.ts`                     |
+| New RFC implementation  | Update `rfc-compliance.test.ts`                  |
+| Major refactor          | Run full scenario suite (`scenarios/*.test.ts`)  |
+| New adapter method      | Smoke test in adapter's `tests/` directory       |
+
+## Test Structure
+
+- **Naming:** `should [expected behavior] when [condition]`
+  ```typescript
+  it('should return rate_limited when source exceeds maxRequests', () => { ... })
+  it('should preserve hash chain integrity after 1000 sequential inserts', () => { ... })
+  ```
+- **Arrange-Act-Assert:** Every test follows AAA pattern with clear separation.
+- **One assertion concept per test.** Multiple `expect()` calls are fine if they validate the same logical assertion.
+
+## Test Isolation
+
+- NO shared mutable state between tests. Each test creates its own instances.
+- Use `beforeEach` for fresh setup, never rely on test execution order.
+- NO `setTimeout` / real timers in unit tests. Use `vi.useFakeTimers()` when time-dependent.
+- File system and network access FORBIDDEN in unit tests. Use mocks/adapters.
+
+## Mock Policy
+
+- Mock ONLY external boundaries: `ProcessAdapter`, `IColdStorageAdapter`, `Date.now()`.
+- Core modules (`Quarantine`, `Agent`, `AuditChain`) MUST use real instances in tests.
+- Mock implementations must enforce the same interface contract as real implementations.
+
+## Security Test Checklist
+
+For any security-relevant code, verify:
+
+- [ ] Boundary values (0, 1, MAX_SAFE_INTEGER, negative)
+- [ ] Oversized input (exceeds maxPayloadSize, exceeds maxCount)
+- [ ] Malformed input (null, undefined, wrong types, empty strings)
+- [ ] Timing safety (constant-time comparison used, no early returns on mismatch)
+- [ ] Hash integrity (tampered evidence detected, chain break detected)
+- [ ] Resource exhaustion (pool exhaustion, quarantine full, rate limiter saturation)
+- [ ] Concurrent access (parallel inserts, parallel neutralize+insert)
+
+## Scenario Tests
+
+Located in `packages/core/scenarios/`. Run after major changes:
+
+- `full-lifecycle.test.ts` -- End-to-end Scent-to-Evidence-to-ColdStorage flow
+- `stress.test.ts` -- High-volume concurrent operations
+- `ipc-stress.test.ts` -- HoundPool under load
+- `fail-safe-integration.test.ts` -- FailSafe threshold and recovery

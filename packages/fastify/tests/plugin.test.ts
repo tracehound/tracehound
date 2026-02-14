@@ -120,6 +120,94 @@ describe('tracehoundPlugin', () => {
     expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ signature: 'test-sig' }))
   })
 
+  it('should return 413 for payload_too_large', async () => {
+    const agent = createMockAgent({ status: 'payload_too_large', limit: 1000 })
+    const fastify = createMockFastify()
+
+    tracehoundPlugin(fastify as any, { agent }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, () => {})
+
+    expect(reply.status).toHaveBeenCalledWith(413)
+    expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ limit: 1000 }))
+  })
+
+  it('should return 500 for error result', async () => {
+    const agent = createMockAgent({
+      status: 'error',
+      error: { state: 'agent', code: 'ERR', message: 'fail', recoverable: false },
+    })
+    const fastify = createMockFastify()
+
+    tracehoundPlugin(fastify as any, { agent }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, () => {})
+
+    expect(reply.status).toHaveBeenCalledWith(500)
+    expect(reply.send).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'Internal Server Error' }),
+    )
+  })
+
+  it('should pass through for ignored result', async () => {
+    const agent = createMockAgent({ status: 'ignored', signature: 'sig' })
+    const fastify = createMockFastify()
+    const next = vi.fn()
+
+    tracehoundPlugin(fastify as any, { agent }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, next)
+
+    expect(next).toHaveBeenCalled()
+    expect(reply.status).not.toHaveBeenCalled()
+  })
+
+  describe('default handlers', () => {
+    it('should use defaultExtractScent to pull IP and payload', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        ip: '192.168.1.1',
+        method: 'PUT',
+        url: '/v1/resource',
+        query: { active: 'true' },
+        body: { data: 123 },
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      expect(agent.intercept).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: '192.168.1.1',
+          payload: expect.objectContaining({
+            method: 'PUT',
+            path: '/v1/resource',
+            query: { active: 'true' },
+            body: { data: 123 },
+          }),
+        }),
+      )
+    })
+  })
+
   it('should use custom extractScent', () => {
     const agent = createMockAgent({ status: 'clean' })
     const customScent = {

@@ -5,10 +5,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   CodecError,
+  createAsyncColdPathCodec,
   createColdPathCodec,
   createHotPathCodec,
   decodeWithIntegrity,
+  decodeWithIntegrityAsync,
   encodeWithIntegrity,
+  encodeWithIntegrityAsync,
   GzipCodec,
   verify,
 } from '../src/utils/binary-codec.js'
@@ -145,6 +148,27 @@ describe('BinaryCodec', () => {
     })
   })
 
+  describe('AsyncGzipCodec', () => {
+    it('roundtrip works asynchronously', async () => {
+      const codec = createAsyncColdPathCodec()
+      const original = new TextEncoder().encode('async test data')
+
+      const encoded = await codec.encode(original)
+      const decoded = await codec.decode(encoded)
+
+      expect(decoded).toEqual(original)
+    })
+
+    it('tracks stats asynchronously', async () => {
+      const codec = createAsyncColdPathCodec()
+      const data = new Uint8Array(20).fill(1)
+
+      await codec.encode(data)
+      expect((codec as any).stats.encodeCount).toBe(1)
+      expect((codec as any).stats.totalInputBytes).toBe(20)
+    })
+  })
+
   // ============================================================================
   // COLD STORAGE INTEGRITY TESTS
   // ============================================================================
@@ -264,6 +288,35 @@ describe('BinaryCodec', () => {
         // Tampering detected without wasting decode CPU
         expect(true).toBe(true)
       }
+    })
+  })
+
+  describe('encodeWithIntegrityAsync()', () => {
+    it('should round-trip encode/decode asynchronously', async () => {
+      const original = new TextEncoder().encode('async integrity test')
+      const encoded = await encodeWithIntegrityAsync(original)
+      const decoded = await decodeWithIntegrityAsync(encoded)
+
+      expect(decoded).toEqual(original)
+    })
+
+    it('should throw CodecError on compression failure', async () => {
+      // We can trigger this by passing something that isn't a Uint8Array
+      // but TypeScript might complain. However, at runtime zlib will fail.
+      await expect(encodeWithIntegrityAsync(null as any)).rejects.toThrow(CodecError)
+    })
+  })
+
+  describe('decodeWithIntegrityAsync()', () => {
+    it('should throw CodecError on decompression failure', async () => {
+      const corrupted = {
+        compressed: new Uint8Array([1, 2, 3]),
+        hash: 'fake',
+        originalSize: 10,
+        compressedSize: 3,
+      }
+
+      await expect(decodeWithIntegrityAsync(corrupted)).rejects.toThrow(CodecError)
     })
   })
 })

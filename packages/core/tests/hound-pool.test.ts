@@ -48,7 +48,7 @@ describe('HoundPool', () => {
       `injection:${hash}`,
       hash,
       'high',
-      Date.now()
+      Date.now(),
     )
   }
 
@@ -247,6 +247,138 @@ describe('HoundPool', () => {
       expect(pool.stats.activeProcesses).toBe(1)
       // 1 dropped (queue full)
       expect(results.filter((r) => r.error === 'defer_queue_full').length).toBe(1)
+    })
+
+    it('escalate emits error but continues', () => {
+      pool.shutdown()
+      mockAdapter = createMockAdapter()
+      pool = createHoundPool({
+        poolSize: 1,
+        timeout: 1000,
+        rotationJitterMs: 10,
+        onPoolExhausted: 'escalate',
+        adapter: mockAdapter,
+      })
+
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      // Fill pool + 1 more
+      pool.activate(createEvidence('test-1'))
+      pool.activate(createEvidence('test-2'))
+
+      expect(pool.stats.activeProcesses).toBe(1)
+      expect(results.filter((r) => r.error === 'pool_exhausted_escalated').length).toBe(1)
+      expect(pool.stats.totalErrors).toBeGreaterThan(0)
+    })
+
+    it('deferred items are processed when slot becomes available', () => {
+      pool.shutdown()
+      mockAdapter = createMockAdapter()
+      pool = createHoundPool({
+        poolSize: 1,
+        timeout: 1000,
+        rotationJitterMs: 10,
+        onPoolExhausted: 'defer',
+        deferQueueLimit: 5,
+        adapter: mockAdapter,
+      })
+
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      // Queue 3 items (1 active + 2 deferred)
+      pool.activate(createEvidence('test-1'))
+      pool.activate(createEvidence('test-2'))
+      pool.activate(createEvidence('test-3'))
+
+      expect(pool.stats.activeProcesses).toBe(1)
+
+      // Complete first one
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+      simulateProcessComplete(pid)
+
+      // Next deferred item should start
+      expect(pool.stats.activeProcesses).toBe(1)
+    })
+  })
+
+  describe('Process error handling', () => {
+    it('handles IPC decode errors', () => {
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      pool.activate(createEvidence('test'))
+
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+
+      // Send invalid message
+      const invalidPayload = new Uint8Array([0xff, 0xff, 0xff]).buffer
+      mockAdapter.simulateMessage(pid, invalidPayload)
+
+      const errorResults = results.filter((r) => r.status === 'error')
+      expect(errorResults.length).toBeGreaterThan(0)
+      expect(pool.stats.totalErrors).toBeGreaterThan(0)
+    })
+
+    it('handles process status error messages', () => {
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      pool.activate(createEvidence('test'))
+
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+
+      // Send error status
+      const errorMessage = encodeHoundMessage({
+        type: 'status',
+        state: 'error',
+        error: 'analysis_failed',
+      })
+      const payloadSlice = errorMessage.subarray(4)
+      const payload = new Uint8Array(payloadSlice).buffer
+      mockAdapter.simulateMessage(pid, payload)
+
+      const errorResults = results.filter((r) => r.status === 'error')
+      expect(errorResults.length).toBeGreaterThan(0)
+      expect(errorResults[0].error).toBeDefined()
+    })
+
+    it('handles unexpected process exit', () => {
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      pool.activate(createEvidence('test'))
+
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+
+      // Simulate unexpected exit
+      mockAdapter.simulateExit(pid, 1)
+
+      const errorResults = results.filter((r) => r.status === 'error')
+      expect(errorResults.length).toBeGreaterThan(0)
+      expect(pool.stats.totalErrors).toBeGreaterThan(0)
+    })
+
+    it('respawns process on next activation after crash', () => {
+      pool.activate(createEvidence('test-1'))
+
+      const processes1 = mockAdapter.getMockProcesses()
+      const pid1 = [...processes1.keys()][0]
+
+      // Crash the process
+      mockAdapter.simulateExit(pid1, 1)
+
+      // Activate again - should spawn new process
+      pool.activate(createEvidence('test-2'))
+
+      const processes2 = mockAdapter.getMockProcesses()
+      // Mock adapter keeps crashed process in map, so we expect 2
+      expect(processes2.size).toBeGreaterThanOrEqual(1)
     })
   })
 

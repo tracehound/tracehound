@@ -54,7 +54,7 @@ interface Snapshot {
   }>
 }
 
-function getSnapshot(): Snapshot {
+export function getSnapshot(): Snapshot {
   // TODO: Connect to real core
   return {
     timestamp: new Date().toISOString(),
@@ -101,7 +101,7 @@ function startDashboard(refreshMs: number): void {
   setInterval(render, refreshMs)
 }
 
-function renderDashboard(s: Snapshot, refreshMs: number): void {
+export function renderDashboard(s: Snapshot, refreshMs: number): void {
   const width = 76
 
   // Header
@@ -110,7 +110,7 @@ function renderDashboard(s: Snapshot, refreshMs: number): void {
   console.log(
     primary(`  ║${' '.repeat(20)}`) +
       bold('🐕 TRACEHOUND LIVE DASHBOARD') +
-      primary(`${' '.repeat(28)}║`)
+      primary(`${' '.repeat(28)}║`),
   )
   console.log(primary(`  ║${' '.repeat(24)}`) + muted(s.timestamp) + primary(`${' '.repeat(28)}║`))
   console.log(primary(`  ╚${'═'.repeat(width)}╝`))
@@ -155,11 +155,11 @@ function renderDashboard(s: Snapshot, refreshMs: number): void {
     [
       'Split',
       `${severity('critical').slice(0, 15)} ${s.quarantine.bySeverity.critical}  ${severity(
-        'high'
+        'high',
       ).slice(0, 12)} ${s.quarantine.bySeverity.high}  ${severity('medium').slice(0, 12)} ${
         s.quarantine.bySeverity.medium
       }  ${severity('low').slice(0, 10)} ${s.quarantine.bySeverity.low}`,
-    ]
+    ],
   )
 
   const poolTable = new Table({
@@ -174,7 +174,7 @@ function renderDashboard(s: Snapshot, refreshMs: number): void {
   poolTable.push(
     ['Active', `${poolBar} ${s.houndPool.active}/${s.houndPool.total}`],
     ['Dormant', String(s.houndPool.dormant)],
-    ['Status', poolStatus]
+    ['Status', poolStatus],
   )
 
   console.log(indent(quarantineTable.toString()))
@@ -220,9 +220,9 @@ function renderDashboard(s: Snapshot, refreshMs: number): void {
   console.log(
     muted(
       `  Press Ctrl+C to exit │ Refresh: ${refreshMs}ms │ ${theme.reset}${secondary(
-        new Date().toLocaleTimeString()
-      )}`
-    )
+        new Date().toLocaleTimeString(),
+      )}`,
+    ),
   )
 }
 

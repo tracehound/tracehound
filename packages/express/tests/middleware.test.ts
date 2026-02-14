@@ -105,6 +105,61 @@ describe('tracehound middleware', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ signature: 'test-sig' }))
   })
 
+  it('should return 500 for error result', () => {
+    const agent = createMockAgent({
+      status: 'error',
+      error: { state: 'agent', code: 'TEST', message: 'fail', recoverable: false },
+    })
+    const middleware = tracehound({ agent })
+    const res = createMockRes()
+
+    middleware(createMockReq(), res, next)
+
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'Internal Server Error' }),
+    )
+  })
+
+  describe('default handlers', () => {
+    it('should use defaultExtractScent to pull IP and payload', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+      const req = createMockReq({
+        ip: '10.0.0.1',
+        method: 'POST',
+        path: '/api/data',
+        query: { key: 'val' },
+        body: { foo: 'bar' },
+      })
+
+      middleware(req, createMockRes(), next)
+
+      expect(agent.intercept).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: '10.0.0.1',
+          payload: expect.objectContaining({
+            method: 'POST',
+            path: '/api/data',
+            query: { key: 'val' },
+            body: { foo: 'bar' },
+          }),
+        }),
+      )
+    })
+
+    it('should use defaultOnIntercept when result is blocked', () => {
+      const agent = createMockAgent({ status: 'rate_limited', retryAfter: 2000 })
+      const middleware = tracehound({ agent })
+      const res = createMockRes()
+
+      middleware(createMockReq(), res, next)
+
+      expect(res.status).toHaveBeenCalledWith(429)
+      expect(res.set).toHaveBeenCalledWith('Retry-After', '2')
+    })
+  })
+
   it('should use custom extractScent function', () => {
     const agent = createMockAgent({ status: 'clean' })
     const customScent = {

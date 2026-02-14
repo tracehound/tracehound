@@ -37,7 +37,6 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
     "lint": "tsc --noEmit",
     "clean": "rm -rf dist"
   },

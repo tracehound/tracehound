@@ -15,7 +15,9 @@ import { statsCommand } from './commands/stats.js'
 import { statusCommand } from './commands/status.js'
 import { watchCommand } from './commands/watch.js'
 
-const program = new Command()
+import { fileURLToPath } from 'url'
+
+export const program = new Command()
 
 program.name('tracehound').description('Tracehound CLI - Runtime Security Buffer').version('0.1.0')
 
@@ -25,4 +27,10 @@ program.addCommand(statsCommand)
 program.addCommand(inspectCommand)
 program.addCommand(watchCommand)
 
-program.parse()
+// Only parse if executed directly
+const isMain =
+  process.argv[1] && fileURLToPath(import.meta.url).endsWith(process.argv[1].replace(/\\/g, '/'))
+
+if (isMain || process.env.NODE_ENV === 'cli-run') {
+  program.parse()
+}

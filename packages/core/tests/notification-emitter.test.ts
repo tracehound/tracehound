@@ -24,7 +24,7 @@ describe('NotificationEmitter', () => {
         expect.objectContaining({
           type: 'threat.detected',
           payload: { test: true },
-        })
+        }),
       )
     })
 
@@ -127,6 +127,97 @@ describe('NotificationEmitter', () => {
       emitter.unregisterWebhook(id)
 
       expect(emitter.stats.activeWebhooks).toBe(0)
+    })
+
+    describe('dispatch', () => {
+      let mockFetch: any
+
+      beforeEach(() => {
+        mockFetch = vi.fn()
+        vi.stubGlobal('fetch', mockFetch)
+        mockFetch.mockResolvedValue({ ok: true, status: 200 })
+      })
+
+      it('dispatches webhooks on event emit', async () => {
+        emitter.registerWebhook({ url: 'https://webhook.site/test' })
+
+        emitter.emit('threat.detected', { foo: 'bar' })
+
+        // Wait for async dispatch
+        await new Promise((resolve) => setTimeout(resolve, 10))
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://webhook.site/test',
+          expect.objectContaining({
+            method: 'POST',
+            body: expect.stringContaining('threat.detected'),
+          }),
+        )
+      })
+
+      it('filters webhooks by event type', async () => {
+        emitter.registerWebhook({
+          url: 'https://threats.only',
+          events: ['threat.detected'],
+        })
+
+        emitter.emit('rate_limit.exceeded', {})
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        expect(mockFetch).not.toHaveBeenCalled()
+
+        emitter.emit('threat.detected', {})
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        expect(mockFetch).toHaveBeenCalled()
+      })
+
+      it('includes HMAC signature if secret provided', async () => {
+        emitter.registerWebhook({
+          url: 'https://secure.webhook',
+          secret: 'test-secret',
+        })
+
+        emitter.emit('threat.detected', { data: 1 })
+        await new Promise((resolve) => setTimeout(resolve, 50)) // Hashing takes a bit more time with dynamic import
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          'https://secure.webhook',
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              'X-Tracehound-Signature': expect.stringMatching(/^sha256=[a-f0-9]{64}$/),
+            }),
+          }),
+        )
+      })
+
+      it('retries on 5xx errors', async () => {
+        mockFetch
+          .mockResolvedValueOnce({ ok: false, status: 503 })
+          .mockResolvedValueOnce({ ok: true, status: 200 })
+
+        emitter.registerWebhook({
+          url: 'https://retry.me',
+          retry: { maxAttempts: 2, delayMs: 1 },
+        })
+
+        emitter.emit('threat.detected', {})
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+      })
+
+      it('gives up after max attempts', async () => {
+        mockFetch.mockResolvedValue({ ok: false, status: 500 })
+
+        emitter.registerWebhook({
+          url: 'https://fail.me',
+          retry: { maxAttempts: 2, delayMs: 1 },
+        })
+
+        emitter.emit('threat.detected', {})
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+      })
     })
   })
 

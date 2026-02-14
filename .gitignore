@@ -31,3 +31,6 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# Internal Files and Folders
+internal/

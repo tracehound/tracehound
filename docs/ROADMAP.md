@@ -3,7 +3,7 @@
 > **Updated:** 2026-02-14
 > **Scope:** Deterministic runtime security buffer & forensic substrate
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
-> **Stack Synergy:** Cluster.127 (Nabu, Mindfry, Atrion, TIR.js)
+> **Stack Synergy:** Cluster.127 (Nabu, Mindfry, Atrion, Blackbox)
 
 ---
 

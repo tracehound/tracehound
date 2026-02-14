@@ -17,9 +17,13 @@ import { watchCommand } from './commands/watch.js'
 
 import { fileURLToPath } from 'url'
 
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const { version } = require('../package.json')
+
 export const program = new Command()
 
-program.name('tracehound').description('Tracehound CLI - Runtime Security Buffer').version('0.1.0')
+program.name('tracehound').description('Tracehound CLI - Runtime Security Buffer').version(version)
 
 // Register commands
 program.addCommand(statusCommand)

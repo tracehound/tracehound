@@ -1,6 +1,6 @@
 {
   "name": "@tracehound/express",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Express middleware for Tracehound security buffer",
   "type": "module",
   "exports": {

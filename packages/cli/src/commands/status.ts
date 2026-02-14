@@ -4,6 +4,9 @@
 
 import Table from 'cli-table3'
 import { Command } from 'commander'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
+const { version } = require('../../package.json')
 
 export const statusCommand = new Command('status')
   .description('Show current Tracehound system status')
@@ -41,7 +44,7 @@ interface SystemStatus {
 function getSystemStatus(): SystemStatus {
   // TODO: Connect to real core when available
   return {
-    version: '0.1.0',
+    version: version,
     uptime: Math.floor(process.uptime()),
     health: 'healthy',
     quarantine: {
@@ -77,7 +80,7 @@ function printStatus(status: SystemStatus): void {
   systemTable.push(
     ['Version', status.version],
     ['Uptime', formatUptime(status.uptime)],
-    ['Health', `${healthIcon} ${status.health}`]
+    ['Health', `${healthIcon} ${status.health}`],
   )
   console.log(systemTable.toString())
   console.log()
@@ -94,7 +97,7 @@ function printStatus(status: SystemStatus): void {
   quarantineTable.push(
     ['Count', `${status.quarantine.count} / ${status.quarantine.capacity}`],
     ['Usage', `${usage}%`],
-    ['Bytes', formatBytes(status.quarantine.bytes)]
+    ['Bytes', formatBytes(status.quarantine.bytes)],
   )
   console.log(quarantineTable.toString())
   console.log()
@@ -106,7 +109,7 @@ function printStatus(status: SystemStatus): void {
   })
   rateLimitTable.push(
     ['Blocked', String(status.rateLimit.blocked)],
-    ['Active', String(status.rateLimit.active)]
+    ['Active', String(status.rateLimit.active)],
   )
   console.log(rateLimitTable.toString())
   console.log()
@@ -119,7 +122,7 @@ function printStatus(status: SystemStatus): void {
   poolTable.push(
     ['Active', String(status.houndPool.active)],
     ['Dormant', String(status.houndPool.dormant)],
-    ['Total', String(status.houndPool.total)]
+    ['Total', String(status.houndPool.total)],
   )
   console.log(poolTable.toString())
   console.log()

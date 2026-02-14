@@ -89,7 +89,7 @@ describe('CLI Commands', () => {
       statusCommand.parse(['status', '--json'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
-      expect(output).toContain('"version": "0.1.0"')
+      expect(output).toContain('"version": "1.2.0"')
     })
 
     it('stats command action should print stats', () => {
@@ -195,7 +195,7 @@ describe('CLI Commands', () => {
     it('should get system snapshot', async () => {
       const { getSnapshot } = await import('../src/commands/watch.js')
       const snapshot = getSnapshot()
-      expect(snapshot.system.version).toBe('0.1.0')
+      expect(snapshot.system.version).toBe('1.2.0')
       expect(snapshot.timestamp).toBeDefined()
     })
 

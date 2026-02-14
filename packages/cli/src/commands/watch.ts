@@ -4,6 +4,7 @@
 
 import Table from 'cli-table3'
 import { Command } from 'commander'
+import { createRequire } from 'module'
 import {
   bold,
   clearScreen,
@@ -16,6 +17,9 @@ import {
   showCursor,
   theme,
 } from '../lib/theme.js'
+
+const require = createRequire(import.meta.url)
+const { version } = require('../../package.json')
 
 export const watchCommand = new Command('watch')
   .description('Launch live dashboard')
@@ -59,7 +63,7 @@ export function getSnapshot(): Snapshot {
   return {
     timestamp: new Date().toISOString(),
     system: {
-      version: '0.1.0',
+      version: version,
       uptime: formatUptime(Math.floor(process.uptime())),
       health: 'healthy',
       memory: { used: 45, total: 256 },

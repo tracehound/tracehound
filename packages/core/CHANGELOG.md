@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-02-14 - Forensic Hardening & English Audit Prep
+
+### Added
+
+- **90%+ Test Coverage**: Achieved project-wide line coverage above 90% threshold.
+  - Comprehensive CLI command action testing (`status`, `stats`, `inspect`, `watch`).
+  - Webhook dispatch logic with HMAC-SHA256 and exponential backoff.
+  - Async binary codec error path verification.
+  - Express and Fastify integration middleware hardening.
+- **English Security Documentation**: All security audit docs translated from Turkish to English for international compliance.
+- **Dynamic Versioning**: Refactored CLI to pull version dynamically from `package.json`, ensuring consistency across the monorepo.
+- **TUI Dashboard Logic Extraction**: Refactored CLI for isolated render testing.
+
+### Fixed
+
+- **CLI Hardcoded Versions**: Corrected legacy `0.1.0` references to match substrate version.
+- **Webhook State Leak**: Fixed test flakiness in notification emitter.
+- **Quarantine Empty State**: Synchronized CLI output expectations for empty quarantine.
+
 ## [1.1.0] - 2026-02-10 - Production Hardening (Phase 4 P1)
 
 ### Added

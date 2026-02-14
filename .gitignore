@@ -2,6 +2,8 @@
 node_modules/
 .pnpm-store/
 .npmrc
+.agent/
+.cursor/
 
 # Build output
 dist/

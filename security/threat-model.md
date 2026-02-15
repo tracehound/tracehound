@@ -8,6 +8,22 @@ This model covers the open-source packages in this repository:
 - `packages/fastify` and `packages/express` (request interception adapters)
 - `packages/cli` (operator-facing inspection/status commands)
 
+## Security Guarantee Envelope
+
+Tracehound is modeled as a **deterministic security buffer**. Security guarantees are intentionally limited to:
+
+1. **Deterministic evidence integrity** (canonicalization + hash/signature consistency)
+2. **Parser and ingestion safety** (bounded + canonical handling of untrusted input)
+3. **No unsafe execution from untrusted input** in supported runtime paths
+
+## Non-Guarantees (Explicit)
+
+- **Process separation is fault containment, not a hard security boundary.**
+- **Quarantine is logical state isolation, not OS-level isolation.**
+- **No sandbox guarantee** is made by application code alone.
+- **Host compromise / container escape** is out of scope for app-layer guarantees.
+- Deployment hardening (seccomp/AppArmor/non-root/network policy) is recommended operationally, but not required for logical correctness of the core security model.
+
 ## System Model
 
 ### Assets
@@ -47,15 +63,15 @@ flowchart LR
 2. **Malicious integration input**: injects malformed `Scent` or untrusted detector output.
 3. **Environment-level adversary**: abuses process spawning/OS capability assumptions.
 
-## Key Assumptions (to validate in next audit)
+## Key Assumptions (Audit Alignment)
 
-- Node runtime flags used for child process reduce dynamic code-generation risk, but are not full sandboxing.
-- Process constraints in adapter are declarative intent unless enforced by platform/container.
-- Canonical serialization + hash path remains deterministic for equivalent inputs.
+- Runtime flags and process separation reduce risk, but are not treated as sandbox guarantees.
+- Deterministic serialization + hash path remains stable for equivalent inputs.
+- External hardening controls are deployment concerns, not core correctness claims.
 
 ## Deliverables for This File
 
 - [x] System model and trust boundaries documented
 - [x] Data flow captured
-- [ ] Per-boundary threat scenarios with test evidence links (`security/artifacts/`)
-- [ ] Threat prioritization matrix (Likelihood x Impact)
+- [x] Per-boundary threat scenarios with test evidence links (`security/artifacts/threat-scenarios.md`)
+- [x] Threat prioritization matrix (Likelihood x Impact) in `security/artifacts/threat-prioritization-matrix.md`

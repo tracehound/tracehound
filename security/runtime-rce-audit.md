@@ -46,12 +46,19 @@ Establish a repository-specific RCE surface map and define what is currently pre
 
 ## Required Evidence
 
-- [ ] Add grep/ripgrep command outputs under `security/artifacts/rce-scan.txt`
-- [ ] Add a reviewed list of all `spawn` call sites with owner sign-off
-- [ ] Confirm `processScriptPath` safety expectations in deployment docs
-- [ ] Add prototype-pollution-focused review notes (source -> sink reasoning)
+- [x] Add grep/ripgrep command outputs under `security/artifacts/rce-scan.txt`
+- [x] Add a reviewed list of all `spawn` call sites with owner sign-off (`security/artifacts/rce-spawn-inventory.md`)
+- [x] Confirm `processScriptPath` safety expectations in deployment docs (`security/artifacts/rce-spawn-inventory.md`)
+- [x] Add prototype-pollution-focused review notes (source -> sink reasoning) (`security/artifacts/prototype-pollution-review.md`)
 
 ## Exit Criteria
 
 - All RCE-01..RCE-04 items have status (`open`, `mitigated`, `accepted risk`).
 - All process execution call sites are explicitly documented.
+
+## Final Status
+
+- RCE-01: mitigated
+- RCE-02: mitigated
+- RCE-03: accepted risk
+- RCE-04: open (monitoring)

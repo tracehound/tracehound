@@ -23,17 +23,17 @@ Since Tracehound acts as a security buffer, its parser/serialization behavior mu
 ## Bound Parameters
 
 - `maxPayloadSize`: integration-configured hard limit (must be explicit in deployment config)
-- Max nesting depth: **currently not hard-limited in code** (risk item)
-- Max key count/object width: **currently not hard-limited in code** (risk item)
+- Max nesting depth: hard-limited to `32` in encode validation path
+- Max key count/object width: hard-limited to `1000` object keys per object
 
 ## Known Gaps
 
-- [ ] Explicit depth limit missing for deeply nested payloads.
-- [ ] Explicit width/object-key cardinality limit missing.
+- [x] Explicit depth limit enforced (32).
+- [x] Explicit width/object-key cardinality limit enforced (1000 keys/object).
 - [ ] No dedicated fuzz artifact yet proving parser determinism under adversarial inputs.
 
 ## Actions
 
-- [ ] Propose default depth/width policy values.
-- [ ] Add deterministic test matrix (key order permutations, mixed encodings, large nested objects).
-- [ ] Create first artifact stub: `security/artifacts/parser-determinism-baseline.md`.
+- [x] Default depth/width policy values proposed and implemented.
+- [x] Deterministic test matrix includes key order, mixed encoding, deep nesting, and width overflow.
+- [x] Create first artifact: `security/artifacts/parser-determinism-baseline.md`.

@@ -2,30 +2,39 @@
 
 ## Objective
 
-Validate whether the "quarantine" claim is backed by real containment controls.
+Describe containment behavior precisely without overstating security guarantees.
 
-## Isolation Layers in Current Design
+## Positioning
 
-1. **Process separation**: hound analysis runs in child process via adapter.
-2. **Protocol separation**: parent/child communication uses length-prefixed binary IPC.
-3. **Timeout-based containment**: long-running workers can be terminated.
-4. **Declarative constraints**: process constraints specify intended restrictions.
+- **Process separation = fault containment**, not a hard security boundary.
+- **Quarantine = logical state isolation**, not OS/process sandbox isolation.
+- Application code does **not** claim kernel/container escape protection.
+
+## Implemented in Code (Guaranteed by repository logic)
+
+1. **Process separation for hound execution** via child process adapter.
+2. **Timeout-based containment** for long-running workers.
+3. **Bounded message protocol** with maximum IPC frame size checks.
+4. **Runtime hardening flags** (`--disable-proto=throw`, `--disallow-code-generation-from-strings`) as risk-reduction controls.
+
+## Not Guaranteed by Code (Out-of-scope for app-layer guarantees)
+
+- Filesystem sandboxing guarantees
+- Network sandbox/egress guarantees
+- Syscall filtering guarantees (seccomp/AppArmor/SELinux)
+- Privilege isolation guarantees (non-root enforcement)
 
 ## Current Control Inventory
 
-| Control Area              | Current Mechanism                              | Evidence Source                       | Assurance Level |
-| ------------------------- | ---------------------------------------------- | ------------------------------------- | --------------- |
-| Process boundary          | `spawn(...)`-based worker isolation            | `process-adapter.ts`, `hound-pool.ts` | Medium          |
-| Code generation hardening | `--disallow-code-generation-from-strings`      | `process-adapter.ts`                  | Medium          |
-| Prototype hardening       | `--disable-proto=throw`                        | `process-adapter.ts`                  | Medium          |
-| Message boundary          | Length-prefixed parser with max message size   | `hound-ipc.ts`                        | Medium          |
-| OS-level sandboxing       | Not enforced in Node itself (declarative only) | adapter comments and constraints      | Low             |
+| Control Area            | Current Mechanism                         | Evidence Source                       | Assurance Level |
+| ----------------------- | ----------------------------------------- | ------------------------------------- | --------------- |
+| Process boundary        | `spawn(...)`-based worker separation      | `process-adapter.ts`, `hound-pool.ts` | Medium          |
+| Timeout containment     | terminate/kill flow for overrun workers   | `hound-pool.ts`, `process-adapter.ts` | Medium          |
+| Message boundary        | Length-prefixed parser + max message size | `hound-ipc.ts`                        | Medium          |
+| Runtime hardening flags | proto/codegen restriction flags           | `process-adapter.ts`                  | Medium          |
+| OS-level sandboxing     | external to app code                      | platform policy                       | Not guaranteed  |
 
-## Important Limitation
-
-`networkAccess`, `fileSystemWrite`, and `childSpawn` constraints in the process adapter are **declarative intent** unless enforced by container/runtime policy. They are not hard guarantees by themselves.
-
-## Required External Enforcement (Deployment)
+## External Hardening (Recommended, not correctness requirement)
 
 - Container profile or runtime policy for filesystem/network isolation
 - Privilege drop (non-root execution)
@@ -40,7 +49,7 @@ Validate whether the "quarantine" claim is backed by real containment controls.
 
 ## Exit Criteria
 
-- Isolation claim is split into:
+- Isolation claims remain explicitly split between:
   - **Implemented in code**
-  - **Required from deployment environment**
-- Every high-severity claim includes at least one verifiable artifact.
+  - **Not guaranteed / platform-managed**
+- No statement implies kernel-level isolation guarantee from app code.

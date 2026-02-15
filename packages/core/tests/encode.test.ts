@@ -105,6 +105,24 @@ describe('encodePayload', () => {
     })
   })
 
+  it('rejects payloads that exceed max nesting depth', () => {
+    let deep: any = { value: 1 }
+    for (let i = 0; i < 40; i++) {
+      deep = { nested: deep }
+    }
+
+    expect(() => encodePayload(deep, 100_000)).toThrow('max nesting depth exceeded')
+  })
+
+  it('rejects objects that exceed max key count', () => {
+    const wide: Record<string, number> = {}
+    for (let i = 0; i < 1001; i++) {
+      wide[`k${i}`] = i
+    }
+
+    expect(() => encodePayload(wide as any, 500_000)).toThrow('max object key count exceeded')
+  })
+
   describe('valid edge cases', () => {
     it('accepts null values', () => {
       const result = encodePayload({ a: null }, 1000)

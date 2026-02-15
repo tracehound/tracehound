@@ -11,10 +11,10 @@ Tracehound is a decision-free security buffer that quarantines threats detected 
 ## Key Features
 
 - **Deterministic Security Buffer**: No heuristics, no false positives. It only operates on explicit signals.
-- **Decision-Free Architecture**: Trusts external detection logic, focusing purely on isolation and evidence.
+- **Decision-Free Architecture**: Trusts external detection logic, focusing on deterministic evidence handling and bounded ingestion safety.
 - **Fail-Open Semantics**: Designed for high-velocity APIs where production availability is paramount.
 - **AuditChain**: Merkle-chained, tamper-evident forensic logging of all security events.
-- **Bounded Memory & Performance**: Fixed memory overhead and sub-millisecond hot-path latency.
+- **Bounded Runtime Controls**: Size, queue, and timeout controls are enforced in core paths; performance envelope is deployment-dependent.
 - **Cold Storage Adapters**: Automatic archival of evidence to S3, R2, or GCS.
 
 ---
@@ -100,7 +100,7 @@ app.register(tracehoundPlugin, { agent: th.agent })
 │  Agent         → Traffic orchestrator         │
 │  Quarantine    → Evidence buffer              │
 │  AuditChain    → Tamper-evident log           │
-│  HoundPool     → Sandboxed analysis           │
+│  HoundPool     → Process-separated analysis   │
 │  Scheduler     → Jittered background          │
 │  Notifications → Universal events             │
 │  SecurityState → Unified metrics              │
@@ -114,7 +114,7 @@ app.register(tracehoundPlugin, { agent: th.agent })
 1.  **Decision-free**: Tracehound never decides if a request is malicious. It only acts on external decisions.
 2.  **Detection is external**: Use your existing WAF, SIEM, or ML engine to drive Tracehound.
 3.  **Forensics > Visualization**: Immutable evidence is our primary product, not pretty dashboards.
-4.  **Local-First**: Operates within your application runtime for maximum speed and security.
+4.  **Local-First**: Operates within your application runtime for low-latency interception and auditability.
 
 ---
 

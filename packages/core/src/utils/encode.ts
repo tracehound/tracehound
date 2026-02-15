@@ -8,6 +8,9 @@
 import type { JsonSerializable } from '../types/common.js'
 import { Errors } from '../types/errors.js'
 
+const MAX_NESTING_DEPTH = 32
+const MAX_OBJECT_KEYS = 1000
+
 /** Result of payload encoding */
 export interface EncodeResult {
   /** UTF-8 encoded bytes */
@@ -24,7 +27,13 @@ export interface EncodeResult {
  *
  * @throws TracehoundError if payload contains problematic values
  */
-function validatePayloadStructure(value: unknown, path: string = 'root'): void {
+function validatePayloadStructure(value: unknown, path: string = 'root', depth: number = 0): void {
+  if (depth > MAX_NESTING_DEPTH) {
+    throw Errors.serializationFailed(
+      `max nesting depth exceeded at ${path} (${depth} > ${MAX_NESTING_DEPTH})`,
+    )
+  }
+
   if (value === undefined) {
     throw Errors.serializationFailed(`undefined value at ${path} - use null instead`)
   }
@@ -52,16 +61,23 @@ function validatePayloadStructure(value: unknown, path: string = 'root'): void {
 
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
-      validatePayloadStructure(value[i], `${path}[${i}]`)
+      validatePayloadStructure(value[i], `${path}[${i}]`, depth + 1)
     }
   } else if (value !== null && typeof value === 'object') {
     // Check for circular references would require WeakSet tracking
     // JSON.stringify will throw on circular refs anyway
-    for (const [key, val] of Object.entries(value)) {
+    const entries = Object.entries(value)
+    if (entries.length > MAX_OBJECT_KEYS) {
+      throw Errors.serializationFailed(
+        `max object key count exceeded at ${path} (${entries.length} > ${MAX_OBJECT_KEYS})`,
+      )
+    }
+
+    for (const [key, val] of entries) {
       if (val === undefined) {
         throw Errors.serializationFailed(`undefined value at ${path}.${key} - use null or omit key`)
       }
-      validatePayloadStructure(val, `${path}.${key}`)
+      validatePayloadStructure(val, `${path}.${key}`, depth + 1)
     }
   }
 }

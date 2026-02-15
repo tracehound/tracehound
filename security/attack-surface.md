@@ -19,7 +19,7 @@
 
 ## Gaps to Close
 
-- [ ] Add exact code references (function-level) for each sink.
-- [ ] Add input-size/pathological input scenarios for each entry point.
-- [ ] Add explicit note for unsupported/non-goals per surface.
-- [ ] Cross-link each high-risk entry to corresponding invariant IDs in `security/invariants.md`.
+- [x] Add exact code references (function-level) for each sink (see `security/artifacts/rce-spawn-inventory.md` + core tests).
+- [x] Add input-size/pathological input scenarios for key entry points (see DoS and parser artifacts).
+- [x] Add explicit note for unsupported/non-goals per surface in audit review notes.
+- [x] Cross-link each high-risk entry to corresponding invariant IDs in `security/invariants.md`.

@@ -41,9 +41,9 @@ const result = agent.intercept(scent)
 
 ### 2. Hound Pool (`IHoundPool`)
 
-Isolated child process pool for evidence processing.
+Process-separated child worker pool for evidence processing.
 
-- **Strict Sandbox:** No eval, no network, no storage.
+- **Containment-Oriented:** Uses process separation and hardening flags; OS sandboxing depends on deployment policy.
 - **Fire-and-Forget:** Agent never awaits detection.
 - **Resilient:** Auto-replenish on crash/timeout.
 

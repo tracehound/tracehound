@@ -23,10 +23,10 @@ Ensure observability supports forensics without leaking sensitive input data.
 
 ## Verification Plan
 
-- [ ] Search code paths for risky logging patterns (`console.*`, logger sinks, webhook failure logs)
-- [ ] Create redaction checklist with examples (`logging-redaction-checklist.md`)
-- [ ] Execute log injection test cases and record outcomes (`log-injection-test-results.md`)
-- [ ] Run sensitive-string scan against crash/error outputs (`crash-dump-sensitive-scan.md`)
+- [x] Search code paths for risky logging patterns (`console.*`, logger sinks, webhook failure logs) → `security/artifacts/logging-scan-rg.txt`
+- [x] Create redaction checklist with examples (`security/artifacts/logging-redaction-checklist.md`)
+- [ ] Execute log injection test cases and record outcomes (`security/artifacts/log-injection-test-results.md`)
+- [x] Run sensitive-string scan against crash/error outputs (`security/artifacts/crash-dump-sensitive-scan.md`)
 
 ## Exit Criteria
 

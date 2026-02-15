@@ -12,12 +12,12 @@ Make dependency risk and build provenance auditable.
 
 ## Required Outputs
 
-| Output                | Command / Source                | Artifact                         |
-| --------------------- | ------------------------------- | -------------------------------- |
-| Full dependency tree  | `pnpm list -r --depth Infinity` | `dependency-tree.txt`            |
-| Vulnerability report  | `pnpm audit --json`             | `pnpm-audit.json`                |
-| SBOM                  | CycloneDX/syft generation       | `sbom.cdx.json`                  |
-| Reproducibility notes | build hash comparison procedure | `build-reproducibility-notes.md` |
+| Output                | Command / Source                | Artifact                                            |
+| --------------------- | ------------------------------- | --------------------------------------------------- |
+| Full dependency tree  | `pnpm list -r --depth Infinity` | `security/artifacts/dependency-tree.txt`            |
+| Vulnerability report  | `pnpm audit --json`             | `security/artifacts/pnpm-audit.json`                |
+| SBOM                  | CycloneDX/syft generation       | `security/artifacts/sbom.cdx.json`                  |
+| Reproducibility notes | build hash comparison procedure | `security/artifacts/build-reproducibility-notes.md` |
 
 ## Policy Requirements
 
@@ -30,3 +30,9 @@ Make dependency risk and build provenance auditable.
 
 - Tree, audit, and SBOM artifacts are produced and versioned per run.
 - Exceptions and accepted risks are documented with expiry.
+
+## Sprint 3 Baseline Notes
+
+- Dependency tree artifact is generated.
+- `pnpm audit` endpoint returned 403 in this environment; output and error are captured in artifact.
+- SBOM artifact is generated via local fallback generator due registry restrictions in `pnpm dlx` path.

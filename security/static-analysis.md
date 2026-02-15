@@ -8,7 +8,8 @@ Establish automated static analysis with clear triage outcomes.
 
 - CodeQL workflow is present in GitHub Actions.
 - CI already runs `pnpm audit --prod`.
-- Semgrep and explicit taint-flow reporting are not yet documented as artifacts.
+- Semgrep CI workflow is present (`.github/workflows/semgrep.yml`).
+- Explicit taint-flow reporting is documented via artifact notes.
 
 ## Required Checks
 
@@ -28,11 +29,19 @@ Establish automated static analysis with clear triage outcomes.
 
 ## Required Artifacts
 
-- `semgrep-results.sarif`
-- `codeql-summary.md`
-- `taint-flow-notes.md`
+- `security/artifacts/semgrep-results.sarif`
+- `security/artifacts/semgrep-ci-summary.md`
+- `security/artifacts/codeql-summary.md`
+- `security/artifacts/taint-flow-notes.md`
 
 ## Exit Criteria
 
 - All critical/high findings are triaged with explicit status.
 - Reachability rationale is documented for accepted risks.
+
+## Sprint 3 Baseline Notes
+
+- CodeQL workflow presence is validated and summarized in `security/artifacts/codeql-summary.md`.
+- Semgrep CI workflow summary is captured in `security/artifacts/semgrep-ci-summary.md`.
+- Local SARIF file remains a placeholder until first CI run artifact is attached.
+- Initial taint flow source->sink notes are captured in `security/artifacts/taint-flow-notes.md`.

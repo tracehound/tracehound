@@ -1,26 +1,57 @@
+name: Semgrep Security Analysis
+
 on:
-  workflow_dispatch: {}
-  pull_request: {}
   push:
     branches:
-    - main
-    - master
-    paths:
-    - .github/workflows/semgrep.yml
+      - main
+      - master
+      - develop
+      - 'release/**'
+  pull_request:
+    branches:
+      - '**'
   schedule:
-  # random HH:MM to avoid a load spike on GitHub Actions at 00:00
-  - cron: 34 4 * * *
-name: Semgrep
+    - cron: '41 2 * * 2'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: semgrep-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   semgrep:
-    name: semgrep/ci
+    name: Semgrep
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    env:
-      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
-    container:
-      image: semgrep/semgrep
+    timeout-minutes: 30
     steps:
-    - uses: actions/checkout@v4
-    - run: semgrep ci
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/nodejs
+            p/typescript
+          generateSarif: '1'
+
+      - name: Upload SARIF to GitHub code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Persist SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-sarif
+          path: semgrep.sarif
+          if-no-files-found: error

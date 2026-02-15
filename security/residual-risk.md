@@ -38,4 +38,8 @@ Document explicit remaining risk after Audit baselines, without claiming absolut
 
 - Residual risk entries include decision + owner.
 - Out-of-scope boundaries are explicit and reviewable.
-- `residual-risk-register.md` is published under `security/artifacts/`.
+- `security/artifacts/residual-risk-register.md` is published and reviewed.
+
+## Sprint 3 Baseline Notes
+
+- Draft residual risk register is now tracked in `security/artifacts/residual-risk-register.md` with owner, expiry, and review cadence.

@@ -30,9 +30,9 @@ Define boundedness checks for memory, queueing, parser behavior, and event-loop 
 
 ## Required Artifacts
 
-- `security/artifacts/dos-load-profile.md`
-- `security/artifacts/event-loop-delay-scan.md`
-- `security/artifacts/worker-pool-exhaustion-results.md`
+- `security/artifacts/dos-load-profile.md` (baseline created)
+- `security/artifacts/event-loop-delay-scan.md` (baseline created)
+- `security/artifacts/worker-pool-exhaustion-results.md` (baseline created)
 
 ## Exit Criteria
 

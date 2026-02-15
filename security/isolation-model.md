@@ -34,9 +34,9 @@ Validate whether the "quarantine" claim is backed by real containment controls.
 
 ## Evidence Plan
 
-- [ ] `security/artifacts/isolation-process-model.md`
-- [ ] `security/artifacts/container-policy-checklist.md`
-- [ ] `security/artifacts/hound-timeout-termination-check.md`
+- [x] `security/artifacts/isolation-process-model.md` (baseline created)
+- [x] `security/artifacts/container-policy-checklist.md` (baseline created)
+- [x] `security/artifacts/hound-timeout-termination-check.md` (baseline created)
 
 ## Exit Criteria
 

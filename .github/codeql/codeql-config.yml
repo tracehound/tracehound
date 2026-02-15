@@ -1,0 +1,30 @@
+name: tracehound-codeql-strict
+
+disable-default-path-filters: true
+
+paths:
+  - packages
+  - docs
+  - security
+
+paths-ignore:
+  - "**/*.test.ts"
+  - "**/tests/**"
+  - "**/scenarios/**"
+  - "**/*.md"
+  - "**/*.mdx"
+  - "**/*.snap"
+  - "**/dist/**"
+  - "**/coverage/**"
+
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
+
+query-filters:
+  - exclude:
+      kind: problem
+      precision:
+        - low
+  - include:
+      tags contain: security

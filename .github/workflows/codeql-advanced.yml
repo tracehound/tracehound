@@ -32,9 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - language: javascript-typescript
-            build-mode: manual
+        language: [javascript-typescript]
 
     steps:
       - name: Harden runner

@@ -44,7 +44,10 @@ export class Quarantine {
   private store = new Map<string, EvidenceHandle>()
   private totalBytes = 0
 
-  constructor(private config: QuarantineConfig, private auditChain: AuditChain) {}
+  constructor(
+    private config: QuarantineConfig,
+    private auditChain: AuditChain,
+  ) {}
 
   /**
    * Insert evidence into quarantine.
@@ -116,7 +119,7 @@ export class Quarantine {
   flush(): NeutralizationRecord[] {
     const records: NeutralizationRecord[] = []
 
-    for (const [signature, evidence] of this.store) {
+    for (const [_signature, evidence] of this.store) {
       const record = evidence.neutralize(this.auditChain.lastHash)
       this.auditChain.append(record)
       records.push(record)

@@ -1,6 +1,8 @@
 # Internal Audit Preparation
 
-When these files are ready:
+## Scope Documents
+
+The audit package is built from these core documents:
 
 - threat-model
 - invariants
@@ -12,20 +14,32 @@ When these files are ready:
 - supply-chain
 - resource-exhaustion
 - static-analysis
+- logging-model
+- residual-risk
 
-The following will be produced:
+## Expected Outcomes
+
+A complete package should make the following visible:
 
 - real attack surface map
 - evidence gaps
 - incorrect security assumptions
 - exploitable boundaries
-- points likely to be identified by auditors (e.g., Cure53)
+- likely auditor focus points
 
 ---
 
 ## Current Status
 
+"Full cover" Node security is not realistic. Risk can still be materially reduced if:
+
 "Full cover Node security" is practically impossible. However:
+
+- invariants are proven with artifacts
+- fuzz campaigns show no unresolved high-impact crashes
+- RCE surface is minimized and justified
+- isolation claims are split between code guarantees and deployment guarantees
+- SBOM/build/provenance controls are in place
 
 - if invariants are proven
 - if there are no fuzz crashes
@@ -33,8 +47,16 @@ The following will be produced:
 - if isolation is real
 - if the SBOM + build are deterministic
 
-External audits generally find model-edge and parser corner-cases, whereas structural vulnerabilities become rare.
+External audits most often find parser/model edge cases rather than structural flaws when the above controls are maintained.
 
 [1]: https://arxiv.org/abs/2207.11171 'Silent Spring: Prototype Pollution Leads to Remote Code Execution in Node.js'
 [2]: https://arxiv.org/abs/2306.13984 'HODOR: Shrinking Attack Surface on Node.js via System Call Limitation'
 [3]: https://arxiv.org/abs/2508.13750 'NodeShield: Runtime Enforcement of Security-Enhanced SBOMs for Node.js'
+
+## Audit Package Checklist
+
+- [ ] All documents updated from baseline to evidence-backed status.
+- [ ] Artifact directories must be populated.
+- [ ] Residual risk register finalized with owner + decision.
+- [ ] Logging leakage checks and injection test results attached.
+- [ ] Final review sign-off recorded in `security/artifacts/audit-package-checklist.md`.

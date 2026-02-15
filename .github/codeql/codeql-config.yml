@@ -1,7 +1,5 @@
 name: tracehound-codeql-strict
 
-disable-default-path-filters: true
-
 paths:
   - packages
   - docs
@@ -23,8 +21,10 @@ queries:
 
 query-filters:
   - exclude:
-      kind: problem
+      problem.severity:
+        - warning
       precision:
         - low
   - include:
-      tags contain: security
+      tags:
+        - security

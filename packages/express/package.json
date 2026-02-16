@@ -2,6 +2,25 @@
   "name": "@tracehound/express",
   "version": "1.2.0",
   "description": "Express middleware for Tracehound security buffer",
+  "license": "Apache-2.0",
+  "author": "Erdem Arslan <me@erdem.work>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tracehound/tracehound.git",
+    "directory": "packages/express"
+  },
+  "homepage": "https://github.com/tracehound/tracehound#readme",
+  "bugs": {
+    "url": "https://github.com/tracehound/tracehound/issues"
+  },
+  "keywords": [
+    "security",
+    "runtime",
+    "express",
+    "quarantine",
+    "forensics",
+    "audit"
+  ],
   "type": "module",
   "exports": {
     ".": {

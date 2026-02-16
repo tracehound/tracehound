@@ -2,6 +2,25 @@
   "name": "@tracehound/fastify",
   "version": "1.2.0",
   "description": "Fastify plugin for Tracehound security buffer",
+  "license": "Apache-2.0",
+  "author": "Erdem Arslan <me@erdem.work>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tracehound/tracehound.git",
+    "directory": "packages/fastify"
+  },
+  "homepage": "https://github.com/tracehound/tracehound#readme",
+  "bugs": {
+    "url": "https://github.com/tracehound/tracehound/issues"
+  },
+  "keywords": [
+    "security",
+    "runtime",
+    "fastify",
+    "quarantine",
+    "forensics",
+    "audit"
+  ],
   "type": "module",
   "exports": {
     ".": {

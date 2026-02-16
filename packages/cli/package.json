@@ -2,6 +2,24 @@
   "name": "@tracehound/cli",
   "version": "1.2.0",
   "description": "Tracehound CLI evaluation runtime",
+  "license": "Apache-2.0",
+  "author": "Erdem Arslan <me@erdem.work>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tracehound/tracehound.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/tracehound/tracehound#readme",
+  "bugs": {
+    "url": "https://github.com/tracehound/tracehound/issues"
+  },
+  "keywords": [
+    "security",
+    "runtime",
+    "cli",
+    "forensics",
+    "audit"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "bin": {

@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "description": "Deterministic runtime security buffer for high-velocity APIs",
   "license": "Apache-2.0",
-  "author": "Tracehound <hello@tracehound.dev>",
+  "author": "Erdem Arslan <me@erdem.work>",
   "repository": {
     "type": "git",
     "url": "https://github.com/tracehound/tracehound.git",

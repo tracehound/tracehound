@@ -14,7 +14,6 @@ It acts as a forensic substrate, preserving tamper-evident evidence while ensuri
 [![CI](https://github.com/tracehound/tracehound/actions/workflows/ci.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/ci.yml)
 [![License: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/license/apache-2-0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-[![Version](https://img.shields.io/badge/version-1.3.0-orange.svg)](https://github.com/tracehound/tracehound)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 
 [Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues)

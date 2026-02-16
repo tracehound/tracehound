@@ -154,4 +154,3 @@ All latency measurements assume:
 
 - [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md) — Failure behavior
 - [LOCAL-STATE-SEMANTICS.md](./LOCAL-STATE-SEMANTICS.md) — Instance isolation
-- [PRICING.md](./PRICING.md) — Package pricing

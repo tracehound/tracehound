@@ -72,7 +72,7 @@ import {
 const auditChain = new AuditChain()
 const quarantine = createQuarantine(
   { maxCount: 1000, maxBytes: 100_000_000, evictionPolicy: 'priority' },
-  auditChain
+  auditChain,
 )
 const rateLimiter = createRateLimiter({
   windowMs: 60_000,
@@ -242,4 +242,4 @@ type InterceptResult =
 
 ## License
 
-Apache 2.0 (Substrate). See [LICENSE](../LICENSE) and [Pricing](./PRICING.md) for commercial tiers.
+Apache 2.0 (Substrate). See [LICENSE](../LICENSE)

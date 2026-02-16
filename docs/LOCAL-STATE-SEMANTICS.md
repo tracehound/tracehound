@@ -143,4 +143,3 @@ Agent.configure({
 
 - [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md) — Failure behavior
 - [PERFORMANCE-SLA.md](./PERFORMANCE-SLA.md) — Latency guarantees
-- [PRICING.md](./PRICING.md) — Package pricing

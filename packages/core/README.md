@@ -122,4 +122,4 @@ if (result.status === 'quarantined') {
 
 ## License
 
-Open-Core — this package is the open-source substrate of the Tracehound ecosystem. See the root [PRICING.md](../../docs/PRICING.md) for details on the commercial satellite packages.
+Open-Core — this package is the open-source substrate of the Tracehound ecosystem.

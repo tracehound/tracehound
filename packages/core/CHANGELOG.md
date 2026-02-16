@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-02-16 - Deterministic Fuzz Assurance Program
+
+This release finalizes the Jazzer-free deterministic fuzz assurance roadmap for Tracehound core.
+It adds reproducible property-fuzz coverage, adversarial corpus replay, lifecycle governance, and CI gate enforcement for audit-grade security invariants.
+
+### Added
+
+- **Deterministic Property Fuzz Suite** under `packages/core/tests/fuzz/` for mandatory invariants:
+  - determinism
+  - canonical idempotency
+  - integrity enforcement
+  - bounded failure
+  - state non-amplification
+  - duplicate stability
+  - IPC logical safety
+- **Adversarial State-Machine Fuzzing**:
+  - append permutation checks
+  - partial failure ordering checks
+  - duplicate replay stability checks
+- **Versioned Adversarial Corpus** under `security/corpus/` with replayable seed manifest.
+- **Lifecycle Automation**:
+  - `scripts/record-fuzz-failure.mjs` for detect/minimize/classify/persist/replay tracking
+  - machine-readable failure ledger: `security/artifacts/generated/fuzz-failures.json`
+- **Assurance Metrics Automation**:
+  - `scripts/generate-fuzz-assurance-report.mjs`
+  - generated metrics artifacts for assurance/regression jobs
+- **CI/Nightly Fuzz Workflows**:
+  - PR regression replay gate
+  - nightly assurance gate and artifact upload
+
+### Changed
+
+- **IPC Parser Safety Hardening**: parser buffer resets on malformed parse failures to avoid corrupted/amplifying buffered state.
+- **Security Documentation Sync**:
+  - updated invariants registry to `INV-DET-01..INV-DET-07`
+  - updated fuzz assurance report model and artifact mapping
+  - synchronized lifecycle/gate evidence docs for audit usage
+- **Gate Enforcement**:
+  - assurance scripts now support enforce-pass behavior
+  - CI fails when unresolved lifecycle records remain
+
+### Operational Outcome
+
+- Deterministic security invariants are enforced by reproducible fuzz + replay evidence.
+- Assurance metrics are machine-readable and CI-enforced.
+- Failure lifecycle has audit-traceable records and replay hooks.
+
 ## [1.3.0] - 2026-02-16 - Security Model Alignment & Parser Hardening
 
 v1.3.0 further aligns Tracehound with a deterministic security buffer model. This release focuses on aligning security claims with technical guarantees, making parser/ingestion boundedness explicit, and strengthening audit preparation through evidence-first artifacts.

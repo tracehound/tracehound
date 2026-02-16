@@ -2,38 +2,40 @@
 
 ## Why this matters
 
-Since Tracehound acts as a security buffer, its parser/serialization behavior must be:
+Since Tracehound acts as a security buffer, parser/serialization behavior must be deterministic and bounded.
 
-- **deterministic** (same input -> same signature)
-- **bounded** (limited resource consumption)
+## Determinism Rules
 
-## Current Determinism Rules
+1. Canonical JSON key sorting before serialization.
+2. SHA-256 hash over canonical UTF-8 bytes.
+3. Signature format `${category}:${hash}`.
+4. EvidenceFactory is single ownership point for hash/signature generation.
 
-1. Payload JSON canonicalization: object keys sorted before serialization.
-2. Hashing path: SHA-256 over canonical UTF-8 bytes.
-3. Signature path: `${category}:${hash}` format.
-4. Factory is single ownership point for hash/signature generation.
+5. Payload JSON canonicalization: object keys sorted before serialization.
+6. Hashing path: SHA-256 over canonical UTF-8 bytes.
+7. Signature path: `${category}:${hash}` format.
+8. Factory is single ownership point for hash/signature generation.
 
-## Current Boundedness Rules
+## Boundedness Rules
 
-1. Payload structure validation rejects non-serializable/ambiguous values (`undefined`, `NaN`, `Infinity`, `function`, `symbol`, `bigint`).
-2. Size control occurs after UTF-8 encoding using `maxPayloadSize`.
-3. Agent maps size overflow to `payload_too_large` result.
+1. Reject ambiguous/non-serializable payload values.
+2. Enforce size limit on encoded UTF-8 bytes.
+3. Enforce depth (`32`) and width (`1000 keys/object`) limits.
+4. IPC parser resets buffered state on malformed frame length errors.
 
 ## Bound Parameters
 
-- `maxPayloadSize`: integration-configured hard limit (must be explicit in deployment config)
-- Max nesting depth: hard-limited to `32` in encode validation path
-- Max key count/object width: hard-limited to `1000` object keys per object
+- `maxPayloadSize`: deployment-configured hard limit.
+- Max nesting depth: `32`.
+- Max object key count: `1000`.
+- Max IPC frame size: `1MB`.
 
 ## Known Gaps
 
-- [x] Explicit depth limit enforced (32).
-- [x] Explicit width/object-key cardinality limit enforced (1000 keys/object).
-- [ ] No dedicated fuzz artifact yet proving parser determinism under adversarial inputs.
+- [x] Dedicated fuzz and corpus evidence proving parser determinism under adversarial inputs.
 
 ## Actions
 
-- [x] Default depth/width policy values proposed and implemented.
-- [x] Deterministic test matrix includes key order, mixed encoding, deep nesting, and width overflow.
-- [x] Create first artifact: `security/artifacts/parser-determinism-baseline.md`.
+- [x] Deterministic property fuzz suite added (`packages/core/tests/fuzz/*.property.test.ts`).
+- [x] Corpus replay test added (`packages/core/tests/fuzz/replay-corpus.test.ts`).
+- [x] Artifact summary updated under `security/artifacts/`.

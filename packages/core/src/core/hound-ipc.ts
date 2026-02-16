@@ -105,7 +105,7 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
     errorBytes.copy(payload, 2)
 
     return encodeMessage(
-      payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length)
+      payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length),
     )
   } else {
     // Type 0x02 = metrics
@@ -116,7 +116,7 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
     payload.writeDoubleBE(message.memoryUsed, 9)
 
     return encodeMessage(
-      payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length)
+      payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length),
     )
   }
 }
@@ -275,12 +275,19 @@ export function createMessageParser(): MessageParser {
       const messages: ArrayBuffer[] = []
 
       // Parse all complete messages
-      while (true) {
-        const result = tryParseMessage(buffer)
-        if (!result) break
+      try {
+        while (true) {
+          const result = tryParseMessage(buffer)
+          if (!result) break
 
-        messages.push(result.payload)
-        buffer = buffer.subarray(result.bytesConsumed)
+          messages.push(result.payload)
+          buffer = buffer.subarray(result.bytesConsumed)
+        }
+      } catch (error: unknown) {
+        // Safety invariant: malformed frames MUST NOT keep parser
+        // in a corrupted/amplifying buffered state.
+        buffer = Buffer.alloc(0)
+        throw error
       }
 
       return messages

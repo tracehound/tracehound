@@ -1,0 +1,40 @@
+name: Fuzz Assurance Nightly
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: fuzz-assurance-nightly
+  cancel-in-progress: true
+
+jobs:
+  fuzz_assurance:
+    name: Nightly Fuzz Assurance
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm --filter @tracehound/core test:fuzz:assurance
+        env:
+          FUZZ_SEED: 20260216
+          FUZZ_NUM_RUNS: 300
+      - run: pnpm assurance:gate
+        env:
+          FUZZ_SEED: 20260216
+          FUZZ_NUM_RUNS: 300
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-assurance-metrics
+          path: security/artifacts/generated/fuzz-assurance-metrics.json

@@ -55,8 +55,8 @@ Program gates G1..G7 in that file define when external audit booking is allowed.
 
 ## Audit Package Checklist
 
-- [ ] All documents updated from baseline to evidence-backed status.
-- [ ] Artifact directories must be populated.
-- [ ] Residual risk register finalized with owner + decision.
-- [ ] Logging leakage checks and injection test results attached.
-- [ ] Final review sign-off recorded in `security/artifacts/audit-package-checklist.md`.
+- [x] All documents updated from baseline to evidence-backed status.
+- [x] Artifact directories must be populated.
+- [x] Residual risk register finalized with owner + decision.
+- [x] Logging leakage checks and injection test results attached.
+- [x] Final review sign-off recorded in `security/artifacts/audit-package-checklist.md`.

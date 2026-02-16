@@ -1,41 +1,27 @@
 # Invariants
 
-This document defines measurable security invariants.
+This register defines deterministic security invariants verified by fuzz/property campaigns.
 
 ## Invariant Register
 
-| ID     | Invariant                                                                      | Why It Matters                                       | Current Evidence                                     | Status |
-| ------ | ------------------------------------------------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------- | ------ |
-| INV-01 | **No-threat scent must not be quarantined.** (If `scent.threat` is null/empty) | Prevents business-logic bypass and false quarantines | `integration.test.ts` clean-scent case               | pass   |
-| INV-02 | **Threat scent must pass through factory before quarantine.**                  | Ensures single ownership of hash/signature           | `integration.test.ts` threat quarantine case         | pass   |
-| INV-03 | **Payload over configured limit must be rejected.**                            | Reduces memory exhaustion risk                       | `encode.test.ts` + adapter 413 tests                 | pass   |
-| INV-04 | **Same canonical payload + same category => same signature.**                  | Forensic determinism                                 | `consistency.test.ts` + `encode.test.ts` determinism | pass   |
-| INV-05 | **Duplicate signature must not create duplicate quarantine state.**            | Limits storage abuse and replay effects              | `integration.test.ts` duplicate signature case       | pass   |
-| INV-06 | **External detector trust must not be silently promoted.**                     | Risks trust-boundary escalation                      | `trust-boundary.test.ts`                             | pass   |
-| INV-07 | **Hound process code-generation-from-strings disabled.**                       | Minimizes RCE surface                                | `runtime.test.ts` + process-adapter flags            | pass   |
+| ID         | Invariant (MUST)                                                                                    | Observable State / Outcome                           | Evidence Linkage                                                                          | Status |
+| ---------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------ |
+| INV-DET-01 | **Determinism:** identical byte-equivalent input MUST yield identical hash/signature/state outcome. | signature, canonical bytes, intercept status         | `determinism.property.test.ts`, `state-machine-adversarial.property.test.ts`, corpus pair | pass   |
+| INV-DET-02 | **Canonical idempotency:** `canonical(canonical(x)) == canonical(x)` MUST hold.                     | canonical JSON string and encoded size               | `canonical-idempotency.property.test.ts`                                                  | pass   |
+| INV-DET-03 | **Integrity enforcement:** mutation between sign → verify MUST be detected.                         | signature comparison mismatch                        | `integrity-enforcement.property.test.ts`                                                  | pass   |
+| INV-DET-04 | **Bounded failure:** malformed/oversized input MUST NOT mutate quarantine/chain.                    | quarantine `count/bytes`, no unbounded parser growth | `bounded-failure.property.test.ts`                                                        | pass   |
+| INV-DET-05 | **State non-amplification:** rejected input MUST NOT grow quarantine/chain/pool.                    | same stats before/after rejection                    | fuzz property + state-machine fuzz + corpus replay                                        | pass   |
+| INV-DET-06 | **Duplicate stability:** duplicate signature MUST NOT create duplicate state.                       | first quarantined, second ignored, stable count      | `duplicate-stability.property.test.ts`, `state-machine-adversarial.property.test.ts`      | pass   |
+| INV-DET-07 | **IPC safety (logical):** malformed IPC frame MUST NOT corrupt parser state.                        | parser buffered bytes bounded/reset on bad frame     | `ipc-safety.property.test.ts`                                                             | pass   |
 
 ## Validation Mapping
 
-- **Code evidence:** core flow and boundary modules (`agent`, `evidence-factory`, `encode`, `trust-boundary`, `process-adapter`)
-- **Existing tests to map:** consistency, trust-boundary, tracehound, and codec tests
-- **Open need:** specific test name + artifact output for each invariant (`security/artifacts/*.md`)
-
-## Ownership & Target Dates (Program Baseline)
-
-| ID     | Owner           | Target Sprint | Target Date (placeholder) | Planned Decision Path |
-| ------ | --------------- | ------------- | ------------------------- | --------------------- |
-| INV-01 | Core Maintainer | Sprint 1      | 2026-03-06                | pass                  |
-| INV-02 | Core Maintainer | Sprint 1      | 2026-03-06                | pass                  |
-| INV-03 | Core Maintainer | Sprint 1      | 2026-03-06                | pass                  |
-| INV-04 | Security + Core | Sprint 1      | 2026-03-06                | pass                  |
-| INV-05 | Core Maintainer | Sprint 1      | 2026-03-06                | pass                  |
-| INV-06 | Security Lead   | Sprint 1      | 2026-03-06                | pass/risk-accepted    |
-| INV-07 | Core + Platform | Sprint 1      | 2026-03-06                | pass/risk-accepted    |
-
-Status transitions to final `pass/fail/risk-accepted` are tracked in `security/artifacts/invariant-mapping.md`.
+- Code evidence: `encode`, `signature`, `agent`, `quarantine`, `hound-ipc`.
+- Replay evidence: versioned corpus under `security/corpus/` with deterministic replay in CI.
+- Program artifacts: `security/artifacts/fuzz-assurance-report.md`, `security/artifacts/fuzz-corpus-summary.md`.
 
 ## Exit Criteria
 
-- [x] Each invariant linked to at least one test/analysis output.
-- [x] Updated statuses to `pass/fail/risk-accepted`.
-- [x] Defined owner and target completion date for INV-01..INV-07.
+- [x] Every invariant mapped to executable property/replay checks.
+- [x] Deterministic seed and reproducibility requirements documented.
+- [x] Artifact linkage updated for audit evidence.

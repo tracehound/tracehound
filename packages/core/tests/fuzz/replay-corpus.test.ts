@@ -1,19 +1,21 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { createMessageParser } from '../../src/core/hound-ipc.js'
 import { generateSignature } from '../../src/types/signature.js'
 import { encodePayload } from '../../src/utils/encode.js'
 import { createTestRuntime } from './helpers.js'
 
-const CORPUS_ROOT = join(process.cwd(), '..', '..', 'security', 'corpus')
+const TEST_DIR = dirname(fileURLToPath(import.meta.url))
+const CORPUS_ROOT = resolve(TEST_DIR, '../../../../security/corpus')
 
 interface CorpusManifest {
   seeds: Array<{ file: string }>
 }
 
 function readJson<T>(relativePath: string): T {
-  const p = join(CORPUS_ROOT, relativePath)
+  const p = resolve(CORPUS_ROOT, relativePath)
   return JSON.parse(readFileSync(p, 'utf8')) as T
 }
 

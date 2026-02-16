@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-02-16 - Security Model Alignment & Parser Hardening
+
+v1.3.0 further aligns Tracehound with a deterministic security buffer model. This release focuses on aligning security claims with technical guarantees, making parser/ingestion boundedness explicit, and strengthening audit preparation through evidence-first artifacts.
+
+### Security Model Clarification
+
+The security model is now explicitly scoped to:
+
+- **Deterministic evidence integrity**: Guaranteed tamper-evident forensic chains.
+- **Parser & ingestion safety**: Bounded and canonical handling of all traffic input.
+- **No unsafe execution**: Prevention of untrusted input execution in supported runtime paths.
+
+_Note: Tracehound focuses on fault containment and logical isolation. It does not claim host compromise protection or OS-level container escape guarantees as internal product invariants._
+
+### Added
+
+- **Parser Boundary Enforcement**: `encodePayload` now enforces explicit boundedness controls:
+  - `MAX_NESTING_DEPTH = 32`
+  - `MAX_OBJECT_KEYS = 1000` (per object)
+- **Hardening Tests**: New unit tests validating rejection of payloads exceeding nesting depth or key cardinality.
+- **Security/Audit Pipeline**: Added Semgrep CI workflow with SARIF upload and artifact persistence.
+- **Open Source Foundation**: Added `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1).
+- **Project Narrative**: Enhanced `README.md` with "About the Project" and "Why we built this" sections.
+
+### Changed
+
+- **Messaging Alignment**: Public-facing docs updated to move from "sandboxed analysis" to "process-separated analysis" to reflect the actual guarantee envelope.
+- **Package Ownership**: Set official package author to **Erdem Arslan <me@erdem.work>**.
+- **Unified Versioning**: Synchronized all ecosystem components to v1.3.0.
+
+### Known Follow-ups
+
+- Attach first real Semgrep CI SARIF + triage output.
+- Regenerate supply-chain evidence in fully authenticated CI context (pnpm audit, final SBOM).
+- Extend parser determinism fuzz evidence depth.
+
 ## [1.2.0] - 2026-02-14 - Forensic Hardening & English Audit Prep
 
 ### Added

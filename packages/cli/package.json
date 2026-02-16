@@ -42,5 +42,7 @@
     "typescript": "^5.0.0",
     "vitest": "^2.0.0"
   },
-  "private": true
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -2,12 +2,14 @@
  * Agent tests - core intercept flow.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Agent, createAgent } from '../src/core/agent.js'
 import { AuditChain } from '../src/core/audit-chain.js'
 import { createEvidenceFactory } from '../src/core/evidence-factory.js'
+import type { INotificationEmitter } from '../src/core/notification-emitter.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
+import type { IWatcher } from '../src/core/watcher.js'
 import type { JsonSerializable, QuarantineConfig, RateLimitConfig } from '../src/types/index.js'
 import type { Scent } from '../src/types/scent.js'
 
@@ -15,6 +17,8 @@ describe('Agent', () => {
   let agent: Agent
   let quarantine: Quarantine
   let auditChain: AuditChain
+  let mockWatcher: IWatcher
+  let mockNotifications: INotificationEmitter
 
   const rateLimitConfig: RateLimitConfig = {
     windowMs: 60_000,
@@ -34,7 +38,7 @@ describe('Agent', () => {
 
   function createScent(
     payload: JsonSerializable,
-    threat?: { category: 'injection' | 'ddos'; severity: 'low' | 'high' }
+    threat?: { category: 'injection' | 'ddos'; severity: 'low' | 'high' },
   ): Scent {
     return {
       id: `scent-${Date.now()}-${Math.random()}`,
@@ -51,7 +55,41 @@ describe('Agent', () => {
     const rateLimiter = createRateLimiter(rateLimitConfig)
     const evidenceFactory = createEvidenceFactory()
 
-    agent = new Agent(agentConfig, quarantine, rateLimiter, evidenceFactory)
+    mockWatcher = {
+      recordThreat: vi.fn(),
+      updateQuarantine: vi.fn(),
+      alert: vi.fn(),
+      setOverloaded: vi.fn(),
+      snapshot: vi.fn(),
+    } as unknown as IWatcher
+
+    mockNotifications = {
+      emit: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      subscribe: vi.fn(),
+      registerWebhook: vi.fn(),
+      unregisterWebhook: vi.fn(),
+      get stats() {
+        return {
+          totalEmitted: 0,
+          byType: {},
+          activeCallbacks: 0,
+          activeSubscribers: 0,
+          activeWebhooks: 0,
+        } as any
+      },
+    } as unknown as INotificationEmitter
+
+    agent = new Agent(
+      agentConfig,
+      quarantine,
+      rateLimiter,
+      evidenceFactory,
+      undefined,
+      mockWatcher,
+      mockNotifications,
+    )
   })
 
   describe('construction', () => {
@@ -65,7 +103,7 @@ describe('Agent', () => {
           { maxPayloadSize: 0 },
           quarantine,
           createRateLimiter(rateLimitConfig),
-          createEvidenceFactory()
+          createEvidenceFactory(),
         )
       }).toThrow('maxPayloadSize must be positive')
     })
@@ -96,7 +134,15 @@ describe('Agent', () => {
       }
 
       const rateLimiter = createRateLimiter(limitedConfig)
-      const localAgent = new Agent(agentConfig, quarantine, rateLimiter, createEvidenceFactory())
+      const localAgent = new Agent(
+        agentConfig,
+        quarantine,
+        rateLimiter,
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
 
       // Use up limit
       localAgent.intercept(createScent({ data: 1 }))
@@ -109,6 +155,38 @@ describe('Agent', () => {
         expect(result.retryAfter).toBeGreaterThan(0)
       }
     })
+
+    it('emits rate_limit.exceeded event when source blocked', () => {
+      const limitedConfig: RateLimitConfig = {
+        windowMs: 60_000,
+        maxRequests: 1,
+        blockDurationMs: 1000,
+      }
+
+      const rateLimiter = createRateLimiter(limitedConfig)
+      const localAgent = new Agent(
+        agentConfig,
+        quarantine,
+        rateLimiter,
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      // Use up limit
+      localAgent.intercept(createScent({ data: 1 }))
+
+      // Second should be rate limited
+      localAgent.intercept(createScent({ data: 2 }))
+
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'rate_limit.exceeded',
+        expect.objectContaining({
+          retryAfterMs: expect.any(Number),
+        }),
+      )
+    })
   })
 
   describe('intercept - payload validation', () => {
@@ -117,12 +195,12 @@ describe('Agent', () => {
         { maxPayloadSize: 10 },
         quarantine,
         createRateLimiter(rateLimitConfig),
-        createEvidenceFactory()
+        createEvidenceFactory(),
       )
 
       const scent = createScent(
         { data: 'x'.repeat(100) },
-        { category: 'injection', severity: 'high' }
+        { category: 'injection', severity: 'high' },
       )
 
       const result = smallAgent.intercept(scent)
@@ -150,7 +228,7 @@ describe('Agent', () => {
     it('returns quarantined for new threat', () => {
       const scent = createScent(
         { attack: 'sql injection' },
-        { category: 'injection', severity: 'high' }
+        { category: 'injection', severity: 'high' },
       )
 
       const result = agent.intercept(scent)
@@ -179,6 +257,35 @@ describe('Agent', () => {
         quarantine.neutralize(result.handle.signature)
         expect(auditChain.length).toBe(1)
       }
+    })
+
+    it('calls observability hooks on quarantine', () => {
+      const scent = createScent(
+        { attack: 'sql injection' },
+        { category: 'injection', severity: 'high' },
+      )
+
+      agent.intercept(scent)
+
+      expect(mockWatcher.recordThreat).toHaveBeenCalledWith('injection', 'high')
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'threat.detected',
+        expect.objectContaining({
+          category: 'injection',
+          severity: 'high',
+        }),
+      )
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'evidence.quarantined',
+        expect.objectContaining({
+          severity: 'high',
+        }),
+      )
+      expect(mockWatcher.updateQuarantine).toHaveBeenCalledWith(
+        1,
+        expect.any(Number),
+        quarantineConfig.maxBytes,
+      )
     })
   })
 
@@ -275,7 +382,7 @@ describe('Agent', () => {
         agentConfig,
         quarantine,
         createRateLimiter(rateLimitConfig),
-        createEvidenceFactory()
+        createEvidenceFactory(),
       )
 
       expect(agentInstance).toBeDefined()

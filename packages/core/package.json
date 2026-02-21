@@ -1,6 +1,6 @@
 {
   "name": "@tracehound/core",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Deterministic runtime security buffer for high-velocity APIs",
   "license": "Apache-2.0",
   "author": "Erdem Arslan <me@erdem.work>",

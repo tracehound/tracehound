@@ -1,14 +1,24 @@
-import express from 'express'
-import { tracehound } from '@tracehound/express'
 import { createTracehound } from '@tracehound/core'
+import { tracehound } from '@tracehound/express'
+import express from 'express'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-// Create a Tracehound instance with very low constraints for testing
+// Resolve the compiled hound-process.js from the monorepo dist output.
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const HOUND_PROCESS_PATH = resolve(__dirname, '../../packages/core/dist/core/hound-process.js')
+
+// Create a Tracehound instance with very low constraints for testing.
+// HoundPool is automatically wired to the Agent inside createTracehound():
+// quarantined evidence is forwarded to the pool without any manual activation.
 const th = createTracehound({
   houndPool: {
     poolSize: 2, // Tiny pool to exhaust quickly
-    timeout: 100, // 100ms timeout for Zombie Hound testing
+    timeout: 100, // 100ms timeout for pool exhaustion testing
     onPoolExhausted: 'defer',
     deferQueueLimit: 10,
+    processScriptPath: HOUND_PROCESS_PATH,
   },
   quarantine: {
     maxBytes: 1024 * 1024 * 10, // 10MB memory ceiling
@@ -16,7 +26,7 @@ const th = createTracehound({
   },
   rateLimit: {
     windowMs: 60 * 1000,
-    maxRequests: 50000, // High rate limit to isolate testing to IPC/Memory
+    maxRequests: 50000, // High rate limit to isolate testing to IPC/pool behaviour
     blockDurationMs: 60_000,
   },
 })
@@ -26,19 +36,17 @@ const port = 3000
 
 app.use(express.json())
 
-// Inject Tracehound middleware using the generated agent
 app.use(
   tracehound({
     agent: th.agent,
     extractScent: (req) => {
-      // Generate scent, injecting an artificial threat if the x-chaos-threat header is present
       return {
         id: (req.headers['x-request-id'] as string) || `chaos-${Date.now()}-${Math.random()}`,
         timestamp: Date.now(),
         source: req.ip || '127.0.0.1',
         threat: req.headers['x-chaos-threat']
           ? {
-              category: 'injection', // Can be standard categories like injection
+              category: 'injection',
               severity: 'critical',
               confidence: 0.99,
               source: 'chaos-tester',
@@ -56,16 +64,15 @@ app.use(
   }),
 )
 
-// Regular health check endpoint (no threat)
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (_req, res) => {
   res.status(200).json({ status: 'ok' })
 })
 
-// Chaos testing endpoint
-app.post('/api/data', (req, res) => {
-  res.status(200).json({ message: 'Data received', data: req.body })
+app.post('/api/data', (_req, res) => {
+  res.status(200).json({ message: 'Data received' })
 })
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`[Chaos Server] Tracehound target application listening on port ${port}`)
+  console.log(`[Chaos Server] HoundPool processScriptPath: ${HOUND_PROCESS_PATH}`)
 })

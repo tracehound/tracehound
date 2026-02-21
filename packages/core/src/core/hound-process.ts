@@ -17,8 +17,8 @@ import { createMessageParser, encodeHoundMessage, type HoundStatusMessage } from
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Processing simulation delay (will be replaced with real logic) */
-const PROCESSING_DELAY_MS = 10
+/** Processing delay in ms — overridable via HOUND_PROCESSING_DELAY_MS env for chaos testing */
+const PROCESSING_DELAY_MS = parseInt(process.env['HOUND_PROCESSING_DELAY_MS'] ?? '10', 10)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State

@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Install build tools for potential native bindings or gyp
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache python3 make g++ procps
 
 # Copy workspace configurations
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./

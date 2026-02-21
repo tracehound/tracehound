@@ -14,8 +14,11 @@ import type { TracehoundError } from '../types/errors.js'
 import type { InterceptResult } from '../types/result.js'
 import type { Scent } from '../types/scent.js'
 import type { IEvidenceFactory } from './evidence-factory.js'
+import type { IHoundPool } from './hound-pool.js'
+import type { INotificationEmitter } from './notification-emitter.js'
 import type { Quarantine } from './quarantine.js'
 import type { IRateLimiter, RateLimitResult } from './rate-limiter.js'
+import type { IWatcher } from './watcher.js'
 
 /**
  * Agent configuration (subset of TracehoundConfig).
@@ -84,7 +87,10 @@ export class Agent implements IAgent {
     private readonly config: AgentConfig,
     private readonly quarantine: Quarantine,
     private readonly rateLimiter: IRateLimiter,
-    private readonly evidenceFactory: IEvidenceFactory
+    private readonly evidenceFactory: IEvidenceFactory,
+    private readonly houndPool?: IHoundPool,
+    private readonly watcher?: IWatcher,
+    private readonly notifications?: INotificationEmitter,
   ) {
     // Validate config
     if (config.maxPayloadSize <= 0) {
@@ -100,10 +106,12 @@ export class Agent implements IAgent {
       const rateResult = this.rateLimiter.check(scent.source)
       if (!rateResult.allowed) {
         this.stats.rateLimitedCount++
-        return {
-          status: 'rate_limited',
-          retryAfter: (rateResult as Extract<RateLimitResult, { allowed: false }>).retryAfter,
-        }
+        const retryAfter = (rateResult as Extract<RateLimitResult, { allowed: false }>).retryAfter
+        this.notifications?.emit('rate_limit.exceeded', {
+          source: scent.source,
+          retryAfterMs: retryAfter,
+        })
+        return { status: 'rate_limited', retryAfter }
       }
 
       // Step 2: Check for threat signal
@@ -114,12 +122,15 @@ export class Agent implements IAgent {
         return { status: 'clean' }
       }
 
+      // Record threat in Watcher (observability) — before any further processing
+      this.watcher?.recordThreat(scent.threat.category, scent.threat.severity)
+
       // Step 3: Create evidence via factory
       // Factory handles: validation, encoding, hashing, signature generation
       const creationResult = this.evidenceFactory.create(
         scent,
         scent.threat,
-        this.config.maxPayloadSize
+        this.config.maxPayloadSize,
       )
 
       if (!creationResult.ok) {
@@ -167,6 +178,26 @@ export class Agent implements IAgent {
         }
       }
 
+      // Forward quarantined evidence to HoundPool for async processing.
+      // This is the canonical wiring point: evidence is still typed as Evidence
+      // here (not yet narrowed to EvidenceHandle), enabling direct activation.
+      this.houndPool?.activate(evidence)
+
+      // Emit observability events — fire-and-forget, must not throw
+      const qStats = this.quarantine.stats
+      this.notifications?.emit('threat.detected', {
+        scentId: scent.id,
+        category: scent.threat.category,
+        severity: scent.threat.severity,
+        source: scent.source,
+      })
+      this.notifications?.emit('evidence.quarantined', {
+        signature,
+        severity: scent.threat.severity,
+        sizeBytes: qStats.bytes,
+      })
+      this.watcher?.updateQuarantine(qStats.count, qStats.bytes, this.quarantine.maxBytes)
+
       // Success
       this.stats.quarantinedCount++
       return {
@@ -212,7 +243,18 @@ export function createAgent(
   config: AgentConfig,
   quarantine: Quarantine,
   rateLimiter: IRateLimiter,
-  evidenceFactory: IEvidenceFactory
+  evidenceFactory: IEvidenceFactory,
+  houndPool?: IHoundPool,
+  watcher?: IWatcher,
+  notifications?: INotificationEmitter,
 ): IAgent {
-  return new Agent(config, quarantine, rateLimiter, evidenceFactory)
+  return new Agent(
+    config,
+    quarantine,
+    rateLimiter,
+    evidenceFactory,
+    houndPool,
+    watcher,
+    notifications,
+  )
 }

@@ -232,6 +232,14 @@ export class Quarantine {
   }
 
   /**
+   * Get the configured maximum bytes limit.
+   * Used by Agent to pass capacity context to Watcher.
+   */
+  get maxBytes(): number {
+    return this.config.maxBytes
+  }
+
+  /**
    * Evict lowest priority evidence.
    */
   private evict(count: number): void {

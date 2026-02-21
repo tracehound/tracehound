@@ -136,20 +136,53 @@ class Tracehound implements ITracehound {
 
     this.evidenceFactory = new EvidenceFactory()
 
-    // Create agent
-    this.agent = createAgent(
-      { maxPayloadSize: options.maxPayloadSize ?? 1_000_000 },
-      this.quarantine,
-      this.rateLimiter,
-      this.evidenceFactory,
-    )
-
-    // Create HoundPool
+    // Create HoundPool first — Agent depends on it for auto-activation
     const poolConfig: HoundPoolConfig = {
       ...DEFAULT_POOL_CONFIG,
       ...options.houndPool,
     }
     this.houndPool = createHoundPool(poolConfig)
+
+    // Create agent — houndPool, watcher, and notifications are all wired in.
+    // Quarantined evidence is forwarded to the pool, and observability events
+    // are emitted automatically without any user configuration.
+    this.agent = createAgent(
+      { maxPayloadSize: options.maxPayloadSize ?? 1_000_000 },
+      this.quarantine,
+      this.rateLimiter,
+      this.evidenceFactory,
+      this.houndPool,
+      this.watcher,
+      this.notifications,
+    )
+
+    // Wire HoundPool results back into Watcher and NotificationEmitter.
+    // timeout/error outcomes are security-relevant events that SecOps must see.
+    this.houndPool.onResult((result) => {
+      if (result.status === 'timeout') {
+        this.watcher.alert({
+          type: 'hound_timeout',
+          severity: 'warning',
+          message: `Hound worker timed out after ${result.durationMs}ms`,
+          context: { signature: result.signature, processId: result.processId },
+        })
+        this.notifications.emit('system.panic', {
+          level: 'warning',
+          reason: `hound_timeout: signature=${result.signature}`,
+        })
+      } else if (result.status === 'error') {
+        this.watcher.alert({
+          type: 'system_overload',
+          severity: 'critical',
+          message: `Hound worker error: ${result.error ?? 'unknown'}`,
+          context: { signature: result.signature, processId: result.processId },
+        })
+        this.notifications.emit('system.panic', {
+          level: 'critical',
+          reason: `hound_error: ${result.error ?? 'unknown'}`,
+        })
+      }
+    })
   }
 }
 

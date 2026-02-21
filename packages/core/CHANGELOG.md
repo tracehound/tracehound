@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-02-21 - Orphan Wiring & Stability Fixes
+
+This patch release resolves critical architectural wiring gaps where observability and background processing components (Watcher, NotificationEmitter, HoundPool) were instantiated but disconnected from the active agent lifecycle. It also stabilizes the chaos testing suite by replacing brittle PID-based assertions with deterministic invariant checks.
+
+### Fixed
+
+- **HoundPool Auto-Activation**: Fixed a core design flaw where `Agent` quarantined evidence but never explicitly activated the `HoundPool` to process it. `Agent` now accepts an optional `IHoundPool` dependency and auto-activates workers on quarantine.
+- **Watcher Observability Wiring**: Fixed `Watcher` remaining perpetually empty. It is now correctly wired to `Agent.intercept()`, receiving `recordThreat()`, `updateQuarantine()`, and `setOverloaded()` events.
+- **NotificationEmitter Wiring**: Fixed dormant `NotificationEmitter`. It now correctly broadcasts `threat.detected`, `evidence.quarantined`, `rate_limit.exceeded`, and `system.panic` events.
+- **HoundPool Execution Results**: Wired `HoundPool.onResult` to intercept worker timeouts and errors, converting them into Watcher alerts and `system.panic` notifications.
+- **Chaos Suite Stabilization**: Rewrote the chaos suite (`run-chaos-suite.ts`) to be PID-free. Repurposed assertions to test deterministic fail-open invariants (pool exhaustion recovery, timeout handling) instead of unreliable process IDs.
+- **Test Integrity**: Updated unit tests to verify full internal wiring (Agent ↔ Watcher ↔ Notifications) and ensure `createTracehound` factory propagates all dependencies correctly.
+
 ## [1.4.0] - 2026-02-16 - Deterministic Fuzz Assurance Program
 
 This release finalizes the Jazzer-free deterministic fuzz assurance roadmap for Tracehound core.

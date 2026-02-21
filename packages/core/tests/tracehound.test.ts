@@ -93,4 +93,71 @@ describe('Tracehound Factory', () => {
       expect(tracehound.quarantine.stats.count).toBe(0)
     })
   })
+
+  describe('Internal Wiring', () => {
+    it('watcher.snapshot() reflects real threats intercepted by agent', () => {
+      const tracehound = createTracehound()
+      tracehound.agent.intercept({
+        id: '1',
+        timestamp: Date.now(),
+        source: '1.2.3.4',
+        threat: { category: 'injection', severity: 'critical' },
+        payload: {},
+      })
+
+      const snapshot = tracehound.watcher.snapshot()
+      expect(snapshot.threats.total).toBe(1)
+      expect(snapshot.threats.byCategory['injection']).toBe(1)
+      expect(snapshot.threats.bySeverity['critical']).toBe(1)
+      expect(snapshot.quarantine.count).toBe(1)
+    })
+
+    it('notifications fire on threat and quarantine', () => {
+      const tracehound = createTracehound()
+      let threatFired = false
+      let quarantineFired = false
+
+      tracehound.notifications.on('threat.detected', () => {
+        threatFired = true
+      })
+      tracehound.notifications.on('evidence.quarantined', () => {
+        quarantineFired = true
+      })
+
+      tracehound.agent.intercept({
+        id: '2',
+        timestamp: Date.now(),
+        source: '1.2.3.4',
+        threat: { category: 'injection', severity: 'high' },
+        payload: {},
+      })
+
+      expect(threatFired).toBe(true)
+      expect(quarantineFired).toBe(true)
+      expect(tracehound.notifications.stats.totalEmitted).toBeGreaterThanOrEqual(2)
+    })
+
+    it('houndPool.onResult handler fires and alerts watcher on timeout', () => {
+      const tracehound = createTracehound()
+
+      // Bypassing private access to simulate a timeout result
+      const mockPool = tracehound.houndPool as any
+      const handlers = mockPool.resultHandlers
+
+      if (handlers && handlers.length > 0) {
+        handlers[0]({
+          signature: 'test-sig',
+          status: 'timeout',
+          durationMs: 5000,
+          processId: 'p1',
+        })
+
+        const snapshot = tracehound.watcher.snapshot()
+        expect(snapshot.totalAlerts).toBe(1)
+        expect(snapshot.lastAlert?.type).toBe('hound_timeout')
+      } else {
+        throw new Error('No result handlers registered on HoundPool')
+      }
+    })
+  })
 })

@@ -1,0 +1,4 @@
+scripts/chaos
+scripts/chaos/
+scripts/chaos/**
+scripts/chaos/**/*

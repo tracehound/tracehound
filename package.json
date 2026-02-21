@@ -8,6 +8,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "test:coverage": "vitest run --coverage",
+    "test:chaos": "tsx scripts/chaos/run-chaos-suite.ts",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean",
     "assurance:report": "node scripts/generate-fuzz-assurance-report.mjs --mode assurance --output security/artifacts/generated/fuzz-assurance-metrics.json",
@@ -18,8 +19,13 @@
     "assurance:gate:regression": "node scripts/generate-fuzz-assurance-report.mjs --mode regression --output security/artifacts/generated/fuzz-regression-metrics.json --enforce-pass"
   },
   "devDependencies": {
+    "@tracehound/core": "workspace:^",
+    "@tracehound/express": "workspace:^",
+    "@types/express": "^4.17.21",
     "@types/node": "^25.0.9",
     "@vitest/coverage-v8": "^2.0.0",
+    "express": "^4.18.2",
+    "tsx": "^4.0.0",
     "typescript": "^5.3.0",
     "vitest": "^2.0.0"
   },

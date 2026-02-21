@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  target-app:
+    build:
+      context: ../../
+      dockerfile: infrastructure/chaos/Dockerfile
+    ports:
+      - '3000:3000'
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 128M
+    volumes:
+      - ./data:/app/data

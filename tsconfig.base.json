@@ -19,6 +19,7 @@
     "exactOptionalPropertyTypes": true,
     "noPropertyAccessFromIndexSignature": true,
     "isolatedModules": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "downlevelIteration": true
   }
 }

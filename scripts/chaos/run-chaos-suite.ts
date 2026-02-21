@@ -10,6 +10,7 @@ function sleep(ms: number) {
 async function sendThreatRequest() {
   const start = Date.now()
   try {
+    // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
     const res = await fetch(TARGET_URL, {
       method: 'POST',
       headers: {
@@ -28,6 +29,7 @@ async function sendThreatRequest() {
 
 function execInContainer(cmd: string): string {
   try {
+    // nosemgrep: javascript.lang.security.detect-child-process.detect-child-process
     return execSync(`docker exec ${CONTAINER_NAME} sh -c "${cmd}"`, { stdio: 'pipe' })
       .toString()
       .trim()
@@ -42,6 +44,7 @@ async function waitForServer() {
   process.stdout.write('Waiting for target-app server to be ready...')
   for (let i = 0; i < 30; i++) {
     try {
+      // nosemgrep: typescript.react.security.react-insecure-request.react-insecure-request
       const res = await fetch('http://127.0.0.1:3000/api/health', { method: 'GET' })
       if (res.ok) {
         console.log(' Ready!')

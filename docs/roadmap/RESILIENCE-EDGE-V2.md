@@ -2,17 +2,17 @@
 
 This roadmap outlines the next evolution of Tracehound's deterministic security guarantees. While Tracehound v1 achieved isolated processing and fail-open survival, v2 focuses on **Developer Experience (DX) simplicity**, **Pre-extraction safety**, and **Zero-overhead cold storage**.
 
-## 1. CLI-Driven Route Policies (The DX Leap)
+## 1. Mitigation of Blind Spot Injection (Fail-Open Exploitation)
 
-**Problem:** Manual configuration of route-specific fail-open / fail-closed policies is tedious and error-prone.
-**Solution:** A built-in CLI command to automatically scan the project (via OpenAPI spec or route scanning) and generate a draft policy file.
+**Problem:** An attacker can exhaust system resources with a localized DDoS, forcing Tracehound into a Fail-Open (Timeout) state, and subsequently slip a malicious payload past the defenses during the bypass window.
+**Solution:** A dual-layered approach combining **Adaptive Rate Limiting** and **Route-Specific Fallback Policies**, supported by automated DX tooling.
 
 ### Key Capabilities
 
-- Developers can run `npx tracehound init --scan=openapi.yaml` (or pass specific keywords using a flag like `--keywords="login,auth,pay"`).
-- Tracehound will NOT blindly enforce generated rules. It will output a descriptive YAML/TS configuration file (e.g., `tracehound.routes.yml`).
-- This allows the engineering team to manually review, modify, and commit the generated route policies before they become active.
-- **Why this matters:** Reduces WAF/Security policy configuration time from days to minutes while keeping the final decision strictly in the hands of the developer.
+- **Adaptive Rate Limiting (Penalty Scoring):** If a request causes a timeout in the `HoundPool` triggering a Fail-Open, a "Penalty Score" is instantly assigned to the originating IP or Session. The Rate Limiter immediately throttles that source's limit by a factor of 10x, mathematically preventing sustained fail-open abuse.
+- **Route-Specific Fallback Policies:** Not all routes require the same resilience strategy. While `/api/public/articles` is perfect for Fail-Open, critical endpoints like `/api/auth/login` or `/api/payments` can be configured as **Fail-Closed** (rejecting requests on timeout).
+- **CLI-Driven Configuration (The DX Leap):** To prevent tedious manual configuration of route policies, engineers can run `npx tracehound init --scan=openapi.yaml` (or use flags like `--keywords="login,auth"`). Tracehound generates a draft `tracehound.routes.yml` file, applying intelligent defaults. The team reviews and commits the rules before enforcement.
+- **Why this matters:** Closes the theoretical fail-open bypass window under heavy load while keeping the developer experience seamless.
 
 ## 2. Pre-Extraction Raw HTTP Shield (Core Opt-in)
 

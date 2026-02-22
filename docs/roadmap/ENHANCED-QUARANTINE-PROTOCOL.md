@@ -1,4 +1,79 @@
-# Enhanced App-Level Quarantine Protocol
+# Enhanced App-Level Quarantine Protocol & Risk Analysis
+
+> [!WARNING]
+> This protocol has undergone a rigorous Execution-Grade Analysis based on global architectural constraints. Severe failure modes, second-order effects, and unknowns have been identified for the proposed Membrane, Decay, and AuditChain mechanisms. A final Action Plan determines operational pivots required before implementation.
+
+## ⚖️ Regulated Data Handling & Compliance (GDPR/KVKK)
+
+Quarantine operations inherently cross the boundary from "Runtime Containment" into **"Regulated Data Handling"**. The protocol enforces the following constraints to mitigate Quarantine State Explosion and Legal/Compliance liabilities:
+
+- **State Pre-Calculation (Bounded Memory):** Quarantined data never expands indefinitely. Tracehound strictly enforces a **Memory-First Ring Buffer** for state limits (e.g., max 50MB resident). Volumetric DoS attacks triggering memory pressure result in "Hard Shedding" (dropping payloads, incrementing drop counters), guaranteeing zero risk of boundless state explosion on the host.
+- **PII Masking by Default:** Tracehound assumes all payloads contain highly sensitive data (PII, SSN, Credit Cards). All forensic log serialization processes enforce mandatory RegExp masking templates _before_ the data touches the AuditChain or memory.
+- **Explicit Liability Transfer:** By installing Tracehound, the enterprise accepts that bypassing the default PII redactors for full-payload forensics shifts the GDPR/KVKK regulatory liability entirely to the host application's SOC team. Tracehound natively provides the containment mechanism; it does not provide legal absolution.
+
+## 🚨 Execution-Grade Analysis & Risk Assessment
+
+### 1. One-Way Membrane API (Metadata-Only Contract)
+
+**Context:** Severing raw evidence byte access from the runtime API (Phase 1).
+
+- **Second-Order Effect (Negative):** Legitimate debugging during development becomes extremely difficult. Developers can no longer simply `console.log(error.payload)` to see what triggered the quarantine.
+- **Blast Radius:** High. Existing enterprise integrations that rely on extracting payload fragments to generate custom 400 Bad Request messages will break fundamentally.
+- **Unknowns:** How do we handle huge `multipart/form-data` uploads where only a tiny chunk is malicious? If we only return metadata, how does the application know which specific chunk/file to reject while keeping the rest?
+
+### 2. Sealed Execution Domain & Capability Segmentation
+
+**Context:** Restricting data access except through deterministic parsers with forensic capability (Phase 2).
+
+- **Second-Order Effect (Negative):** Enforcing "Same payload + same version = identical canonical hash" relies heavily on parser implementation. Unicode normalization (NFC/NFD), whitespace, and JSON key reordering attacks can easily break parsing determinism, leading to hash collisions or branch forks.
+- **Blast Radius:** Medium. A flaw in capability token validation (e.g., JWT spoofing) grants a "Confused Deputy" total access to the Quarantine, turning our security tool into an arbitrary data exfiltration vector.
+- **Fragility:** The parser/serializer logic is the most fragile component. Determinism in V8/Javascript is notoriously hard to guarantee across different OS architectures.
+
+### 3. Time-Bounded Decay & Passive Archive Pipeline
+
+**Context:** Bounding active surface using TTL and mitigating DoS pressure via passive archiving (Phase 3).
+
+- **Second-Order Effect (Negative):** "Passive Archiving" payloads to cold storage during a massive DoS attack will actively consume CPU, Disk I/O, and Network bandwidth. The mechanism designed to save the system will ironically contribute to its resource exhaustion.
+- **Blast Radius:** High. If the AWS S3/Cold Storage bucket rate-limits the app, the decay pipeline backs up. This creates memory backpressure that will eventually pause the main Node.js Event Loop, hard-crashing the service.
+- **Self-Critique:** The postulate "Zero hot-path overhead" is structurally false here. Moving MBs of quarantined data across I/O boundaries is never zero-overhead under burst conditions.
+
+### 4. Full Chain-of-Custody (AuditChain)
+
+**Context:** Linking all lifecycle events (insert, purge, evict) to a tamper-evident chain (Phase 4).
+
+- **Second-Order Effect (Negative):** Continuous cryptographic hashing (e.g., SHA-256) of _every_ single TTL eviction event during a TTL expiration storm will burn massive CPU cycles, causing latency jitter for the main application.
+- **Blast Radius:** Maximum. If the chain breaks or forks due to a race condition (e.g., pod crashes mid-append during a deploy), the entire non-repudiation contract is voided, rendering the audit log legally inadmissible.
+- **Assumption:** Assumes the underlying filesystem provides perfect atomic appends under high concurrency, which is dangerously false in network-attached storage (EFS/NFS).
+
+---
+
+## 🚀 Action Plan & Strategic Pivot
+
+Given the severe systemic risks identified, the following architectural pivots MUST be applied to the Sprints before execution:
+
+### 1. Membrane API (Conditional Pivot)
+
+**Decision:** CONDITIONAL PIVOT
+**Action:** We will strictly enforce the One-Way Membrane in production. However, to solve the DX nightmare, we will inject a standardized `x-tracehound-trace-id` into the response headers. Developers can use a separate, localized CLI tool (`tracehound inspect <trace-id>`) that reads the local DB to see raw bytes during development. The runtime app remains blind.
+
+### 2. Capability Segmentation (Pivot Required)
+
+**Decision:** PIVOT
+**Action:** We abandon structural/JSON AST hashing for determinism due to extreme fragility. We will hash the **Raw TCP Bytes** exclusively. If the raw bytes match, the hash matches. Any parsing or formatting happens _after_ the immutable hash is generated.
+
+### 3. Decay & Archive Pipeline (Abandon & Re-architect)
+
+**Decision:** ABANDON PASSIVE ARCHIVING DURING DOS
+**Action:** "Passive Archiving" during an active attack is a self-inflicted wound. We will transition to a **"Drop & Count" (Hard Shedding)** mechanism under extreme pressure. If the quarantine queue exceeds a deterministic safety threshold (e.g., 50MB), we completely stop archiving and instead increment a single lightweight `dropped_events` integer. We prioritize Host Application Survival over Forensic Completeness.
+
+### 4. AuditChain Continuity (Pivot Required)
+
+**Decision:** PIVOT TO BATCHED MERKLE TREES
+**Action:** Hashing every individual eviction event is CPU suicide. We will implement **Merkle Tree Batching**. Lifecycle events (insert/purge/decay) are accumulated in memory and hashed as a single Merkle Root every 1000ms (1 second). This reduces cryptography overhead by over 99% while maintaining mathematical chain-of-custody.
+
+<br>
+<hr>
+<br>
 
 ## Sprints
 

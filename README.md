@@ -1,13 +1,14 @@
 ![Tracehound](.github/assets/banner.png)
 
-<center>
+<div align="center">
 
-# Tracehound
+# TRACEHOUND
 
 **Deterministic Runtime Security Buffer for Modern Applications.**
 
-Tracehound is a decision-free security buffer that quarantines threats detected by external systems (WAFs, SIEMs, or ML detectors). <br />
-It acts as a forensic substrate, preserving tamper-evident evidence while ensuring production safety through fail-open semantics.
+Tracehound Core is a deterministic and fail-open runtime security layer designed to operate between detection systems and operational response. <br />
+It provides bounded ingestion, rate and buffer controls, controlled choke mechanisms, and reproducible event processing. <br />
+The system does not classify threats or enforce policies. Instead, it guarantees controlled runtime behavior and integrity of the resulting event chain.
 
 [![Advanced CodeQL Analysis](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml)
 [![Semgrep Security Analysis](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml)
@@ -20,7 +21,7 @@ It acts as a forensic substrate, preserving tamper-evident evidence while ensuri
 
 [Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
 
-</center>
+</div>
 
 ## About the Project
 

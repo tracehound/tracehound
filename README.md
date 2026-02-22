@@ -1,5 +1,7 @@
 ![Tracehound](.github/assets/banner.png)
 
+<center>
+
 # Tracehound
 
 **Deterministic Runtime Security Buffer for Modern Applications.**
@@ -16,9 +18,9 @@ It acts as a forensic substrate, preserving tamper-evident evidence while ensuri
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 
-[Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues)
+[Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
 
----
+</center>
 
 ## About the Project
 

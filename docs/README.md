@@ -8,11 +8,10 @@
 
 ## Quick Links
 
-| Category          | Document                                   | Purpose                    |
-| ----------------- | ------------------------------------------ | -------------------------- |
-| **Start Here**    | [GETTING-STARTED.md](./GETTING-STARTED.md) | Installation & quick start |
-| **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)     | All config options         |
-| **API**           | [API.md](./API.md)                         | Public API reference       |
+| Category         | Document                                   | Purpose                    |
+| ---------------- | ------------------------------------------ | -------------------------- |
+| **Start Here**   | [GETTING-STARTED.md](./GETTING-STARTED.md) | Installation & quick start |
+| **API & Config** | [API.md](./API.md)                         | Public API reference       |
 
 ---
 

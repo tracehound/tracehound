@@ -150,10 +150,9 @@ app.register(tracehoundPlugin, { agent: th.agent })
 ## Documentation
 
 - **[Getting Started](./docs/GETTING-STARTED.md)**
-- **[Configuration Reference](./docs/CONFIGURATION.md)**
-- [API Documentation](./docs/API.md)
-- [Evidence Lifecycle](./docs/EVIDENCE-LIFECYCLE-POLICY.md)
-- [Security Assurance & Chaos Testing](./docs/SECURITY-ASSURANCE.md)
+- **[API & Configuration](./docs/API.md)**
+- **[Evidence Lifecycle](./docs/EVIDENCE-LIFECYCLE-POLICY.md)**
+- **[Security Assurance & Chaos Testing](./docs/SECURITY-ASSURANCE.md)**
 
 ---
 

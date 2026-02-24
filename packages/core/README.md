@@ -28,15 +28,10 @@ The main entry point. Orchestrates the threat detection flow.
 - **Fail-safe:** Defaults to "clean" on error.
 
 ```ts
-import {
-  createAgent,
-  createQuarantine,
-  createRateLimiter,
-  createEvidenceFactory,
-} from '@tracehound/core'
+import { createTracehound } from '@tracehound/core'
 
-const agent = createAgent({ maxPayloadSize: 1_000_000 })
-const result = agent.intercept(scent)
+const th = createTracehound({ maxPayloadSize: 1_000_000 })
+const result = th.agent.intercept(scent)
 ```
 
 ### 2. Hound Pool (`IHoundPool`)
@@ -74,26 +69,18 @@ Background task management.
 ## Usage Example
 
 ```ts
-import {
-  createAgent,
-  createQuarantine,
-  createRateLimiter,
-  createEvidenceFactory,
-  createHoundPool,
-  AuditChain,
-} from '@tracehound/core'
+import { createTracehound } from '@tracehound/core'
 
-// 1. Setup Dependencies
-const auditChain = new AuditChain()
-const quarantine = createQuarantine({ maxCount: 1000 }, auditChain)
-const rateLimiter = createRateLimiter({ windowMs: 60000, maxRequests: 100 })
-const factory = createEvidenceFactory()
+// 1. Create Tracehound Instance
+const th = createTracehound({
+  maxPayloadSize: 1_000_000,
+  quarantine: { maxCount: 1000 },
+  rateLimit: { windowMs: 60000, maxRequests: 100 },
+  houndPool: { poolSize: 4 }, // Automatically provisions process-separated workers
+})
 
-// 2. Create Agent
-const agent = createAgent({ maxPayloadSize: 1_000_000 }, quarantine, rateLimiter, factory)
-
-// 3. Intercept Traffic
-const result = agent.intercept({
+// 2. Intercept Traffic
+const result = th.agent.intercept({
   id: 'req-1',
   source: '192.168.1.1',
   payload: { user: 'input' },

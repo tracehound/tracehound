@@ -59,7 +59,7 @@ function defaultExtractScent(req: FastifyRequest): Scent {
 function defaultOnIntercept(
   result: InterceptResult,
   _req: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ): void {
   switch (result.status) {
     case 'rate_limited':
@@ -105,18 +105,18 @@ function defaultOnIntercept(
  * ```ts
  * import fastify from 'fastify'
  * import { tracehoundPlugin } from '@tracehound/fastify'
- * import { createAgent } from '@tracehound/core'
+ * import { createTracehound } from '@tracehound/core'
  *
  * const app = fastify()
- * const agent = createAgent({ ... })
+ * const th = createTracehound({ }) // options here
  *
- * app.register(tracehoundPlugin, { agent })
+ * app.register(tracehoundPlugin, { agent: th.agent })
  * ```
  */
 export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = (
   fastify,
   options,
-  done
+  done,
 ) => {
   const { agent, extractScent = defaultExtractScent, onIntercept = defaultOnIntercept } = options
 

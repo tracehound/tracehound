@@ -99,12 +99,12 @@ function defaultOnIntercept(result: InterceptResult, _req: Request, res: Respons
  * ```ts
  * import express from 'express'
  * import { tracehound } from '@tracehound/express'
- * import { createAgent } from '@tracehound/core'
+ * import { createTracehound } from '@tracehound/core'
  *
  * const app = express()
- * const agent = createAgent({ ... })
+ * const th = createTracehound({ }) // options here
  *
- * app.use(tracehound({ agent }))
+ * app.use(tracehound({ agent: th.agent }))
  * ```
  */
 export function tracehound(options: TracehoundMiddlewareOptions): RequestHandler {

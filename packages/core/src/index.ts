@@ -46,7 +46,7 @@ export { DEFAULT_CONFIG, mergeWithDefaults } from './types/index.js'
 // Errors
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createError, Errors } from './types/index.js'
+export { Errors, createError } from './types/index.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Result type guards
@@ -89,14 +89,14 @@ export type { InsertResult, QuarantineStats } from './core/quarantine.js'
 // Core - Rate Limiter
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createRateLimiter, RateLimiter } from './core/rate-limiter.js'
-export type { IRateLimiter, RateLimiterStats, RateLimitResult } from './core/rate-limiter.js'
+export { RateLimiter, createRateLimiter } from './core/rate-limiter.js'
+export type { IRateLimiter, RateLimitResult, RateLimiterStats } from './core/rate-limiter.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Evidence Factory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createEvidenceFactory, EvidenceFactory } from './core/evidence-factory.js'
+export { EvidenceFactory, createEvidenceFactory } from './core/evidence-factory.js'
 export type {
   EvidenceCreationResult,
   EvidenceFactoryOptions,
@@ -114,7 +114,7 @@ export type { AgentConfig, AgentStats, IAgent } from './core/agent.js'
 // Core - Hound Pool
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createHoundPool, createMockAdapter, HoundPool } from './core/hound-pool.js'
+export { HoundPool, createHoundPool, createMockAdapter } from './core/hound-pool.js'
 export type {
   HoundPoolConfig,
   HoundPoolStats,
@@ -128,7 +128,7 @@ export type { HoundProcessConstraints } from './core/process-adapter.js'
 // Core - Scheduler
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createScheduler, Scheduler } from './core/scheduler.js'
+export { Scheduler, createScheduler } from './core/scheduler.js'
 export type {
   BusyChecker,
   IScheduler,
@@ -141,7 +141,7 @@ export type {
 // Core - Watcher
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createWatcher, Watcher } from './core/watcher.js'
+export { Watcher, createWatcher } from './core/watcher.js'
 export type {
   Alert,
   AlertSeverity,
@@ -177,12 +177,15 @@ export { serialize } from './utils/serialize.js'
 
 export {
   AsyncGzipCodec,
+  GzipCodec,
   createAsyncColdPathCodec,
   createColdPathCodec,
   createHotPathCodec,
+  decodeWithIntegrity,
   decodeWithIntegrityAsync,
+  encodeWithIntegrity,
   encodeWithIntegrityAsync,
-  GzipCodec,
+  verify,
 } from './utils/binary-codec.js'
 export type {
   AsyncColdPathCodec,
@@ -199,7 +202,7 @@ export type { EncodeResult } from './utils/encode.js'
 // Core - Cold Storage
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createMemoryColdStorage, MemoryColdStorage } from './core/cold-storage.js'
+export { MemoryColdStorage, createMemoryColdStorage } from './core/cold-storage.js'
 export type {
   ColdStorageReadResult,
   ColdStorageWriteResult,
@@ -210,7 +213,7 @@ export type {
 // Core - S3 Cold Storage
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createS3ColdStorage, S3ColdStorage } from './core/s3-cold-storage.js'
+export { S3ColdStorage, createS3ColdStorage } from './core/s3-cold-storage.js'
 export type { S3ColdStorageConfig, S3LikeClient } from './core/s3-cold-storage.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,7 +241,7 @@ export type {
 // Core - Lane Queue
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createLaneQueue, DEFAULT_LANE_CONFIG, LaneQueue } from './core/lane-queue.js'
+export { DEFAULT_LANE_CONFIG, LaneQueue, createLaneQueue } from './core/lane-queue.js'
 export type {
   Alert as LaneAlert,
   LaneConfig,
@@ -250,7 +253,7 @@ export type {
 // Core - Fail-Safe
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createFailSafe, DEFAULT_FAIL_SAFE_CONFIG, FailSafe } from './core/fail-safe.js'
+export { DEFAULT_FAIL_SAFE_CONFIG, FailSafe, createFailSafe } from './core/fail-safe.js'
 export type {
   FailSafeConfig,
   PanicCallback,
@@ -271,7 +274,7 @@ export type { ITracehound, TracehoundOptions } from './core/tracehound.js'
 // Core - Notification Emitter
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createNotificationEmitter, NotificationEmitter } from './core/notification-emitter.js'
+export { NotificationEmitter, createNotificationEmitter } from './core/notification-emitter.js'
 export type {
   EventCallback,
   EventType,
@@ -292,7 +295,7 @@ export type {
 // Core - Security State
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createSecurityState, SecurityState } from './core/security-state.js'
+export { SecurityState, createSecurityState } from './core/security-state.js'
 export type {
   ISecurityState,
   LicenseState,

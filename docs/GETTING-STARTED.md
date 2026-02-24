@@ -60,29 +60,24 @@ npm install @tracehound/core
 ### 1. Create Tracehound Instance
 
 ```typescript
-import {
-  createAgent,
-  createQuarantine,
-  createRateLimiter,
-  createEvidenceFactory,
-  AuditChain,
-} from '@tracehound/core'
+import { createTracehound } from '@tracehound/core'
 
-// Initialize components
-const auditChain = new AuditChain()
-const quarantine = createQuarantine(
-  { maxCount: 1000, maxBytes: 100_000_000, evictionPolicy: 'priority' },
-  auditChain,
-)
-const rateLimiter = createRateLimiter({
-  windowMs: 60_000,
-  maxRequests: 100,
-  blockDurationMs: 300_000,
+// Initialize Tracehound
+const th = createTracehound({
+  maxPayloadSize: 1_000_000,
+  quarantine: {
+    maxCount: 1000,
+    maxBytes: 100_000_000,
+  },
+  rateLimit: {
+    windowMs: 60_000,
+    maxRequests: 100,
+    blockDurationMs: 300_000,
+  },
 })
-const evidenceFactory = createEvidenceFactory()
 
-// Create agent
-const agent = createAgent({ maxPayloadSize: 1_000_000 }, quarantine, rateLimiter, evidenceFactory)
+// Access components
+const agent = th.agent
 ```
 
 ### 2. Intercept Requests
@@ -149,26 +144,40 @@ app.use((req, res, next) => {
 ### Express
 
 ```typescript
-import { createTracehoundMiddleware } from '@tracehound/express'
+import { createTracehound } from '@tracehound/core'
+import { tracehound } from '@tracehound/express'
 
-const middleware = createTracehoundMiddleware({
+// Configure Tracehound first
+const th = createTracehound({
   maxPayloadSize: 1_000_000,
   quarantine: { maxCount: 1000 },
   rateLimit: { windowMs: 60_000, maxRequests: 100 },
-  detector: (req) => externalDetector(req),
 })
 
-app.use(middleware)
+// Pass the agent to the middleware
+app.use(
+  tracehound({
+    agent: th.agent,
+    extractScent: (req) => customExtraction(req), // Optional: custom logic
+  }),
+)
 ```
 
 ### Fastify
 
 ```typescript
+import { createTracehound } from '@tracehound/core'
 import { tracehoundPlugin } from '@tracehound/fastify'
 
-fastify.register(tracehoundPlugin, {
+// Configure Tracehound first
+const th = createTracehound({
   maxPayloadSize: 1_000_000,
-  detector: (req) => externalDetector(req),
+})
+
+// Register the plugin with the agent
+fastify.register(tracehoundPlugin, {
+  agent: th.agent,
+  extractScent: (req) => customExtraction(req), // Optional: custom logic
 })
 ```
 
@@ -234,8 +243,7 @@ type InterceptResult =
 
 ## Next Steps
 
-- [Configuration Reference](./CONFIGURATION.md)
-- [API Documentation](./API.md)
+- [API & Configuration Reference](./API.md)
 - [RFC-0000: Core Architecture](./rfc/0000-Proposal.md)
 
 ---
@@ -243,3 +251,7 @@ type InterceptResult =
 ## License
 
 Apache 2.0 (Substrate). See [LICENSE](../LICENSE)
+
+```
+
+```

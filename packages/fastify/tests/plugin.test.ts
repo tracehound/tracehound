@@ -101,7 +101,7 @@ describe('tracehoundPlugin', () => {
     expect(reply.header).toHaveBeenCalledWith('Retry-After', '5')
   })
 
-  it('should return 403 for quarantined', async () => {
+  it('should NOT return signature by default for quarantined', async () => {
     const agent = createMockAgent({
       status: 'quarantined',
       handle: { signature: 'test-sig' } as any,
@@ -109,6 +109,27 @@ describe('tracehoundPlugin', () => {
     const fastify = createMockFastify()
 
     tracehoundPlugin(fastify as any, { agent }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, () => {})
+
+    expect(reply.status).toHaveBeenCalledWith(403)
+    const sentBody = (reply.send as any).mock.calls[0][0]
+    expect(sentBody.signature).toBeUndefined()
+    expect(sentBody.error).toBe('Forbidden')
+  })
+
+  it('should return signature when emitSignatureInResponse is true', async () => {
+    const agent = createMockAgent({
+      status: 'quarantined',
+      handle: { signature: 'test-sig' } as any,
+    })
+    const fastify = createMockFastify()
+
+    tracehoundPlugin(fastify as any, { agent, emitSignatureInResponse: true }, () => {})
 
     const req = createMockReq()
     const reply = createMockReply()
@@ -205,6 +226,33 @@ describe('tracehoundPlugin', () => {
           }),
         }),
       )
+    })
+
+    it('should handle cyclical structures in body/query without crashing', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const circular: any = { a: 1 }
+      circular.self = circular
+
+      const req = createMockReq({
+        body: circular,
+        query: { circ: circular } as any,
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+
+      // Should not throw
+      expect(() => hookHandler(req, reply, next)).not.toThrow()
+      expect(agent.intercept).toHaveBeenCalled()
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.payload.body).toBeUndefined()
+      expect(scent.payload.query.circ).toBeUndefined()
     })
   })
 

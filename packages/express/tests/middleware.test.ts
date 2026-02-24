@@ -91,12 +91,28 @@ describe('tracehound middleware', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ limit: 1000000 }))
   })
 
-  it('should return 403 for quarantined result', () => {
+  it('should NOT return signature by default for quarantined result', () => {
     const agent = createMockAgent({
       status: 'quarantined',
       handle: { signature: 'test-sig' } as any,
     })
     const middleware = tracehound({ agent })
+    const res = createMockRes()
+
+    middleware(createMockReq(), res, next)
+
+    expect(res.status).toHaveBeenCalledWith(403)
+    const jsonBody = (res.json as any).mock.calls[0][0]
+    expect(jsonBody.signature).toBeUndefined()
+    expect(jsonBody.error).toBe('Forbidden')
+  })
+
+  it('should return signature when emitSignatureInResponse is true', () => {
+    const agent = createMockAgent({
+      status: 'quarantined',
+      handle: { signature: 'test-sig' } as any,
+    })
+    const middleware = tracehound({ agent, emitSignatureInResponse: true })
     const res = createMockRes()
 
     middleware(createMockReq(), res, next)
@@ -146,6 +162,27 @@ describe('tracehound middleware', () => {
           }),
         }),
       )
+    })
+
+    it('should handle cyclical structures in body/query without crashing', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+
+      const circular: any = { a: 1 }
+      circular.self = circular
+
+      const req = createMockReq({
+        body: circular,
+        query: { circ: circular } as any,
+      })
+
+      // Should not throw
+      expect(() => middleware(req, createMockRes(), next)).not.toThrow()
+      expect(agent.intercept).toHaveBeenCalled()
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.payload.body).toBeUndefined() // safeClone returns undefined on circular
+      expect(scent.payload.query.circ).toBeUndefined()
     })
 
     it('should use defaultOnIntercept when result is blocked', () => {

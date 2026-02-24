@@ -35,11 +35,12 @@ app.listen({ port: 3000 })
 
 ## Options
 
-| Option         | Type                           | Required | Description               |
-| -------------- | ------------------------------ | -------- | ------------------------- |
-| `agent`        | `IAgent`                       | Yes      | Tracehound Agent instance |
-| `extractScent` | `(req) => Scent`               | No       | Custom scent extraction   |
-| `onIntercept`  | `(result, req, reply) => void` | No       | Custom response handler   |
+| Option                    | Type                           | Required | Description                                        |
+| ------------------------- | ------------------------------ | -------- | -------------------------------------------------- |
+| `agent`                   | `IAgent`                       | Yes      | Tracehound Agent instance                          |
+| `emitSignatureInResponse` | `boolean`                      | No       | If true, returns signature in 403 (default: false) |
+| `extractScent`            | `(req) => Scent`               | No       | Custom scent extraction                            |
+| `onIntercept`             | `(result, req, reply) => void` | No       | Custom response handler                            |
 
 ## Response Codes
 

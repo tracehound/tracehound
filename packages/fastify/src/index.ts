@@ -18,8 +18,14 @@ export interface TracehoundPluginOptions {
   agent: IAgent
 
   /**
+   * If true, includes the Tracehound `signature` in the HTTP 403 Forbidden body
+   * for quarantined requests. This is false by default to prevent correlation attacks.
+   */
+  emitSignatureInResponse?: boolean
+
+  /**
    * Custom scent extraction function.
-   * Default extracts IP, path, method, and headers.
+   * Default extracts IP, path, method, and headers safely.
    */
   extractScent?: (req: FastifyRequest) => Scent
 
@@ -28,6 +34,19 @@ export interface TracehoundPluginOptions {
    * Default sends appropriate HTTP status codes.
    */
   onIntercept?: (result: InterceptResult, req: FastifyRequest, reply: FastifyReply) => void
+}
+
+/**
+ * Defensive clone for safely copying deeply nested or cyclical external payloads
+ * without crashing the process.
+ */
+function safeClone(obj: any): any {
+  if (obj === undefined) return undefined
+  try {
+    return JSON.parse(JSON.stringify(obj))
+  } catch {
+    return undefined // Unsafe to clone or cyclical, omit silently
+  }
 }
 
 /**
@@ -43,12 +62,12 @@ function defaultExtractScent(req: FastifyRequest): Scent {
     payload: {
       method: req.method,
       path: req.url,
-      query: JSON.parse(JSON.stringify(req.query)),
+      query: safeClone(req.query) ?? {},
       headers: {
         'user-agent': req.headers['user-agent'] || '',
         'content-type': req.headers['content-type'] || '',
       },
-      body: req.body ? JSON.parse(JSON.stringify(req.body)) : undefined,
+      body: safeClone(req.body),
     },
   }
 }
@@ -60,6 +79,7 @@ function defaultOnIntercept(
   result: InterceptResult,
   _req: FastifyRequest,
   reply: FastifyReply,
+  options?: Pick<TracehoundPluginOptions, 'emitSignatureInResponse'>,
 ): void {
   switch (result.status) {
     case 'rate_limited':
@@ -82,7 +102,7 @@ function defaultOnIntercept(
     case 'quarantined':
       reply.status(403).send({
         error: 'Forbidden',
-        signature: result.handle.signature,
+        ...(options?.emitSignatureInResponse ? { signature: result.handle.signature } : {}),
       })
       break
 
@@ -118,7 +138,7 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
   options,
   done,
 ) => {
-  const { agent, extractScent = defaultExtractScent, onIntercept = defaultOnIntercept } = options
+  const { agent, extractScent = defaultExtractScent, onIntercept } = options
 
   fastify.addHook('onRequest', (req, reply, hookDone) => {
     const scent = extractScent(req)
@@ -129,7 +149,18 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
       return
     }
 
-    onIntercept(result, req, reply)
+    if (onIntercept) {
+      onIntercept(result, req, reply)
+    } else {
+      defaultOnIntercept(
+        result,
+        req,
+        reply,
+        options.emitSignatureInResponse !== undefined
+          ? { emitSignatureInResponse: options.emitSignatureInResponse }
+          : {},
+      )
+    }
     // Don't call hookDone() - response is already sent
   })
 

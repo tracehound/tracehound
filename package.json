@@ -1,14 +1,16 @@
 {
   "name": "tracehound",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
+    "pretest": "pnpm --filter @tracehound/core build",
     "test": "pnpm -r test",
     "test:coverage": "vitest run --coverage",
     "test:chaos": "tsx scripts/chaos/run-chaos-suite.ts",
+    "prelint": "pnpm --filter @tracehound/core build",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean",
     "assurance:report": "node scripts/generate-fuzz-assurance-report.mjs --mode assurance --output security/artifacts/generated/fuzz-assurance-metrics.json",

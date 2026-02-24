@@ -26,19 +26,19 @@ describe('RateLimiter', () => {
     it('throws on non-positive windowMs', () => {
       expect(() => new RateLimiter({ ...config, windowMs: 0 })).toThrow('windowMs must be positive')
       expect(() => new RateLimiter({ ...config, windowMs: -1 })).toThrow(
-        'windowMs must be positive'
+        'windowMs must be positive',
       )
     })
 
     it('throws on non-positive maxRequests', () => {
       expect(() => new RateLimiter({ ...config, maxRequests: 0 })).toThrow(
-        'maxRequests must be positive'
+        'maxRequests must be positive',
       )
     })
 
     it('throws on negative blockDurationMs', () => {
       expect(() => new RateLimiter({ ...config, blockDurationMs: -1 })).toThrow(
-        'blockDurationMs cannot be negative'
+        'blockDurationMs cannot be negative',
       )
     })
 
@@ -132,6 +132,56 @@ describe('RateLimiter', () => {
         expect(result.retryAfter).toBeGreaterThan(0)
         expect(result.retryAfter).toBeLessThanOrEqual(config.blockDurationMs)
       }
+    })
+  })
+
+  describe('capacity limits (LRU eviction)', () => {
+    it('evicts oldest entry when maxSources is exceeded', () => {
+      const smallConfig = { ...config, maxSources: 3 }
+      const limiter = new RateLimiter(smallConfig)
+
+      // Insert 3 sources
+      limiter.check('A')
+      limiter.check('B')
+      limiter.check('C')
+
+      expect(limiter.stats.sources).toBe(3)
+      expect(limiter.stats.totalEvictions).toBe(0)
+
+      // Insert 4th source -> Evicts A
+      limiter.check('D')
+
+      expect(limiter.stats.sources).toBe(3)
+      expect(limiter.stats.totalEvictions).toBe(1)
+
+      // Verify A is treated as a new entry. It shouldn't be blocked.
+      for (let i = 0; i < smallConfig.maxRequests - 1; i++) {
+        expect(limiter.check('A').allowed).toBe(true)
+      }
+      expect(limiter.check('A').allowed).toBe(true) // Last check should be allowed if A was fresh
+    })
+
+    it('respects LRU order when evicting', () => {
+      const smallConfig = { ...config, maxSources: 3 }
+      const limiter = new RateLimiter(smallConfig)
+
+      limiter.check('A') // oldest
+      limiter.check('B')
+      limiter.check('C') // newest
+
+      // Re-check A -> B is now the oldest
+      limiter.check('A')
+
+      // Insert D -> Evicts B
+      limiter.check('D')
+
+      expect(limiter.stats.totalEvictions).toBe(1)
+
+      // Verify B is evicted and treated as new
+      for (let i = 0; i < smallConfig.maxRequests - 1; i++) {
+        expect(limiter.check('B').allowed).toBe(true)
+      }
+      expect(limiter.check('B').allowed).toBe(true)
     })
   })
 

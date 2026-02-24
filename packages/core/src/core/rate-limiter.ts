@@ -76,6 +76,8 @@ export interface RateLimiterStats {
   totalChecks: number
   /** Total rejections */
   totalRejections: number
+  /** Total capacity evictions */
+  totalEvictions: number
 }
 
 /**
@@ -97,6 +99,7 @@ export class RateLimiter implements IRateLimiter {
   private readonly config: Required<RateLimitConfig>
   private totalChecks = 0
   private totalRejections = 0
+  private totalEvictions = 0
 
   constructor(config: RateLimitConfig) {
     // Validate config
@@ -109,11 +112,15 @@ export class RateLimiter implements IRateLimiter {
     if (config.blockDurationMs < 0) {
       throw new Error('blockDurationMs cannot be negative')
     }
+    if (config.maxSources !== undefined && config.maxSources <= 0) {
+      throw new Error('maxSources must be positive')
+    }
 
     this.config = {
       windowMs: config.windowMs,
       maxRequests: config.maxRequests,
       blockDurationMs: config.blockDurationMs,
+      maxSources: config.maxSources ?? 100_000,
     }
   }
 
@@ -123,7 +130,21 @@ export class RateLimiter implements IRateLimiter {
 
     // Get or create source entry
     let entry = this.sources.get(source)
-    if (!entry) {
+    if (entry) {
+      // LRU Eviction Logic: Push to the back of the Map (youngest)
+      this.sources.delete(source)
+      this.sources.set(source, entry)
+    } else {
+      // Capacity Bound check
+      if (this.sources.size >= this.config.maxSources) {
+        // Evict oldest (O(1)) from front of Map
+        const oldestSource = this.sources.keys().next().value
+        if (oldestSource !== undefined) {
+          this.sources.delete(oldestSource)
+          this.totalEvictions++
+        }
+      }
+
       entry = {
         timestamps: [],
         blockedUntil: null,
@@ -234,6 +255,7 @@ export class RateLimiter implements IRateLimiter {
       blocked,
       totalChecks: this.totalChecks,
       totalRejections: this.totalRejections,
+      totalEvictions: this.totalEvictions,
     }
   }
 }

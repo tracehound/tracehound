@@ -10,6 +10,8 @@ export interface RateLimitConfig {
   maxRequests: number
   /** Block duration after limit exceeded */
   blockDurationMs: number
+  /** Maximum sources to track before LRU eviction (default: 100,000) */
+  maxSources?: number
 }
 
 /** Quarantine storage configuration */

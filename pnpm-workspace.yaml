@@ -1,2 +1,3 @@
 packages:
   - 'packages/*'
+  - 'security/tests/metasploit/proxy'

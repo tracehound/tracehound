@@ -12,6 +12,8 @@
  * activeProcesses reflects OS-level active child processes
  */
 
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Evidence } from './evidence.js'
 import { decodeHoundMessage } from './hound-ipc.js'
 import {
@@ -168,9 +170,14 @@ export class HoundPool implements IHoundPool {
   private _totalErrors = 0
 
   constructor(private readonly config: HoundPoolConfig) {
+    // Determine default script path relative to this file
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = dirname(__filename)
+    const defaultScript = join(__dirname, 'hound-process.js')
+
     // Use provided adapter or create real one
     this.adapter = config.adapter ?? createProcessAdapter()
-    this.processScriptPath = config.processScriptPath ?? './hound-process.js'
+    this.processScriptPath = config.processScriptPath ?? defaultScript
     this.onPoolExhausted = config.onPoolExhausted ?? 'drop'
     this.deferQueueLimit = config.deferQueueLimit ?? 100
 
@@ -324,7 +331,7 @@ export class HoundPool implements IHoundPool {
       try {
         processState.handle = this.adapter.spawn(
           this.processScriptPath,
-          this.config.processConstraints
+          this.config.processConstraints,
         )
         processState.pid = processState.handle.pid
 
@@ -400,7 +407,7 @@ export class HoundPool implements IHoundPool {
   private terminateProcess(
     processState: ProcessState,
     reason: 'timeout' | 'forced_terminate' | 'error',
-    errorMessage?: string
+    errorMessage?: string,
   ): void {
     const signature = processState.currentSignature
     const startTime = processState.startTime

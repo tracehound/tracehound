@@ -2,6 +2,116 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.3] - 2026-02-25 - Monorepo Security Hardening & Robustness
+
+## Release Notes
+
+Covers changes since commit [v1.4.2 release].
+
+## Engineering and Infrastructure
+
+- **Defensive Scent Extraction**: Implemented `safeClone` in Express/Fastify adapters. This ensures the Tracehound process is resilient to circular references or exotic payload shapes (e.g., Stream objects, DOM nodes) that could otherwise trigger runtime crashes during scent extraction.
+- **Privacy Hardening**: Standardized the suppression of Tracehound `signature` in external HTTP `403` responses by default. This reduces the adversarial correlation surface while providing an opt-in `emitSignatureInResponse` toggle for legitimate tracing needs.
+- **Workspace Quality Gate**: Integrated root `pretest` and `prelint` hooks into `package.json`. These mandatory lifecycle steps enforce that `@tracehound/core` artifacts are compiled before workspace packages run validation, eliminating cross-package dependency resolution failures in CI.
+
+## Rationale & Compliance
+
+1. Alternative Approaches and Reasons for Rejection
+   - **Alternative 1: Using `structuredClone()` for payload extraction**. Why Rejected? `structuredClone` is strictly type-sensitive and throws on non-cloneable objects (functions, symbols). In a middleware context, we cannot trust that third-party plugins haven't attached non-serializable properties to the request. `JSON`-based sanitization is safer for "High-Velocity API" environments.
+   - **Alternative 2: Keeping signatures in 403 by default but adding a warning**. Why Rejected? Security defaults must be restrictive. Exposing an internal blockchain-linked signature to the public Internet without explicit justification is a "shortcut" that compromises the 'Strictly Stateless Network Containment' axiom.
+
+2. Dependency Awareness Contract
+   - **Data Model**: Unaffected.
+   - **API / Contract Surface**: **Breaking Change**. The default JSON response for `quarantined` results in both Express and Fastify adapters no longer includes the `signature` key.
+   - **Runtime Behavior**: Improved robustness against DoS via malformed/circular request payloads.
+   - **Deployment / Operations**: Improved CI stability via workspace build ordering.
+   - **Observability**: Signatures remain visible in internal forensic logs and AuditChain; only the external disclosure is suppressed.
+   - **Future Roadmap Impact**: Sets a precedent for "Privacy-by-Default" in all ecosystem adapters.
+
+3. Facts, Assumptions, and Unknowns
+   - **Fact 1**: The root build ordering fix eliminates the most common cause of "False Negative" build failures in the monorepo.
+   - **Assumption 1**: Integrators requiring signatures for tracing have the technical capacity to toggle the `emitSignatureInResponse` flag.
+   - **Unknown 1**: The exact overhead of `double-serialization` (JSON stringify then parse) for extremely large request bodies (e.g., >10MB) vs. a custom recursive shallow cloner hasn't been benchmarked on low-spec edge hardware yet.
+
+4. Second-Order Effects
+   - **Positive (Second-order)**: Reduced attacker feedback loop makes rule-discovery significantly harder for automated probing scripts.
+   - **Negative (Second-order)**: Frontend engineers debugging quarantined requests might find the lack of an immediate signature in the response body confusing until they reference the updated documentation.
+
+5. Effort Justification Rule
+   - This solution is correct because it prioritizes **system-wide resilience** (via safe cloning) over the "fastest" implementation (raw object pointer passing), ensuring the security layer cannot be exploited as a performance bottleneck or DoS vector.
+
+6. Failure Modes, Rollback, and Blast Radius
+   - **Failure Modes**: Over-aggressive sanitization might strip non-cyclical but non-standard properties that a user expects to be analyzed by the core agent.
+   - **Rollback**: Standard version revert. Reversing root `package.json` scripts restores legacy build behaviors.
+   - **Blast Radius**: Limited to adapter-level request parsing. The core `napi-rs` logic and binary artifacts are untouched.
+
+7. Self-Critique Requirement
+   - **Weakest Assumption**: That no high-priority customer is relying on the 403 signature for mission-critical, automated real-time reconciliation.
+   - **Most Fragile Component**: The `safeClone` implementation's performance profile under extreme payload pressure.
+   - **Where will it fail first?** In environments where raw binary buffers are passed through request bodies and incorrectly handled by the stringification fallback.
+
+## [1.4.2] - 2026-02-21 - Document Updates & Roadmap
+
+## Release Notes
+
+Covers changes since commit 204b957d85b79f728102f37042541580953a023d.
+
+## Strategic and Architectural Roadmaps
+
+- **2026 Pilot Program (`PILOT-PROGRAM-2026.md`)**: Added vision containing go-to-market (GTM) and adoption strategies for early-stage integrators.
+- **Enhanced Quarantine Protocol (`ENHANCED-QUARANTINE-PROTOCOL.md`)**: Documented the roadmap detailing the multi-phase integration of application-level quarantine mechanisms.
+- **Resilience Edge V2 (`RESILIENCE-EDGE-V2.md`)**: Conveyed the next-generation hardware/server architecture focusing on pre-extraction protection, absolute network containment, and zero-overhead logging goals.
+- **Comprehensive Threat Model (`THREAT-MODEL.md`)**: Added an official threat model to guide future architectural decisions and strictly define security boundaries.
+
+## Engineering and Infrastructure
+
+- **Chaos Testing ADR** `(chaos-testing-architecture-decision.md)`: Integrated an Architecture Decision Record (ADR) justifying why a custom chaos testing suite was chosen over third-party tools.
+- **CI/CD Reliability (Semgrep Fix)**: Stabilized the CI pipeline by masking SemGrep rules that produced false-positive warnings in chaos test scripts via `.semgrepignore` configuration.
+
+## Documentation and Governance
+
+- **Main Showcase (README)**: Added a project banner, sharpened the project description, and modernized heading formats.
+- **FAQ Addition**: Created FAQ documentation to accelerate developer onboarding and clarify project boundaries.
+
+## Rationale & Compliance
+
+In accordance with tracehound standards, the system-wide evaluation of this release (and the format of these notes) is as follows:
+
+1. Alternative Approaches and Reasons for Rejection
+   - **Alternative 1**: **Listing only technical git commit logs (Classic Changelog Style)**. Why Rejected? Because this release consists of strategic documents, roadmaps, and ADRs rather than code. A pure commit list cannot reflect the vision of where the project is evolving and would be considered a "shortcut".
+   - **Alternative 2:** **Compressing documentation additions into a single line under "Minor Fixes / Docs"**. Why Rejected? The added Architecture Decision Record (ADR), Threat Model, and Resilience Edge vision are as critical a System Design artifact as code itself. They dictate the future of the system independently of the code, so highlighting them as main release targets is an architectural necessity.
+
+2. Dependency Awareness Contract
+   - **Data Model**: Unaffected (Documentation only).
+   - **API / Contract Surface**: Affected. The added `THREAT-MODEL` and `RESILIENCE-EDGE-V2` documents make minimum security standards binding for future API interfaces starting now.
+   - **Runtime Behavior**: Unaffected.
+   - **Deployment / Operations**: CI/CD pipeline has become more stable and resilient (due to the chaos test SemGrep fix).
+   - **Observability**: Unaffected.
+   - **Future Roadmap Impact: Critical Impact**. The "2026 Pilot Program" and "Quarantine Protocol" documents added with this release directly dictate the engineering effort for the next 12 months.
+
+3. Facts, Assumptions, and Unknowns
+   - **Assumption 1**: The added large-scale vision documents (Edge V2, etc.) will directly and unequivocally guide future code. It is assumed that these unimplemented features will provide the same theoretical flexibility and performance during development.
+   - **Assumption 2**: The ADR created for chaos testing reflects the team's strategic decision to persist with their private process/spawn-based model instead of third-party tools (like Pumba).
+   - **Unknown 1** (Critical): It is currently unknown to what extent early integrators or customers (mentioned in the Pilot Program docs) during the go-to-market phase will adapt to these strict security models (e.g., Quarantine Protocol) or what compromises they might request, as this has not yet been tested in the field.
+   - **Unknown 2**: It is accepted as provided by the team that the `.semgrepignore` masking only hides "false-positive" warnings; it cannot be known with absolute certainty whether a real security anti-pattern is hidden under the mask until exhaustive test scenarios are run.
+
+4. Second-Order Effects
+   - **Positive (Second-order)**: Newly onboarding engineers or auditors will reference the created ADR `(chaos-testing-architecture-decision.md)` instead of asking questions like "Why aren't we using a 3rd party chaos test?", minimizing cognitive load.
+   - **Negative (Second-order)**: The surface area of documentation and roadmaps has expanded artificially fast (Edge V2, Threat Model, etc.). If plans pivot during the development phase, these numerous added vision documents will also need updating; otherwise, there is a risk of "Doc Rot" (maintenance overhead).
+
+5. Effort Justification Rule
+   - These release notes are **technically correct** not because they are "easy to produce", but because the project's current status has shifted from pure code development to architectural blueprinting; they explicitly frame the newly developed and committed boundaries.
+
+6. Failure Modes, Rollback, Blast Radius
+   - **Failure Modes**: Misunderstandings; if customers read the V2 roadmap and assume those features "currently exist and can be used immediately," it will result in integration frustration and increased support tickets.
+   - **Rollback**: Achieved via `git reset --hard 204b957d` and rewinding the document commit history. Due to zero code dependency, it can be rolled back safely without any downtime.
+   - **Blast Radius**: Completely isolated. There are zero side effects or ripple effects (blast radius) on production environments, live traffic processing units, or the current runtime behavior model.
+
+7. Self-Critique Requirement
+   - **Weakest Assumption**: Assuming that the masked code is truly "100% false-positive" for all cases just by looking at a single `.semgrepignore` commit.
+   - **Most Fragile Component**: The newly added large-scale and highly-promising "Resilience Edge V2" vision document. If future implementation fails to meet ambitious metrics like "zero-overhead" promised in this document due to hardware or software limitations, the document's existence will become technical debt for the project.
+   - **Where will it fail first?** Roadmaps were written very strictly. The most likely breaking point is a disconnect between the rigid vision written and the real-world implementation at the first unforeseen integration barrier once implementation begins.
+
 ## [1.4.1] - 2026-02-21 - Orphan Wiring & Stability Fixes
 
 This patch release resolves critical architectural wiring gaps where observability and background processing components (Watcher, NotificationEmitter, HoundPool) were instantiated but disconnected from the active agent lifecycle. It also stabilizes the chaos testing suite by replacing brittle PID-based assertions with deterministic invariant checks.

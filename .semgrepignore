@@ -2,3 +2,4 @@ scripts/chaos
 scripts/chaos/
 scripts/chaos/**
 scripts/chaos/**/*
+infrastructure/docker/attacker/Dockerfile

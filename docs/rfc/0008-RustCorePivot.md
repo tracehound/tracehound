@@ -90,7 +90,7 @@ Complete rewrite of Tracehound's core logic from TypeScript to Rust. **Note (Feb
 
 ### 3. Hot Reload
 
-> ⛔ **CRITICAL:** Restart-based config update is **unacceptable** in fintech.
+> ⛔ **CRITICAL:** Restart-based config update is **unacceptable**.
 
 **Implementation:**
 

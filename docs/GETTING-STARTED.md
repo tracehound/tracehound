@@ -1,6 +1,6 @@
 # Getting Started with Tracehound
 
-> **Tracehound**: Deterministic runtime security buffer for FinTech applications
+> **Tracehound**: Deterministic runtime security buffer for applications
 
 ## What is Tracehound?
 

@@ -2,6 +2,12 @@
  * Inspect command - Inspect quarantine contents
  */
 
+import {
+  findTraceInspectionEntryBySignature,
+  getTraceInspectionEntry,
+  listTraceInspectionEntries,
+  type TraceInspectionEntry,
+} from '@tracehound/core'
 import Table from 'cli-table3'
 import { Command } from 'commander'
 
@@ -9,36 +15,7 @@ const DEFAULT_LIMIT = 10
 
 type LookupMode = 'signature' | 'traceId'
 
-interface QuarantineEntry {
-  traceId: string
-  signature: string
-  severity: 'critical' | 'high' | 'medium' | 'low'
-  category: string
-  size: number
-  captured: number
-  source: string
-}
-
-const LOCAL_QUARANTINE_ENTRIES: readonly QuarantineEntry[] = [
-  {
-    traceId: 'trace-demo-opaque-0001',
-    signature: 'sig_8f2d3b11c0a4',
-    severity: 'high',
-    category: 'injection',
-    size: 1536,
-    captured: 1_772_520_000_000,
-    source: '127.0.0.1',
-  },
-  {
-    traceId: 'trace-demo-opaque-0002',
-    signature: 'sig_2d61c7af9b44',
-    severity: 'medium',
-    category: 'ddos',
-    size: 4096,
-    captured: 1_772_520_060_000,
-    source: '10.0.0.45',
-  },
-]
+type QuarantineEntry = TraceInspectionEntry
 
 export const inspectCommand = new Command('inspect')
   .description('Inspect quarantine contents')
@@ -66,16 +43,13 @@ export const inspectCommand = new Command('inspect')
 
 function getQuarantineEntries(limit: number): QuarantineEntry[] {
   const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : DEFAULT_LIMIT
-  return LOCAL_QUARANTINE_ENTRIES.slice(0, normalizedLimit).map((entry) => ({ ...entry }))
+  return listTraceInspectionEntries(normalizedLimit)
 }
 
 function getEntry(identifier: string, mode: LookupMode): QuarantineEntry | null {
-  const entry =
-    mode === 'traceId'
-      ? LOCAL_QUARANTINE_ENTRIES.find((item) => item.traceId === identifier)
-      : LOCAL_QUARANTINE_ENTRIES.find((item) => item.signature === identifier)
-
-  return entry ? { ...entry } : null
+  return mode === 'traceId'
+    ? getTraceInspectionEntry(identifier)
+    : findTraceInspectionEntryBySignature(identifier)
 }
 
 function inspectSingle(identifier: string, mode: LookupMode, json: boolean): void {
@@ -122,7 +96,7 @@ function inspectList(limit: number, json: boolean): void {
     table.push([
       shorten(entry.traceId, 16),
       `${severityIcon} ${entry.severity}`,
-      entry.category,
+      inferCategory(entry.signature),
       formatBytes(entry.size),
       shorten(entry.source, 13),
     ])
@@ -147,10 +121,11 @@ function printEntry(entry: QuarantineEntry): void {
     { 'Trace ID': entry.traceId },
     { Signature: entry.signature },
     { Severity: `${severityIcon} ${entry.severity}` },
-    { Category: entry.category },
+    { Category: inferCategory(entry.signature) },
     { Size: formatBytes(entry.size) },
     { Source: entry.source },
     { Captured: new Date(entry.captured).toISOString() },
+    { Recorded: new Date(entry.recordedAt).toISOString() },
   )
 
   console.log(table.toString())
@@ -162,6 +137,16 @@ function shorten(value: string, maxLength: number): string {
     return value
   }
   return `${value.slice(0, maxLength - 3)}...`
+}
+
+function inferCategory(signature: string): string {
+  if (signature.startsWith('injection:')) {
+    return 'injection'
+  }
+  if (signature.startsWith('ddos:')) {
+    return 'ddos'
+  }
+  return 'unknown'
 }
 
 function getSeverityIcon(severity: string): string {

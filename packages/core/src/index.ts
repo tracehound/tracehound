@@ -170,6 +170,23 @@ export { hash, hashBuffer } from './utils/hash.js'
 
 export { generateSecureId, isValidSecureId } from './utils/id.js'
 
+export {
+  clearTraceInspectionHistory,
+  clearTraceRegistryDisk,
+  findTraceInspectionEntryBySignature,
+  getTraceInspectionEntry,
+  getTraceRegistryStats,
+  listTraceInspectionEntries,
+  recordTraceInspectionEntry,
+  resolveTraceRegistryPath,
+} from './utils/trace-registry.js'
+export type {
+  TraceInspectionEntry,
+  TraceRegistryClearResult,
+  TraceRegistryOptions,
+  TraceRegistryStats,
+} from './utils/trace-registry.js'
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Utils - Serialization
 // ─────────────────────────────────────────────────────────────────────────────
@@ -311,4 +328,5 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
+
 

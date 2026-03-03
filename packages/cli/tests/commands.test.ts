@@ -1,8 +1,17 @@
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { recordTraceInspectionEntry } from '@tracehound/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { diskCommand } from '../src/commands/disk.js'
+import { historyCommand } from '../src/commands/history.js'
 import { inspectCommand } from '../src/commands/inspect.js'
 import { statsCommand } from '../src/commands/stats.js'
 import { statusCommand } from '../src/commands/status.js'
 import { watchCommand } from '../src/commands/watch.js'
+
+const SEEDED_TRACE_ID = 'trace-seeded-0001'
+const SEEDED_SIGNATURE = 'injection:seeded-signature'
 
 describe('CLI Commands', () => {
   describe('Smoke tests', () => {
@@ -28,6 +37,18 @@ describe('CLI Commands', () => {
       const { watchCommand } = await import('../src/commands/watch.js')
       expect(watchCommand).toBeDefined()
       expect(typeof watchCommand).toBe('object')
+    })
+
+    it('should have history command', async () => {
+      const { historyCommand } = await import('../src/commands/history.js')
+      expect(historyCommand).toBeDefined()
+      expect(typeof historyCommand).toBe('object')
+    })
+
+    it('should have disk command', async () => {
+      const { diskCommand } = await import('../src/commands/disk.js')
+      expect(diskCommand).toBeDefined()
+      expect(typeof diskCommand).toBe('object')
     })
   })
 
@@ -60,17 +81,58 @@ describe('CLI Commands', () => {
       expect(watchCommand.name()).toBe('watch')
       expect(watchCommand.description()).toBeTruthy()
     })
+
+    it('history command should expose clear subcommand', () => {
+      expect(historyCommand.name()).toBe('history')
+      expect(historyCommand.commands.map((command) => command.name())).toContain('clear')
+    })
+
+    it('disk command should expose clear subcommand', () => {
+      expect(diskCommand.name()).toBe('disk')
+      expect(diskCommand.commands.map((command) => command.name())).toContain('clear')
+    })
   })
 
   describe('Command execution', () => {
     let logSpy: any
+    let previousRegistryPath: string | undefined
+    let registryDir = ''
 
     beforeEach(() => {
       logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+
+      previousRegistryPath = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+      registryDir = mkdtempSync(join(tmpdir(), 'tracehound-cli-registry-'))
+      process.env.TRACEHOUND_TRACE_REGISTRY_PATH = join(registryDir, 'trace-registry.ndjson')
+
+      recordTraceInspectionEntry({
+        traceId: SEEDED_TRACE_ID,
+        signature: SEEDED_SIGNATURE,
+        severity: 'high',
+        size: 1536,
+        captured: 1_772_520_000_000,
+        source: '127.0.0.1',
+      })
+      recordTraceInspectionEntry({
+        traceId: 'trace-seeded-0002',
+        signature: 'ddos:seeded-signature',
+        severity: 'medium',
+        size: 4096,
+        captured: 1_772_520_060_000,
+        source: '10.0.0.45',
+      })
     })
 
     afterEach(() => {
       logSpy.mockRestore()
+
+      rmSync(registryDir, { recursive: true, force: true })
+      if (previousRegistryPath === undefined) {
+        delete process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+      } else {
+        process.env.TRACEHOUND_TRACE_REGISTRY_PATH = previousRegistryPath
+      }
+
       // Reset commander options to avoid state leakage
       inspectCommand.setOptionValue('signature', undefined)
       inspectCommand.setOptionValue('traceId', undefined)
@@ -86,7 +148,6 @@ describe('CLI Commands', () => {
       statusCommand.parse(['status'], { from: 'user' })
 
       expect(logSpy).toHaveBeenCalled()
-      // Look for a known string in the output
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
       expect(output).toContain('TRACEHOUND STATUS')
     })
@@ -105,6 +166,17 @@ describe('CLI Commands', () => {
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
       expect(output).toContain('THREAT STATISTICS')
+      expect(output).toContain('TRACE REGISTRY')
+    })
+
+    it('stats command action should print trace registry JSON snapshot', () => {
+      statsCommand.exitOverride()
+      statsCommand.parse(['stats', '--json'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('"traceRegistry"')
+      expect(output).toContain('"retainedEntries"')
+      expect(output).toContain('"path"')
     })
 
     it('inspect command action should print quarantine list', () => {
@@ -128,27 +200,57 @@ describe('CLI Commands', () => {
       inspectCommand.parse(['--json'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
-      expect(output).toContain('trace-demo-opaque-0001')
+      expect(output).toContain(SEEDED_TRACE_ID)
     })
 
     it('inspect command action should resolve trace id via option', () => {
       inspectCommand.exitOverride()
-      inspectCommand.parse(['--trace-id', 'trace-demo-opaque-0001'], { from: 'user' })
+      inspectCommand.parse(['--trace-id', SEEDED_TRACE_ID], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
       expect(output).toContain('EVIDENCE DETAILS')
-      expect(output).toContain('trace-demo-opaque-0001')
+      expect(output).toContain(SEEDED_TRACE_ID)
     })
 
     it('inspect command action should resolve trace id via positional argument', () => {
       inspectCommand.exitOverride()
-      inspectCommand.parse(['trace-demo-opaque-0001', '--json'], { from: 'user' })
+      inspectCommand.parse([SEEDED_TRACE_ID, '--json'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
-      expect(output).toContain('"traceId": "trace-demo-opaque-0001"')
+      expect(output).toContain('"traceId": "trace-seeded-0001"')
       expect(output).not.toContain('"bytes"')
     })
 
+    it('history clear should clear retained history explicitly', () => {
+      historyCommand.exitOverride()
+      historyCommand.parse(['clear', '--json'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('"mode": "history"')
+      expect(output).toContain('"success": true')
+
+      logSpy.mockClear()
+
+      inspectCommand.exitOverride()
+      inspectCommand.parse(['--json'], { from: 'user' })
+
+      const inspectOutput = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(inspectOutput).toContain('[]')
+    })
+
+    it('disk clear should remove registry file explicitly', () => {
+      const registryPath = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+      expect(registryPath).toBeTruthy()
+
+      diskCommand.exitOverride()
+      diskCommand.parse(['clear', '--json'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('"mode": "disk"')
+      expect(output).toContain('"success": true')
+
+      expect(existsSync(registryPath as string)).toBe(false)
+    })
   })
 
   describe('Theme Utilities', () => {
@@ -245,9 +347,8 @@ describe('CLI Commands', () => {
     it('should have all commands registered', async () => {
       const { program } = await import('../src/index.js')
       expect(program.commands.map((c) => c.name())).toEqual(
-        expect.arrayContaining(['status', 'stats', 'inspect', 'watch']),
+        expect.arrayContaining(['status', 'stats', 'inspect', 'watch', 'history', 'disk']),
       )
     })
   })
 })
-

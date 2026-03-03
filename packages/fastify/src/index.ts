@@ -4,7 +4,13 @@
  * Fastify plugin for Tracehound security buffer.
  */
 
-import { generateSecureId, type IAgent, type InterceptResult, type Scent } from '@tracehound/core'
+import {
+  generateSecureId,
+  recordTraceInspectionEntry,
+  type IAgent,
+  type InterceptResult,
+  type Scent,
+} from '@tracehound/core'
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from 'fastify'
 
 /**
@@ -83,7 +89,7 @@ function defaultExtractScent(req: FastifyRequest): Scent {
  */
 function defaultOnIntercept(
   result: InterceptResult,
-  _req: FastifyRequest,
+  req: FastifyRequest,
   reply: FastifyReply,
   options?: Pick<TracehoundPluginOptions, 'emitSignatureInResponse' | 'emitTraceIdHeader'>,
 ): void {
@@ -107,7 +113,18 @@ function defaultOnIntercept(
 
     case 'quarantined':
       if (options?.emitTraceIdHeader) {
-        reply.header('x-tracehound-trace-id', generateSecureId())
+        const traceId = generateSecureId()
+        const source = req.ip || 'unknown'
+
+        reply.header('x-tracehound-trace-id', traceId)
+        recordTraceInspectionEntry({
+          traceId,
+          signature: result.handle.signature,
+          severity: result.handle.severity,
+          size: result.handle.size,
+          captured: result.handle.captured,
+          source,
+        })
       }
 
       reply.status(403).send({

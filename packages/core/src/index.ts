@@ -228,7 +228,9 @@ export { MemoryColdStorage, createMemoryColdStorage } from './core/cold-storage.
 export type {
   ColdStorageReadResult,
   ColdStorageWriteResult,
+  DiskBufferOptions,
   IColdStorageAdapter,
+  MemoryColdStorageOptions,
 } from './core/cold-storage.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -328,5 +330,8 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
+
+
+
 
 

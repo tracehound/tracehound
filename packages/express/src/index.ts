@@ -24,6 +24,12 @@ export interface TracehoundMiddlewareOptions {
   emitSignatureInResponse?: boolean
 
   /**
+   * If true, emits x-tracehound-trace-id for quarantined responses.
+   * Disabled by default for privacy-sensitive environments.
+   */
+  emitTraceIdHeader?: boolean
+
+  /**
    * Custom scent extraction function.
    * Default extracts IP, path, method, and headers safely.
    */
@@ -79,7 +85,7 @@ function defaultOnIntercept(
   result: InterceptResult,
   _req: Request,
   res: Response,
-  options?: Pick<TracehoundMiddlewareOptions, 'emitSignatureInResponse'>,
+  options?: Pick<TracehoundMiddlewareOptions, 'emitSignatureInResponse' | 'emitTraceIdHeader'>,
 ): void {
   switch (result.status) {
     case 'rate_limited':
@@ -98,6 +104,10 @@ function defaultOnIntercept(
       break
 
     case 'quarantined':
+      if (options?.emitTraceIdHeader) {
+        res.set('x-tracehound-trace-id', generateSecureId())
+      }
+
       res.status(403).json({
         error: 'Forbidden',
         ...(options?.emitSignatureInResponse ? { signature: result.handle.signature } : {}),
@@ -136,15 +146,21 @@ export function tracehound(options: TracehoundMiddlewareOptions): RequestHandler
 
   const interceptHandler =
     onIntercept ||
-    ((res, req, resp) =>
-      defaultOnIntercept(
-        res,
-        req,
-        resp,
-        options.emitSignatureInResponse !== undefined
-          ? { emitSignatureInResponse: options.emitSignatureInResponse }
-          : {},
-      ))
+    ((res, req, resp) => {
+      const interceptOptions: Pick<
+        TracehoundMiddlewareOptions,
+        'emitSignatureInResponse' | 'emitTraceIdHeader'
+      > = {}
+
+      if (options.emitSignatureInResponse !== undefined) {
+        interceptOptions.emitSignatureInResponse = options.emitSignatureInResponse
+      }
+      if (options.emitTraceIdHeader !== undefined) {
+        interceptOptions.emitTraceIdHeader = options.emitTraceIdHeader
+      }
+
+      defaultOnIntercept(res, req, resp, interceptOptions)
+    })
 
   return (req: Request, res: Response, next: NextFunction): void => {
     const scent = extractScent(req)
@@ -166,3 +182,4 @@ export const createMiddleware = tracehound
 
 // Re-export types for convenience
 export type { InterceptResult, Scent } from '@tracehound/core'
+

@@ -120,6 +120,7 @@ describe('tracehoundPlugin', () => {
     const sentBody = (reply.send as any).mock.calls[0][0]
     expect(sentBody.signature).toBeUndefined()
     expect(sentBody.error).toBe('Forbidden')
+    expect(reply.header).not.toHaveBeenCalledWith('x-tracehound-trace-id', expect.any(String))
   })
 
   it('should return signature when emitSignatureInResponse is true', async () => {
@@ -141,6 +142,33 @@ describe('tracehoundPlugin', () => {
     expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ signature: 'test-sig' }))
   })
 
+  it('should emit opaque x-tracehound-trace-id header when enabled for quarantined', async () => {
+    const signature = 'trace-123'
+    const agent = createMockAgent({
+      status: 'quarantined',
+      handle: { signature } as any,
+    })
+    const fastify = createMockFastify()
+
+    tracehoundPlugin(fastify as any, { agent, emitTraceIdHeader: true }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, () => {})
+
+    expect(reply.status).toHaveBeenCalledWith(403)
+
+    const traceIdCall = (reply.header as any).mock.calls.find(
+      ([name]: [string]) => name === 'x-tracehound-trace-id',
+    )
+    expect(traceIdCall).toBeDefined()
+
+    const [, traceId] = traceIdCall as [string, string]
+    expect(traceId).toEqual(expect.any(String))
+    expect(traceId).not.toBe(signature)
+  })
   it('should return 413 for payload_too_large', async () => {
     const agent = createMockAgent({ status: 'payload_too_large', limit: 1000 })
     const fastify = createMockFastify()
@@ -279,3 +307,4 @@ describe('tracehoundPlugin', () => {
     expect(agent.intercept).toHaveBeenCalledWith(customScent)
   })
 })
+

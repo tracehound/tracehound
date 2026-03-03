@@ -15,13 +15,25 @@
  */
 
 import { Buffer } from 'node:buffer'
-import { existsSync, truncateSync } from 'node:fs'
-import { appendFile, mkdir, readFile } from 'node:fs/promises'
+import {
+  createReadStream,
+  existsSync,
+  openSync,
+  readSync,
+  closeSync,
+  statSync,
+  truncateSync,
+} from 'node:fs'
+import { appendFile, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { createInterface } from 'node:readline'
 import type { EncodedPayload } from '../utils/binary-codec.js'
 
 const DEFAULT_MAX_ENTRIES = 1_024
 const DEFAULT_MAX_BYTES = 8 * 1024 * 1024
+const DEFAULT_MAX_DISK_QUEUE_ENTRIES = 1_024
+const DISK_FLUSH_BATCH_SIZE = 128
+const DISK_FLUSH_RETRY_MS = 1_000
 
 /**
  * Cold storage write result.
@@ -56,6 +68,8 @@ export interface DiskBufferOptions {
   enabled?: boolean
   /** NDJSON path for optional disk buffering */
   path?: string
+  /** Bounded in-memory queue length for async disk flush */
+  maxQueueEntries?: number
 }
 
 /**
@@ -127,6 +141,24 @@ interface DiskDeleteEvent {
 
 type DiskEvent = DiskPutEvent | DiskDeleteEvent
 
+interface DiskQueueItem {
+  event: DiskEvent
+  line: string
+  bytes: number
+}
+
+interface DiskIndexEntry {
+  kind: DiskEvent['kind']
+  offset: number
+  length: number
+}
+
+interface EnqueueResult {
+  accepted: boolean
+  warning?: string
+  error?: string
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // In-Memory Implementation (Memory-first + optional disk)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -142,16 +174,34 @@ export class MemoryColdStorage implements IColdStorageAdapter {
   private readonly maxBytes: number
   private readonly diskBufferEnabled: boolean
   private readonly diskBufferPath: string | undefined
+  private readonly maxDiskQueueEntries: number
 
   private totalBytes = 0
   private totalDropped = 0
   private totalDroppedBytes = 0
+
+  private readonly diskQueue: DiskQueueItem[] = []
+  private diskQueueDropped = 0
+  private diskFlushing = false
+
+  private diskNextOffset: number | null = null
+  private readonly diskIndex = new Map<string, DiskIndexEntry>()
+  private diskIndexLoaded = false
+  private diskIndexLoading: Promise<void> | null = null
 
   constructor(options: MemoryColdStorageOptions = {}) {
     this.maxEntries = coerceNonNegativeInt(options.maxEntries, DEFAULT_MAX_ENTRIES)
     this.maxBytes = coerceNonNegativeInt(options.maxBytes, DEFAULT_MAX_BYTES)
     this.diskBufferEnabled = options.diskBuffer?.enabled === true
     this.diskBufferPath = options.diskBuffer?.path
+    this.maxDiskQueueEntries = coercePositiveInt(
+      options.diskBuffer?.maxQueueEntries,
+      DEFAULT_MAX_DISK_QUEUE_ENTRIES,
+    )
+
+    if (this.diskBufferEnabled && this.diskBufferPath) {
+      this.diskNextOffset = safeFileSize(this.diskBufferPath)
+    }
   }
 
   async write(id: string, payload: EncodedPayload): Promise<ColdStorageWriteResult> {
@@ -173,20 +223,25 @@ export class MemoryColdStorage implements IColdStorageAdapter {
         }
       }
 
-      try {
-        await this.appendDiskEvent({
-          kind: 'put',
-          id,
-          at: Date.now(),
-          payload: serializePayload(payload),
-        })
-        return { success: true, id }
-      } catch (error: unknown) {
+      const enqueued = this.enqueueDiskEvent({
+        kind: 'put',
+        id,
+        at: Date.now(),
+        payload: serializePayload(payload),
+      })
+
+      if (!enqueued.accepted) {
         return {
           success: false,
-          error: error instanceof Error ? error.message : 'disk buffer write failed',
+          error: enqueued.error ?? 'disk buffer enqueue failed',
         }
       }
+
+      if (enqueued.warning) {
+        return { success: true, id, error: enqueued.warning }
+      }
+
+      return { success: true, id }
     }
 
     this.upsertMemory(id, payload, estimatedBytes)
@@ -196,22 +251,26 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       return { success: true, id }
     }
 
-    try {
-      await this.appendDiskEvent({
-        kind: 'put',
-        id,
-        at: Date.now(),
-        payload: serializePayload(payload),
-      })
-      return { success: true, id }
-    } catch (error: unknown) {
-      // Memory write succeeded; disk mirror is best-effort.
+    const enqueued = this.enqueueDiskEvent({
+      kind: 'put',
+      id,
+      at: Date.now(),
+      payload: serializePayload(payload),
+    })
+
+    if (!enqueued.accepted) {
       return {
         success: true,
         id,
-        error: error instanceof Error ? error.message : 'disk buffer write failed',
+        error: enqueued.error ?? 'disk buffer enqueue failed',
       }
     }
+
+    if (enqueued.warning) {
+      return { success: true, id, error: enqueued.warning }
+    }
+
+    return { success: true, id }
   }
 
   async read(id: string): Promise<ColdStorageReadResult> {
@@ -224,11 +283,26 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       return { success: false, error: 'Not found' }
     }
 
+    const pending = this.findPendingDiskEvent(id)
+    if (pending) {
+      if (pending.kind === 'delete') {
+        return { success: false, error: 'Not found' }
+      }
+
+      return { success: true, payload: deserializePayload(pending.payload) }
+    }
+
     try {
-      const payload = await this.readFromDisk(id)
+      const entry = await this.getDiskIndexEntry(id)
+      if (!entry || entry.kind === 'delete') {
+        return { success: false, error: 'Not found' }
+      }
+
+      const payload = this.readDiskPayloadAt(entry)
       if (!payload) {
         return { success: false, error: 'Not found' }
       }
+
       return { success: true, payload }
     } catch (error: unknown) {
       return {
@@ -245,16 +319,17 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       return removed
     }
 
-    try {
-      await this.appendDiskEvent({
-        kind: 'delete',
-        id,
-        at: Date.now(),
-      })
-      return true
-    } catch {
+    const enqueued = this.enqueueDiskEvent({
+      kind: 'delete',
+      id,
+      at: Date.now(),
+    })
+
+    if (!enqueued.accepted) {
       return removed
     }
+
+    return true
   }
 
   async isAvailable(): Promise<boolean> {
@@ -295,11 +370,29 @@ export class MemoryColdStorage implements IColdStorageAdapter {
     return this.totalDroppedBytes
   }
 
+  /** Current disk flush queue depth (testing helper) */
+  get diskQueueDepth(): number {
+    return this.diskQueue.length
+  }
+
+  /** Total dropped disk queue events (testing helper) */
+  get diskQueueDroppedCount(): number {
+    return this.diskQueueDropped
+  }
+
   /** Clear all storage (testing helper) */
   clear(): void {
     this.storage.clear()
     this.payloadSizes.clear()
     this.totalBytes = 0
+    this.totalDropped = 0
+    this.totalDroppedBytes = 0
+
+    this.diskQueue.length = 0
+    this.diskQueueDropped = 0
+    this.diskIndex.clear()
+    this.diskIndexLoaded = false
+    this.diskIndexLoading = null
 
     if (this.diskBufferEnabled && this.diskBufferPath && existsSync(this.diskBufferPath)) {
       try {
@@ -307,6 +400,12 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       } catch {
         // ignore
       }
+    }
+
+    if (this.diskBufferEnabled && this.diskBufferPath) {
+      this.diskNextOffset = safeFileSize(this.diskBufferPath)
+    } else {
+      this.diskNextOffset = 0
     }
   }
 
@@ -352,60 +451,252 @@ export class MemoryColdStorage implements IColdStorageAdapter {
     return removed
   }
 
-  private async appendDiskEvent(event: DiskEvent): Promise<void> {
+  private enqueueDiskEvent(event: DiskEvent): EnqueueResult {
     if (!this.diskBufferEnabled) {
-      return
+      return {
+        accepted: false,
+        error: 'disk buffering is disabled',
+      }
     }
 
     if (!this.diskBufferPath || this.diskBufferPath.length === 0) {
-      throw new Error('disk buffer path is required when disk buffering is enabled')
+      return {
+        accepted: false,
+        error: 'disk buffer path is required when disk buffering is enabled',
+      }
     }
 
-    await mkdir(dirname(this.diskBufferPath), { recursive: true })
-    await appendFile(this.diskBufferPath, `${JSON.stringify(event)}\n`, 'utf8')
+    const line = `${JSON.stringify(event)}\n`
+    const item: DiskQueueItem = {
+      event,
+      line,
+      bytes: Buffer.byteLength(line),
+    }
+
+    let queueDropped = false
+    while (this.diskQueue.length >= this.maxDiskQueueEntries) {
+      this.diskQueue.shift()
+      this.diskQueueDropped++
+      queueDropped = true
+    }
+
+    this.diskQueue.push(item)
+    this.scheduleDiskFlush()
+
+    if (queueDropped) {
+      return {
+        accepted: true,
+        warning: 'disk queue overflow: oldest pending event dropped',
+      }
+    }
+
+    return { accepted: true }
   }
 
-  private async readFromDisk(id: string): Promise<EncodedPayload | null> {
-    if (!this.diskBufferPath || this.diskBufferPath.length === 0 || !existsSync(this.diskBufferPath)) {
-      return null
+  private scheduleDiskFlush(delayMs: number = 0): void {
+    if (this.diskFlushing || this.diskQueue.length === 0) {
+      return
     }
 
-    const raw = await readFile(this.diskBufferPath, 'utf8')
-    if (raw.length === 0) {
-      return null
+    this.diskFlushing = true
+
+    const run = () => {
+      void this.flushDiskQueue()
     }
 
-    const lines = raw.split(/\r?\n/)
+    if (delayMs > 0) {
+      setTimeout(run, delayMs)
+      return
+    }
 
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i]
-      if (!line || line.length === 0) {
+    queueMicrotask(run)
+  }
+
+  private async flushDiskQueue(): Promise<void> {
+    const path = this.diskBufferPath
+
+    if (!path || path.length === 0) {
+      this.diskFlushing = false
+      return
+    }
+
+    let flushFailed = false
+
+    try {
+      await mkdir(dirname(path), { recursive: true })
+
+      while (this.diskQueue.length > 0) {
+        const batch = this.diskQueue.slice(0, Math.min(DISK_FLUSH_BATCH_SIZE, this.diskQueue.length))
+        if (batch.length === 0) {
+          break
+        }
+
+        const payload = batch.map((item) => item.line).join('')
+        const startOffset = this.resolveDiskNextOffset(path)
+
+        try {
+          await appendFile(path, payload, 'utf8')
+        } catch {
+          flushFailed = true
+          break
+        }
+
+        this.diskQueue.splice(0, batch.length)
+
+        let offset = startOffset
+        for (const item of batch) {
+          this.diskIndex.set(item.event.id, {
+            kind: item.event.kind,
+            offset,
+            length: item.bytes,
+          })
+          offset += item.bytes
+        }
+
+        this.diskNextOffset = offset
+      }
+    } catch {
+      flushFailed = true
+    } finally {
+      this.diskFlushing = false
+
+      if (this.diskQueue.length > 0) {
+        this.scheduleDiskFlush(flushFailed ? DISK_FLUSH_RETRY_MS : 0)
+      }
+    }
+  }
+
+  private resolveDiskNextOffset(path: string): number {
+    if (typeof this.diskNextOffset === 'number' && this.diskNextOffset >= 0) {
+      return this.diskNextOffset
+    }
+
+    this.diskNextOffset = safeFileSize(path)
+    return this.diskNextOffset
+  }
+
+  private findPendingDiskEvent(id: string): DiskEvent | null {
+    for (let i = this.diskQueue.length - 1; i >= 0; i--) {
+      const event = this.diskQueue[i]?.event
+      if (!event) {
         continue
       }
 
-      let parsed: DiskEvent | null = null
-      try {
-        parsed = JSON.parse(line) as DiskEvent
-      } catch {
-        continue
+      if (event.id === id) {
+        return event
       }
-
-      if (!parsed || parsed.id !== id) {
-        continue
-      }
-
-      if (parsed.kind === 'delete') {
-        return null
-      }
-
-      if (parsed.kind !== 'put') {
-        continue
-      }
-
-      return deserializePayload(parsed.payload)
     }
 
     return null
+  }
+
+  private async getDiskIndexEntry(id: string): Promise<DiskIndexEntry | undefined> {
+    await this.ensureDiskIndexLoaded()
+    return this.diskIndex.get(id)
+  }
+
+  private async ensureDiskIndexLoaded(): Promise<void> {
+    if (this.diskIndexLoaded) {
+      return
+    }
+
+    if (this.diskIndexLoading) {
+      await this.diskIndexLoading
+      return
+    }
+
+    this.diskIndexLoading = this.rebuildDiskIndex()
+
+    try {
+      await this.diskIndexLoading
+      this.diskIndexLoaded = true
+    } finally {
+      this.diskIndexLoading = null
+    }
+  }
+
+  private async rebuildDiskIndex(): Promise<void> {
+    this.diskIndex.clear()
+
+    const path = this.diskBufferPath
+    if (!path || path.length === 0 || !existsSync(path)) {
+      this.diskNextOffset = 0
+      return
+    }
+
+    const stream = createReadStream(path, { encoding: 'utf8' })
+    const reader = createInterface({ input: stream, crlfDelay: Infinity })
+
+    let offset = 0
+
+    try {
+      for await (const line of reader) {
+        const lineWithNewline = `${line}\n`
+        const bytes = Buffer.byteLength(lineWithNewline)
+
+        if (line.length > 0) {
+          const event = parseDiskEvent(line)
+          if (event) {
+            this.diskIndex.set(event.id, {
+              kind: event.kind,
+              offset,
+              length: bytes,
+            })
+          }
+        }
+
+        offset += bytes
+      }
+    } finally {
+      try {
+        reader.close()
+      } catch {
+        // ignore close errors
+      }
+
+      try {
+        stream.close()
+      } catch {
+        // ignore close errors
+      }
+    }
+
+    this.diskNextOffset = offset
+  }
+
+  private readDiskPayloadAt(entry: DiskIndexEntry): EncodedPayload | null {
+    const path = this.diskBufferPath
+    if (!path || path.length === 0 || !existsSync(path)) {
+      return null
+    }
+
+    const fd = openSync(path, 'r')
+
+    try {
+      const buffer = Buffer.alloc(entry.length)
+      const bytesRead = readSync(fd, buffer, 0, entry.length, entry.offset)
+      if (bytesRead <= 0) {
+        return null
+      }
+
+      const line = buffer.subarray(0, bytesRead).toString('utf8').trim()
+      if (line.length === 0) {
+        return null
+      }
+
+      const event = parseDiskEvent(line)
+      if (!event || event.kind !== 'put') {
+        return null
+      }
+
+      return deserializePayload(event.payload)
+    } finally {
+      try {
+        closeSync(fd)
+      } catch {
+        // ignore close errors
+      }
+    }
   }
 }
 
@@ -422,6 +713,14 @@ function coerceNonNegativeInt(input: number | undefined, fallback: number): numb
   }
 
   if (input < 0) {
+    return fallback
+  }
+
+  return Math.floor(input)
+}
+
+function coercePositiveInt(input: number | undefined, fallback: number): number {
+  if (typeof input !== 'number' || !Number.isFinite(input) || input <= 0) {
     return fallback
   }
 
@@ -453,4 +752,86 @@ function deserializePayload(serialized: DiskPutEvent['payload']): EncodedPayload
     compressedSize: serialized.compressedSize,
   }
 }
+
+function parseDiskEvent(line: string): DiskEvent | null {
+  try {
+    const parsed = JSON.parse(line) as Partial<DiskEvent>
+
+    if (!parsed || typeof parsed !== 'object') {
+      return null
+    }
+
+    if (parsed.kind === 'put') {
+      const candidate = parsed as Partial<DiskPutEvent>
+      if (
+        typeof candidate.id === 'string' &&
+        candidate.id.length > 0 &&
+        candidate.payload !== undefined &&
+        isSerializedPayload(candidate.payload)
+      ) {
+        return {
+          kind: 'put',
+          id: candidate.id,
+          at: typeof candidate.at === 'number' ? candidate.at : Date.now(),
+          payload: candidate.payload,
+        }
+      }
+
+      return null
+    }
+
+    if (parsed.kind === 'delete') {
+      const candidate = parsed as Partial<DiskDeleteEvent>
+      if (typeof candidate.id === 'string' && candidate.id.length > 0) {
+        return {
+          kind: 'delete',
+          id: candidate.id,
+          at: typeof candidate.at === 'number' ? candidate.at : Date.now(),
+        }
+      }
+
+      return null
+    }
+
+    return null
+  } catch {
+    return null
+  }
+}
+
+function isSerializedPayload(value: unknown): value is DiskPutEvent['payload'] {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const payload = value as Partial<DiskPutEvent['payload']>
+
+  return (
+    typeof payload.compressedBase64 === 'string' &&
+    typeof payload.hash === 'string' &&
+    typeof payload.originalSize === 'number' &&
+    Number.isFinite(payload.originalSize) &&
+    payload.originalSize >= 0 &&
+    typeof payload.compressedSize === 'number' &&
+    Number.isFinite(payload.compressedSize) &&
+    payload.compressedSize >= 0
+  )
+}
+
+function safeFileSize(path: string): number {
+  if (!existsSync(path)) {
+    return 0
+  }
+
+  try {
+    return statSync(path).size
+  } catch {
+    return 0
+  }
+}
+
+
+
+
+
 

@@ -666,11 +666,17 @@ export class MemoryColdStorage implements IColdStorageAdapter {
 
   private readDiskPayloadAt(entry: DiskIndexEntry): EncodedPayload | null {
     const path = this.diskBufferPath
-    if (!path || path.length === 0 || !existsSync(path)) {
+    if (!path || path.length === 0) {
       return null
     }
 
-    const fd = openSync(path, 'r')
+    let fd: number
+    try {
+      fd = openSync(path, 'r')
+    } catch {
+      // File may be rotated/deleted between index lookup and open.
+      return null
+    }
 
     try {
       const buffer = Buffer.alloc(entry.length)
@@ -690,6 +696,8 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       }
 
       return deserializePayload(event.payload)
+    } catch {
+      return null
     } finally {
       try {
         closeSync(fd)
@@ -829,6 +837,7 @@ function safeFileSize(path: string): number {
     return 0
   }
 }
+
 
 
 

@@ -433,6 +433,47 @@ describe('Agent', () => {
       }
     })
 
+    it('keeps quarantined handle serializable without membrane violations', () => {
+      const scent = createScent(
+        { attack: 'serialization-safe' },
+        { category: 'injection', severity: 'high' },
+      )
+
+      const result = agent.intercept(scent)
+      expect(result.status).toBe('quarantined')
+
+      if (result.status === 'quarantined') {
+        expect(() => ({ ...result.handle })).not.toThrow()
+        expect(() => JSON.stringify(result.handle)).not.toThrow()
+
+        const spreadHandle = { ...result.handle }
+        expect(spreadHandle).toMatchObject({
+          membrane: 'metadata_only',
+          signature: result.handle.signature,
+        })
+        expect(spreadHandle).not.toHaveProperty('bytes')
+        expect(spreadHandle).not.toHaveProperty('transfer')
+        expect(spreadHandle).not.toHaveProperty('neutralize')
+        expect(spreadHandle).not.toHaveProperty('evacuate')
+
+        const json = JSON.parse(JSON.stringify(result.handle)) as Record<string, unknown>
+        expect(json).toMatchObject({
+          membrane: 'metadata_only',
+          signature: result.handle.signature,
+        })
+        expect(json).not.toHaveProperty('bytes')
+
+        const membraneWarnings = (mockNotifications.emit as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter(
+          ([event, payload]) =>
+            event === 'system.panic' &&
+            typeof payload === 'object' &&
+            payload !== null &&
+            'reason' in (payload as Record<string, unknown>) &&
+            (payload as { reason?: string }).reason === 'membrane.payload_egress_blocked',
+        )
+        expect(membraneWarnings).toHaveLength(0)
+      }
+    })
     it('inserts evidence into quarantine', () => {
       const scent = createScent({ attack: 'test' }, { category: 'injection', severity: 'high' })
 
@@ -583,3 +624,4 @@ describe('Agent', () => {
     })
   })
 })
+

@@ -5,20 +5,21 @@
  * to prevent memory exhaustion attacks via large payloads.
  */
 
-import type { JsonSerializable } from '../types/common.js'
-import { Errors } from '../types/errors.js'
+import type { JsonSerializable } from "../types/common.js";
+import { Errors } from "../types/errors.js";
+import { serialize } from "./serialize.js";
 
-const MAX_NESTING_DEPTH = 32
-const MAX_OBJECT_KEYS = 1000
+const MAX_NESTING_DEPTH = 32;
+const MAX_OBJECT_KEYS = 1000;
 
 /** Result of payload encoding */
 export interface EncodeResult {
   /** UTF-8 encoded bytes */
-  bytes: Uint8Array
+  bytes: Uint8Array;
   /** Size in bytes */
-  size: number
+  size: number;
   /** Canonical JSON string (for debugging only) */
-  canonical: string
+  canonical: string;
 }
 
 /**
@@ -27,80 +28,74 @@ export interface EncodeResult {
  *
  * @throws TracehoundError if payload contains problematic values
  */
-function validatePayloadStructure(value: unknown, path: string = 'root', depth: number = 0): void {
+function validatePayloadStructure(
+  value: unknown,
+  path: string = "root",
+  depth: number = 0,
+): void {
   if (depth > MAX_NESTING_DEPTH) {
     throw Errors.serializationFailed(
       `max nesting depth exceeded at ${path} (${depth} > ${MAX_NESTING_DEPTH})`,
-    )
+    );
   }
 
   if (value === undefined) {
-    throw Errors.serializationFailed(`undefined value at ${path} - use null instead`)
+    throw Errors.serializationFailed(
+      `undefined value at ${path} - use null instead`,
+    );
   }
 
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     if (Number.isNaN(value)) {
-      throw Errors.serializationFailed(`NaN value at ${path} - not allowed`)
+      throw Errors.serializationFailed(`NaN value at ${path} - not allowed`);
     }
     if (!Number.isFinite(value)) {
-      throw Errors.serializationFailed(`Infinity value at ${path} - not allowed`)
+      throw Errors.serializationFailed(
+        `Infinity value at ${path} - not allowed`,
+      );
     }
   }
 
-  if (typeof value === 'function') {
-    throw Errors.serializationFailed(`function at ${path} - not serializable`)
+  if (typeof value === "function") {
+    throw Errors.serializationFailed(`function at ${path} - not serializable`);
   }
 
-  if (typeof value === 'symbol') {
-    throw Errors.serializationFailed(`symbol at ${path} - not serializable`)
+  if (typeof value === "symbol") {
+    throw Errors.serializationFailed(`symbol at ${path} - not serializable`);
   }
 
-  if (typeof value === 'bigint') {
-    throw Errors.serializationFailed(`bigint at ${path} - use string representation`)
+  if (typeof value === "bigint") {
+    throw Errors.serializationFailed(
+      `bigint at ${path} - use string representation`,
+    );
   }
 
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
-      validatePayloadStructure(value[i], `${path}[${i}]`, depth + 1)
+      validatePayloadStructure(value[i], `${path}[${i}]`, depth + 1);
     }
-  } else if (value !== null && typeof value === 'object') {
+  } else if (value !== null && typeof value === "object") {
     // Check for circular references would require WeakSet tracking
     // JSON.stringify will throw on circular refs anyway
-    const entries = Object.entries(value)
+    const entries = Object.entries(value);
     if (entries.length > MAX_OBJECT_KEYS) {
       throw Errors.serializationFailed(
         `max object key count exceeded at ${path} (${entries.length} > ${MAX_OBJECT_KEYS})`,
-      )
+      );
     }
 
     for (const [key, val] of entries) {
       if (val === undefined) {
-        throw Errors.serializationFailed(`undefined value at ${path}.${key} - use null or omit key`)
+        throw Errors.serializationFailed(
+          `undefined value at ${path}.${key} - use null or omit key`,
+        );
       }
-      validatePayloadStructure(val, `${path}.${key}`, depth + 1)
+      validatePayloadStructure(val, `${path}.${key}`, depth + 1);
     }
   }
 }
 
-/**
- * Serialize value to canonical JSON with sorted keys.
- * Ensures identical payloads produce identical strings.
- */
-function canonicalize(value: JsonSerializable): string {
-  return JSON.stringify(value, (_, v: unknown) => {
-    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
-      const sorted: Record<string, unknown> = {}
-      const obj = v as Record<string, unknown>
-      Object.keys(obj)
-        .sort()
-        .forEach((key) => {
-          sorted[key] = obj[key]
-        })
-      return sorted
-    }
-    return v
-  })
-}
+// canonicalize is provided by serialize() from ./serialize.ts
 
 /**
  * Encode payload to UTF-8 bytes with size-first validation.
@@ -115,27 +110,30 @@ function canonicalize(value: JsonSerializable): string {
  * @returns Encoded bytes and metadata
  * @throws TracehoundError if validation fails
  */
-export function encodePayload(payload: JsonSerializable, maxSize: number): EncodeResult {
+export function encodePayload(
+  payload: JsonSerializable,
+  maxSize: number,
+): EncodeResult {
   // Step 1: Validate structure (catches undefined, NaN, etc.)
-  validatePayloadStructure(payload)
+  validatePayloadStructure(payload);
 
   // Step 2: Canonicalize to JSON string
-  const canonical = canonicalize(payload)
+  const canonical = serialize(payload);
 
   // Step 3: Encode to UTF-8 bytes
-  const encoder = new TextEncoder()
-  const bytes = encoder.encode(canonical)
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(canonical);
 
   // Step 4: Check size AFTER encoding (actual byte size, not string length)
   if (bytes.length > maxSize) {
-    throw Errors.payloadTooLarge(bytes.length, maxSize)
+    throw Errors.payloadTooLarge(bytes.length, maxSize);
   }
 
   return {
     bytes,
     size: bytes.length,
     canonical,
-  }
+  };
 }
 
 /**
@@ -147,8 +145,8 @@ export function encodePayload(payload: JsonSerializable, maxSize: number): Encod
  */
 export function estimatePayloadSize(payload: JsonSerializable): number {
   // Quick stringify without sorting (faster for estimation)
-  const json = JSON.stringify(payload)
+  const json = JSON.stringify(payload);
   // UTF-8: ASCII = 1 byte, others = up to 4 bytes
   // Use 2x as conservative multiplier
-  return json.length * 2
+  return json.length * 2;
 }

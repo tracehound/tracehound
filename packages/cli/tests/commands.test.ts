@@ -38,6 +38,12 @@ describe('CLI Commands', () => {
       expect(inspectCommand.description()).toBeTruthy()
     })
 
+    it('inspect command should support trace-id option', async () => {
+      const { inspectCommand } = await import('../src/commands/inspect.js')
+      const traceIdOption = inspectCommand.options.find((option) => option.long === '--trace-id')
+      expect(traceIdOption).toBeDefined()
+    })
+
     it('stats command should be a Commander command', async () => {
       const { statsCommand } = await import('../src/commands/stats.js')
       expect(statsCommand.name()).toBe('stats')
@@ -67,6 +73,7 @@ describe('CLI Commands', () => {
       logSpy.mockRestore()
       // Reset commander options to avoid state leakage
       inspectCommand.setOptionValue('signature', undefined)
+      inspectCommand.setOptionValue('traceId', undefined)
       inspectCommand.setOptionValue('limit', '10')
       inspectCommand.setOptionValue('json', undefined)
       statusCommand.setOptionValue('json', undefined)
@@ -100,17 +107,17 @@ describe('CLI Commands', () => {
       expect(output).toContain('THREAT STATISTICS')
     })
 
-    it('inspect command action should print empty quarantine message', () => {
+    it('inspect command action should print quarantine list', () => {
       inspectCommand.exitOverride()
-      inspectCommand.parse(['inspect', '--limit', '5'], { from: 'user' })
+      inspectCommand.parse(['--limit', '5'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
-      expect(output).toContain('Quarantine is empty')
+      expect(output).toContain('QUARANTINE CONTENTS')
     })
 
     it('inspect command action should print not found message for signature', () => {
       inspectCommand.exitOverride()
-      inspectCommand.parse(['inspect', '--signature', 'missing-sig'], { from: 'user' })
+      inspectCommand.parse(['--signature', 'missing-sig'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
       expect(output).toContain('Evidence not found')
@@ -118,11 +125,30 @@ describe('CLI Commands', () => {
 
     it('inspect command action should print JSON list', () => {
       inspectCommand.exitOverride()
-      inspectCommand.parse(['inspect', '--json'], { from: 'user' })
+      inspectCommand.parse(['--json'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
-      expect(output).toContain('[]')
+      expect(output).toContain('trace-demo-opaque-0001')
     })
+
+    it('inspect command action should resolve trace id via option', () => {
+      inspectCommand.exitOverride()
+      inspectCommand.parse(['--trace-id', 'trace-demo-opaque-0001'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('EVIDENCE DETAILS')
+      expect(output).toContain('trace-demo-opaque-0001')
+    })
+
+    it('inspect command action should resolve trace id via positional argument', () => {
+      inspectCommand.exitOverride()
+      inspectCommand.parse(['trace-demo-opaque-0001', '--json'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('"traceId": "trace-demo-opaque-0001"')
+      expect(output).not.toContain('"bytes"')
+    })
+
   })
 
   describe('Theme Utilities', () => {
@@ -224,3 +250,4 @@ describe('CLI Commands', () => {
     })
   })
 })
+

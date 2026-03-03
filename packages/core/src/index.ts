@@ -12,6 +12,10 @@ export type {
   AlertConfig,
   AuditConfig,
   ColdStorageConfig,
+  CoordinationFeature,
+  CoordinationHealth,
+  CoordinationMode,
+  CoordinationProvider,
   ErrorState,
   EvacuateRecord,
   EvidenceHandle,
@@ -306,3 +310,4 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
+

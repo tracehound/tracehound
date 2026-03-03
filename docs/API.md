@@ -199,6 +199,33 @@ interface ThreatSignal {
 
 ---
 
+### Coordination Contract Types (RFC-0009 Draft)
+
+The core package now exposes coordination boundary contracts for external provider integrations. These are type-only contracts and do not change runtime behavior.
+
+```ts
+import type {
+  CoordinationFeature,
+  CoordinationHealth,
+  CoordinationProvider,
+} from '@tracehound/core'
+
+const provider: CoordinationProvider = {
+  providerId: 'external-provider',
+  features: new Set<CoordinationFeature>(['shared_blocklist']),
+  async start() {},
+  async stop() {},
+  health(): CoordinationHealth {
+    return {
+      mode: 'local',
+      lastSyncAt: null,
+      syncLagMs: null,
+      provider: 'external-provider',
+    }
+  },
+}
+```
+
 ## Utilities
 
 ### ID Generation

@@ -12,6 +12,7 @@ import { createEvidenceFactory, EvidenceFactory } from '../src/core/evidence-fac
 import { Evidence } from '../src/core/evidence.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
+import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
 import type { Scent } from '../src/types/scent.js'
 import { encodePayload } from '../src/utils/encode.js'
 import { hashBuffer } from '../src/utils/hash.js'
@@ -415,6 +416,45 @@ describe('RFC-0000 Compliance', () => {
       expect(auditChain.verify()).toBe(false)
     })
   })
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RFC Section: External Coordination Contract (RFC-0009 Draft)
+  // "Coordination is optional and fail-open compatible"
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('Coordination Contract Compliance (RFC-0009 Draft)', () => {
+    it('coordination contract exposes explicit local/degraded/synchronized modes', () => {
+      const modeSet: ReadonlySet<CoordinationHealth['mode']> = new Set([
+        'local',
+        'degraded',
+        'synchronized',
+      ])
+
+      expect(modeSet.has('local')).toBe(true)
+      expect(modeSet.has('degraded')).toBe(true)
+      expect(modeSet.has('synchronized')).toBe(true)
+    })
+
+    it('coordination provider contract remains optional and lifecycle-scoped', async () => {
+      const provider: CoordinationProvider = {
+        providerId: 'test-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => ({
+          mode: 'local',
+          lastSyncAt: null,
+          syncLagMs: null,
+          provider: 'test-provider',
+        }),
+      }
+
+      await provider.start()
+      await provider.stop()
+
+      expect(provider.health().mode).toBe('local')
+      expect(provider.features.has('shared_blocklist')).toBe(true)
+    })
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -438,3 +478,6 @@ function createTestSetup(options: { maxRequests?: number } = {}) {
 
   return { agent, quarantine, auditChain, rateLimiter }
 }
+
+
+

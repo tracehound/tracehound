@@ -34,6 +34,12 @@ export interface TickSchedulerConfig {
    * DEFAULT: true (RFC requirement for timing attack prevention)
    */
   skipIfBusy?: boolean
+  /**
+   * Hard cap for task executions per tick.
+   * Overflowing due tasks are shed deterministically and counted.
+   * DEFAULT: unlimited.
+   */
+  maxTasksPerTick?: number
 }
 
 /**
@@ -44,6 +50,8 @@ export interface SchedulerStats {
   totalTicks: number
   /** Total tasks executed */
   totalTasksExecuted: number
+  /** Total due tasks shed due to maxTasksPerTick */
+  droppedTasks: number
   /** Total ticks skipped (due to busy) */
   skippedTicks: number
   /** Number of scheduled tasks */
@@ -127,14 +135,17 @@ export class Scheduler implements IScheduler {
   // Statistics
   private _totalTicks = 0
   private _totalTasksExecuted = 0
+  private _droppedTasks = 0
   private _skippedTicks = 0
 
   // Config with defaults
   private readonly skipIfBusy: boolean
+  private readonly maxTasksPerTick: number
 
   constructor(private readonly config: TickSchedulerConfig) {
     // skipIfBusy defaults to true (RFC requirement)
     this.skipIfBusy = config.skipIfBusy ?? true
+    this.maxTasksPerTick = normalizeMaxTasksPerTick(config.maxTasksPerTick)
   }
 
   start(): void {
@@ -172,6 +183,7 @@ export class Scheduler implements IScheduler {
     return Object.freeze({
       totalTicks: this._totalTicks,
       totalTasksExecuted: this._totalTasksExecuted,
+      droppedTasks: this._droppedTasks,
       skippedTicks: this._skippedTicks,
       scheduledTasks: this.tasks.size,
       running: this._running,
@@ -211,11 +223,29 @@ export class Scheduler implements IScheduler {
     const now = Date.now()
     const dueTasks = this.getDueTasks(now)
 
-    // Sort by priority
-    dueTasks.sort((a, b) => (a.task.priority ?? 100) - (b.task.priority ?? 100))
+    // Sort by priority, then task id for deterministic ordering.
+    dueTasks.sort((a, b) => {
+      const priorityDiff = (a.task.priority ?? 100) - (b.task.priority ?? 100)
+      if (priorityDiff !== 0) {
+        return priorityDiff
+      }
+      return a.task.id.localeCompare(b.task.id)
+    })
 
-    for (const taskState of dueTasks) {
-      this.executeTask(taskState, now)
+    const executionBudget = Math.min(this.maxTasksPerTick, dueTasks.length)
+
+    for (let i = 0; i < dueTasks.length; i++) {
+      const taskState = dueTasks[i]
+      if (!taskState) {
+        continue
+      }
+
+      if (i < executionBudget) {
+        this.executeTask(taskState, now)
+        continue
+      }
+
+      this.shedTask(taskState, now)
     }
 
     // Schedule next tick
@@ -252,6 +282,23 @@ export class Scheduler implements IScheduler {
       // Silently ignore task errors
     }
   }
+
+  private shedTask(taskState: TaskState, now: number): void {
+    taskState.lastExecuted = now
+    this._droppedTasks++
+  }
+}
+
+function normalizeMaxTasksPerTick(maxTasksPerTick: number | undefined): number {
+  if (typeof maxTasksPerTick !== 'number' || !Number.isFinite(maxTasksPerTick)) {
+    return Number.MAX_SAFE_INTEGER
+  }
+
+  if (maxTasksPerTick <= 0) {
+    return 0
+  }
+
+  return Math.floor(maxTasksPerTick)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -200,6 +200,15 @@ export class Agent implements IAgent {
         }
       }
 
+      if (insertResult.status === 'dropped') {
+        // Pressure containment: quarantine may shed deterministically under hard caps.
+        this.stats.ignoredCount++
+        return {
+          status: 'ignored',
+          signature,
+        }
+      }
+
       // Forward quarantined evidence to HoundPool for async processing.
       // This is the canonical wiring point: evidence is still typed as Evidence
       // here (not yet narrowed to EvidenceHandle), enabling direct activation.
@@ -492,3 +501,4 @@ export function createAgent(
     notifications,
   )
 }
+

@@ -9,14 +9,17 @@ import type { AuditChain } from './audit-chain.js'
 
 /** Result of insert operation */
 export interface InsertResult {
-  status: 'inserted' | 'duplicate'
+  status: 'inserted' | 'duplicate' | 'dropped'
   existing?: EvidenceHandle
+  reason?: 'oversized' | 'capacity' | 'pressure'
 }
 
 /** Quarantine statistics */
 export interface QuarantineStats {
   count: number
   bytes: number
+  droppedCount: number
+  droppedBytes: number
   bySeverity: Record<Severity, number>
 }
 
@@ -43,6 +46,8 @@ const SEVERITY_RANK: Record<Severity, number> = {
 export class Quarantine {
   private store = new Map<string, EvidenceHandle>()
   private totalBytes = 0
+  private droppedCount = 0
+  private droppedBytes = 0
 
   constructor(
     private config: QuarantineConfig,
@@ -51,7 +56,7 @@ export class Quarantine {
 
   /**
    * Insert evidence into quarantine.
-   * Triggers eviction if limits exceeded.
+   * Triggers deterministic Drop and Count when limits are exceeded.
    */
   insert(evidence: EvidenceHandle): InsertResult {
     // Check duplicate
@@ -62,13 +67,42 @@ export class Quarantine {
       }
     }
 
-    // Insert new evidence
+    // Hard-cap guard: impossible to retain this evidence.
+    if (this.config.maxCount <= 0 || this.config.maxBytes <= 0) {
+      this.dropIncoming(evidence)
+      return {
+        status: 'dropped',
+        reason: 'capacity',
+      }
+    }
+
+    if (evidence.size > this.config.maxBytes) {
+      this.dropIncoming(evidence)
+      return {
+        status: 'dropped',
+        reason: 'oversized',
+      }
+    }
+
+    // Insert new evidence first, then rebalance deterministically.
     this.store.set(evidence.signature, evidence)
     this.totalBytes += evidence.size
 
-    // Evict if limits exceeded
+    // Evict until limits are satisfied.
     while (this.exceedsLimits()) {
-      this.evict(1)
+      const victim = this.selectForEviction(1)[0]
+      if (!victim) {
+        break
+      }
+
+      this.dropStored(victim)
+    }
+
+    if (!this.store.has(evidence.signature)) {
+      return {
+        status: 'dropped',
+        reason: 'pressure',
+      }
     }
 
     return { status: 'inserted' }
@@ -227,6 +261,8 @@ export class Quarantine {
     return {
       count: this.store.size,
       bytes: this.totalBytes,
+      droppedCount: this.droppedCount,
+      droppedBytes: this.droppedBytes,
       bySeverity,
     }
   }
@@ -246,37 +282,29 @@ export class Quarantine {
     const victims = this.selectForEviction(count)
 
     for (const evidence of victims) {
-      const size = evidence.size
-      const signature = evidence.signature
-
-      // Neutralize and append to audit chain
-      const record = evidence.neutralize(this.auditChain.lastHash)
-      this.auditChain.append(record)
-
-      // Remove from store
-      this.store.delete(signature)
-      this.totalBytes -= size
-
-      // NOTE: Eviction is tracked via audit chain neutralization record.
-      // High/critical severity alerts are handled by Watcher observing quarantine stats.
+      this.dropStored(evidence)
     }
   }
 
   /**
    * Select evidence for eviction based on priority.
-   * Lowest severity first, then oldest.
+   * Lowest severity first, then oldest, then signature for deterministic ties.
    */
   private selectForEviction(count: number): EvidenceHandle[] {
     const all = Array.from(this.store.values())
 
-    // Sort: lowest severity first, then oldest
     all.sort((a, b) => {
       const severityDiff = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
       if (severityDiff !== 0) {
         return severityDiff
       }
-      // Same severity: oldest first
-      return a.captured - b.captured
+
+      const capturedDiff = a.captured - b.captured
+      if (capturedDiff !== 0) {
+        return capturedDiff
+      }
+
+      return a.signature.localeCompare(b.signature)
     })
 
     return all.slice(0, count)
@@ -287,5 +315,32 @@ export class Quarantine {
    */
   private exceedsLimits(): boolean {
     return this.store.size > this.config.maxCount || this.totalBytes > this.config.maxBytes
+  }
+
+  private dropIncoming(evidence: EvidenceHandle): void {
+    const size = evidence.size
+
+    this.droppedCount++
+    this.droppedBytes += size
+
+    try {
+      evidence.transfer()
+    } catch {
+      // Best-effort disposal only.
+    }
+  }
+
+  private dropStored(evidence: EvidenceHandle): void {
+    const size = evidence.size
+    const signature = evidence.signature
+
+    const record = evidence.neutralize(this.auditChain.lastHash)
+    this.auditChain.append(record)
+
+    this.store.delete(signature)
+    this.totalBytes -= size
+
+    this.droppedCount++
+    this.droppedBytes += size
   }
 }

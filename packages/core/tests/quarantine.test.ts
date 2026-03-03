@@ -115,6 +115,33 @@ describe('Quarantine', () => {
 
       expect(quarantine.stats.bytes).toBeLessThanOrEqual(10000)
     })
+
+    it('drops oversized evidence and increments drop counters', () => {
+      const result = quarantine.insert(createEvidence('too-big', 'critical', 20_000))
+
+      expect(result.status).toBe('dropped')
+      expect(result.reason).toBe('oversized')
+      expect(quarantine.has('too-big')).toBe(false)
+      expect(quarantine.stats.count).toBe(0)
+      expect(quarantine.stats.droppedCount).toBe(1)
+      expect(quarantine.stats.droppedBytes).toBe(20_000)
+    })
+
+    it('drops incoming low-priority evidence under count pressure deterministically', () => {
+      quarantine.insert(createEvidence('crit-1', 'critical', 100))
+      quarantine.insert(createEvidence('high-1', 'high', 100))
+      quarantine.insert(createEvidence('med-1', 'medium', 100))
+      quarantine.insert(createEvidence('med-2', 'medium', 100))
+      quarantine.insert(createEvidence('high-2', 'high', 100))
+
+      const result = quarantine.insert(createEvidence('low-new', 'low', 100))
+
+      expect(result.status).toBe('dropped')
+      expect(result.reason).toBe('pressure')
+      expect(quarantine.has('low-new')).toBe(false)
+      expect(quarantine.stats.count).toBe(5)
+      expect(quarantine.stats.droppedCount).toBe(1)
+    })
   })
 
   describe('get', () => {
@@ -310,5 +337,27 @@ describe('Quarantine', () => {
       expect(quarantine.stats.count).toBe(0)
       expect(quarantine.stats.bytes).toBe(0)
     })
+
+    it('tracks dropped count and bytes monotonically', () => {
+      quarantine.insert(createEvidence('keep-1', 'critical', 100))
+      quarantine.insert(createEvidence('keep-2', 'critical', 100))
+      quarantine.insert(createEvidence('keep-3', 'critical', 100))
+      quarantine.insert(createEvidence('keep-4', 'critical', 100))
+      quarantine.insert(createEvidence('keep-5', 'critical', 100))
+
+      const firstDrop = quarantine.insert(createEvidence('drop-low-1', 'low', 100))
+      const secondDrop = quarantine.insert(createEvidence('drop-low-2', 'low', 100))
+      const oversizedDrop = quarantine.insert(createEvidence('drop-oversized', 'low', 20_000))
+
+      expect(firstDrop.status).toBe('dropped')
+      expect(secondDrop.status).toBe('dropped')
+      expect(oversizedDrop.status).toBe('dropped')
+
+      const stats = quarantine.stats
+      expect(stats.droppedCount).toBe(3)
+      expect(stats.droppedBytes).toBe(20_200)
+    })
   })
 })
+
+

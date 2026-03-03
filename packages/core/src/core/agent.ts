@@ -318,39 +318,58 @@ export class Agent implements IAgent {
     const signature = evidence.signature
     const agent = this
 
-    return Object.freeze({
-      membrane: 'metadata_only' as const,
-      get size(): number {
-        return evidence.size
+    const handle = {} as RuntimeEvidenceHandle
+
+    Object.defineProperties(handle, {
+      membrane: {
+        value: 'metadata_only' as const,
+        enumerable: true,
       },
-      get hash(): string {
-        return evidence.hash
+      size: {
+        get: (): number => evidence.size,
+        enumerable: true,
       },
-      get signature(): string {
-        return evidence.signature
+      hash: {
+        get: (): string => evidence.hash,
+        enumerable: true,
       },
-      get captured(): number {
-        return evidence.captured
+      signature: {
+        get: (): string => evidence.signature,
+        enumerable: true,
       },
-      get severity(): RuntimeEvidenceHandle['severity'] {
-        return evidence.severity
+      captured: {
+        get: (): number => evidence.captured,
+        enumerable: true,
       },
-      get disposed(): boolean {
-        return evidence.disposed
+      severity: {
+        get: (): RuntimeEvidenceHandle['severity'] => evidence.severity,
+        enumerable: true,
       },
-      get bytes(): never {
-        return agent.rejectRuntimePayloadEgress('bytes', signature)
+      disposed: {
+        get: (): boolean => evidence.disposed,
+        enumerable: true,
       },
-      transfer(): never {
-        return agent.rejectRuntimePayloadEgress('transfer', signature)
+      bytes: {
+        get: (): never => agent.rejectRuntimePayloadEgress('bytes', signature),
+        enumerable: false,
       },
-      neutralize(_previousHash: string): never {
-        return agent.rejectRuntimePayloadEgress('neutralize', signature)
+      transfer: {
+        value: (): never => agent.rejectRuntimePayloadEgress('transfer', signature),
+        enumerable: false,
       },
-      evacuate(_destination: string): never {
-        return agent.rejectRuntimePayloadEgress('evacuate', signature)
+      neutralize: {
+        value: (_previousHash: string): never =>
+          agent.rejectRuntimePayloadEgress('neutralize', signature),
+        enumerable: false,
+      },
+      evacuate: {
+        value: (_destination: string): never =>
+          agent.rejectRuntimePayloadEgress('evacuate', signature),
+        enumerable: false,
       },
     })
+
+    return Object.freeze(handle)
   }
 
   private rejectRuntimePayloadEgress(

@@ -1,6 +1,6 @@
 # Documentation Index
 
-> **Last Updated:** 2026-02-10
+> **Last Updated:** 2026-03-03
 > **Version:** v1.0.0 Stable
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
@@ -41,6 +41,9 @@
 | [0006-Heimdall.md](./rfc/0006-Heimdall.md)           | 📋 Planned     | Heimdall — supply chain security    |
 | [0007-Loki.md](./rfc/0007-Loki.md)                   | 📋 Planned     | Loki — passive deception & tarpit   |
 | [0008-RustCorePivot.md](./rfc/0008-RustCorePivot.md) | 📋 Planned     | Rust core pivot strategy            |
+| [0009-CoordinationProviderContract.md](./rfc/0009-CoordinationProviderContract.md) | ⚠️ Draft | External coordination contract |
+| [0010-OneWayMembrane.md](./rfc/0010-OneWayMembrane.md) | ⚠️ Draft | One-way membrane and trace id signaling |
+| [0011-PressureContainment.md](./rfc/0011-PressureContainment.md) | ⚠️ Draft | Pressure containment and graceful shielding |
 
 ---
 

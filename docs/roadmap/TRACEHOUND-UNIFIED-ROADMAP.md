@@ -278,3 +278,7 @@ These remain in `internal` strategy artifacts.
 7. [docs/rfc/0002-Argos.md](../rfc/0002-Argos.md)
 8. [docs/rfc/0007-Loki.md](../rfc/0007-Loki.md)
 9. [docs/rfc/0008-RustCorePivot.md](../rfc/0008-RustCorePivot.md)
+10. [docs/rfc/0009-CoordinationProviderContract.md](../rfc/0009-CoordinationProviderContract.md)
+11. [docs/rfc/0010-OneWayMembrane.md](../rfc/0010-OneWayMembrane.md)
+12. [docs/rfc/0011-PressureContainment.md](../rfc/0011-PressureContainment.md)
+13. [SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md](./SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md)

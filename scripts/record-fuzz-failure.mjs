@@ -20,16 +20,11 @@ if (!initMode && !recordPath) {
 
 const safeRecordPath = recordPath ? resolve(recordPath) : null;
 if (safeRecordPath) {
-  // Provide clear Regex-based sanitization for SAST tools (Snyk CWE-23)
-  if (!/^[a-zA-Z0-9_\-\/.\\]+$/.test(recordPath)) {
-    throw new Error("Path contains invalid characters");
-  }
-
   const baseDirRec = resolve("security/artifacts");
   const relRecPath = relative(baseDirRec, safeRecordPath);
   if (isAbsolute(relRecPath) || relRecPath.startsWith("..")) {
     throw new Error(
-      "Path traversal blocked: Record path must be strictly enclosed within security/artifacts/",
+      `Path traversal blocked for --record "${recordPath}". Record path must be a relative path strictly enclosed within "security/artifacts/".`,
     );
   }
 }

@@ -31,14 +31,10 @@ const outputPath = resolve(rawOutPath);
 const baseDirOut = resolve("security/artifacts");
 const relOutPath = relative(baseDirOut, outputPath);
 
-// Provide clear Regex-based sanitization for SAST tools (Snyk CWE-23)
-if (!/^[a-zA-Z0-9_\-\/.\\]+$/.test(rawOutPath)) {
-  throw new Error("Path contains invalid characters");
-}
-
+// Enforce that the resolved output path stays strictly within security/artifacts (CWE-23)
 if (isAbsolute(relOutPath) || relOutPath.startsWith("..")) {
   throw new Error(
-    "Path traversal blocked: Output path must be strictly enclosed within security/artifacts/",
+    `Path traversal blocked for --output "${rawOutPath}". Output path must be a relative path strictly enclosed within "security/artifacts/".`,
   );
 }
 const manifestPath = resolve("security/corpus/manifest.json");

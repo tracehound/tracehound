@@ -10,16 +10,19 @@ Tracehound Core is a deterministic and fail-open runtime security layer designed
 It provides bounded ingestion, rate and buffer controls, controlled choke mechanisms, and reproducible event processing.
 The system does not classify threats or enforce policies. Instead, it guarantees controlled runtime behavior and integrity of the resulting event chain.
 
-[![Advanced CodeQL Analysis](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml)
+[![Advanced CodeQL Analysis](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml)
 [![Semgrep Security Analysis](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml)
 [![CodeQL](https://github.com/tracehound/tracehound/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/github-code-scanning/codeql)
 [![Dependabot Updates](https://github.com/tracehound/tracehound/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/dependabot/dependabot-updates)
 [![CI](https://github.com/tracehound/tracehound/actions/workflows/ci.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/ci.yml)
+[![Chaos Suite](https://github.com/tracehound/tracehound/actions/workflows/chaos-verify.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/chaos-verify.yml)
+[![Copilot code review](https://github.com/tracehound/tracehound/actions/workflows/copilot-pull-request-reviewer/copilot-pull-request-reviewer/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/copilot-pull-request-reviewer/copilot-pull-request-reviewer)
+[![Fuzz Assurance Nightly](https://github.com/tracehound/tracehound/actions/workflows/fuzz-assurance-nightly.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/fuzz-assurance-nightly.yml)
 [![License: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/license/apache-2-0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 
-[Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
+[Official Website](https://tracehoundlabs.com) · [Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
 
 </div>
 
@@ -66,53 +69,53 @@ Tracehound is a monorepo containing several specialized packages:
 ### Core Usage
 
 ```typescript
-import { createTracehound } from '@tracehound/core'
+import { createTracehound } from "@tracehound/core";
 
 const tracehound = createTracehound({
   quarantine: { maxCount: 1000 },
   rateLimit: { windowMs: 60000, maxRequests: 100 },
-})
+});
 
 // Intercept a potential threat signal (Scent)
 const result = tracehound.agent.intercept({
-  id: 'unique-id',
+  id: "unique-id",
   timestamp: Date.now(),
-  source: '127.0.0.1',
-  payload: { path: '/api/v1/user', method: 'POST' },
-})
+  source: "127.0.0.1",
+  payload: { path: "/api/v1/user", method: "POST" },
+});
 
-if (result.status === 'quarantined') {
-  console.log('Threat quarantined. Signature:', result.handle.signature)
+if (result.status === "quarantined") {
+  console.log("Threat quarantined. Signature:", result.handle.signature);
 }
 ```
 
 ### Express Integration
 
 ```typescript
-import express from 'express'
-import { createTracehound } from '@tracehound/core'
-import { tracehound } from '@tracehound/express'
+import express from "express";
+import { createTracehound } from "@tracehound/core";
+import { tracehound } from "@tracehound/express";
 
-const app = express()
-const th = createTracehound()
+const app = express();
+const th = createTracehound();
 
 // Mount the middleware
-app.use(tracehound({ agent: th.agent }))
+app.use(tracehound({ agent: th.agent }));
 
-app.get('/', (req, res) => res.send('Protected by Tracehound'))
+app.get("/", (req, res) => res.send("Protected by Tracehound"));
 ```
 
 ### Fastify Integration
 
 ```typescript
-import fastify from 'fastify'
-import { createTracehound } from '@tracehound/core'
-import { tracehoundPlugin } from '@tracehound/fastify'
+import fastify from "fastify";
+import { createTracehound } from "@tracehound/core";
+import { tracehoundPlugin } from "@tracehound/fastify";
 
-const app = fastify()
-const th = createTracehound()
+const app = fastify();
+const th = createTracehound();
 
-app.register(tracehoundPlugin, { agent: th.agent })
+app.register(tracehoundPlugin, { agent: th.agent });
 ```
 
 ---

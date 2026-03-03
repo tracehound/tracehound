@@ -221,6 +221,49 @@ describe('Scheduler', () => {
     })
   })
 
+  describe('Drop and Count', () => {
+    it('sheds and counts due tasks above maxTasksPerTick', () => {
+      scheduler.stop()
+      scheduler = createScheduler({
+        tickInterval: 100,
+        jitterMs: 0,
+        maxTasksPerTick: 1,
+      })
+
+      let executed = 0
+      scheduler.schedule({
+        id: 'task-a',
+        execute: () => {
+          executed++
+        },
+        intervalMs: 10,
+        priority: 1,
+      })
+      scheduler.schedule({
+        id: 'task-b',
+        execute: () => {
+          executed++
+        },
+        intervalMs: 10,
+        priority: 1,
+      })
+      scheduler.schedule({
+        id: 'task-c',
+        execute: () => {
+          executed++
+        },
+        intervalMs: 10,
+        priority: 1,
+      })
+
+      scheduler.start()
+      vi.advanceTimersByTime(100)
+
+      expect(executed).toBe(1)
+      expect(scheduler.stats.droppedTasks).toBe(2)
+    })
+  })
+
   describe('Error handling', () => {
     it('continues after sync task error', () => {
       let successCount = 0
@@ -317,3 +360,4 @@ describe('Scheduler', () => {
     })
   })
 })
+

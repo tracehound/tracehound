@@ -4,6 +4,12 @@
 
 export type { AuditRecord, IAuditChain } from './audit.js'
 export type { JsonPrimitive, JsonSerializable, Severity } from './common.js'
+export type {
+  CoordinationFeature,
+  CoordinationHealth,
+  CoordinationMode,
+  CoordinationProvider,
+} from './coordination.js'
 export { DEFAULT_CONFIG, mergeWithDefaults } from './config.js'
 export type {
   AlertConfig,
@@ -31,3 +37,4 @@ export { compareSignatures, generateSignature, validateSignature } from './signa
 export type { GenerateSignatureOptions } from './signature.js'
 export { createThreatInput } from './threat.js'
 export type { Threat, ThreatInput } from './threat.js'
+

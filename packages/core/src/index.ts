@@ -29,6 +29,7 @@ export type {
   QuarantineConfig,
   RateLimitConfig,
   RuntimeConfig,
+  RuntimeEvidenceHandle,
   Scent,
   SchedulerConfig,
   Severity,

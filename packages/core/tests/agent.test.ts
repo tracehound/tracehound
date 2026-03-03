@@ -405,6 +405,34 @@ describe('Agent', () => {
       }
     })
 
+    it('rejects runtime payload egress from quarantined handle', () => {
+      const scent = createScent(
+        { attack: 'membrane-test' },
+        { category: 'injection', severity: 'high' },
+      )
+
+      const result = agent.intercept(scent)
+      expect(result.status).toBe('quarantined')
+
+      if (result.status === 'quarantined') {
+        expect(result.handle.membrane).toBe('metadata_only')
+        expect(() => result.handle.transfer()).toThrow()
+        expect(() => result.handle.bytes).toThrow()
+        expect(() => result.handle.neutralize('prev-hash')).toThrow()
+
+        expect(mockNotifications.emit).toHaveBeenCalledWith(
+          'system.panic',
+          expect.objectContaining({
+            level: 'warning',
+            reason: 'membrane.payload_egress_blocked',
+            context: expect.objectContaining({
+              signature: result.handle.signature,
+            }),
+          }),
+        )
+      }
+    })
+
     it('inserts evidence into quarantine', () => {
       const scent = createScent({ attack: 'test' }, { category: 'injection', severity: 'high' })
 

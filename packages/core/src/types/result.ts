@@ -2,8 +2,53 @@
  * Intercept result types and type guards.
  */
 
+import type { Severity } from './common.js'
 import type { TracehoundError } from './errors.js'
-import type { EvidenceHandle } from './evidence.js'
+
+/**
+ * Runtime-safe quarantine handle.
+ *
+ * Membrane policy:
+ * - Exposes metadata only
+ * - Rejects direct payload egress attempts (`bytes` / `transfer`)
+ * - Rejects forensic lifecycle operations from runtime path
+ */
+export interface RuntimeEvidenceHandle {
+  /** Membrane marker for explicit runtime contract checks. */
+  readonly membrane: 'metadata_only'
+  /** Encoded evidence size in bytes. */
+  readonly size: number
+  /** Content hash (SHA-256). */
+  readonly hash: string
+  /** Threat signature. */
+  readonly signature: string
+  /** Capture timestamp. */
+  readonly captured: number
+  /** Threat severity. */
+  readonly severity: Severity
+  /** Whether underlying evidence has been disposed. */
+  readonly disposed: boolean
+
+  /**
+   * Always rejected in runtime membrane path.
+   */
+  readonly bytes: never
+
+  /**
+   * Always rejected in runtime membrane path.
+   */
+  transfer(): never
+
+  /**
+   * Always rejected in runtime membrane path.
+   */
+  neutralize(previousHash: string): never
+
+  /**
+   * Always rejected in runtime membrane path.
+   */
+  evacuate(destination: string): never
+}
 
 /**
  * Result of an intercept operation.
@@ -14,7 +59,7 @@ export type InterceptResult =
   | { status: 'rate_limited'; retryAfter: number }
   | { status: 'payload_too_large'; limit: number }
   | { status: 'ignored'; signature: string }
-  | { status: 'quarantined'; handle: EvidenceHandle }
+  | { status: 'quarantined'; handle: RuntimeEvidenceHandle }
   | { status: 'error'; error: TracehoundError }
 
 /**
@@ -22,7 +67,7 @@ export type InterceptResult =
  */
 export function isQuarantined(
   result: InterceptResult
-): result is { status: 'quarantined'; handle: EvidenceHandle } {
+): result is { status: 'quarantined'; handle: RuntimeEvidenceHandle } {
   return result.status === 'quarantined'
 }
 

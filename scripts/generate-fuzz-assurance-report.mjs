@@ -30,6 +30,12 @@ const rawOutPath = parseArg(
 const outputPath = resolve(rawOutPath);
 const baseDirOut = resolve("security/artifacts");
 const relOutPath = relative(baseDirOut, outputPath);
+
+// Provide clear Regex-based sanitization for SAST tools (Snyk CWE-23)
+if (!/^[a-zA-Z0-9_\-\/.\\]+$/.test(rawOutPath)) {
+  throw new Error("Path contains invalid characters");
+}
+
 if (isAbsolute(relOutPath) || relOutPath.startsWith("..")) {
   throw new Error(
     "Path traversal blocked: Output path must be strictly enclosed within security/artifacts/",

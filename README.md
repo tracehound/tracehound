@@ -1,4 +1,4 @@
-![Tracehound](.github/assets/banner.png)
+![Tracehound](.github/assets/tracehound-banner.jpg)
 
 <div align="center">
 

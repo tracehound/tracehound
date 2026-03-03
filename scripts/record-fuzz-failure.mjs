@@ -1,51 +1,65 @@
 #!/usr/bin/env node
 
 // @ts-nocheck
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 function parseArg(flag, fallback = null) {
-  const index = process.argv.indexOf(flag)
-  if (index === -1 || index + 1 >= process.argv.length) return fallback
-  return process.argv[index + 1]
+  const index = process.argv.indexOf(flag);
+  if (index === -1 || index + 1 >= process.argv.length) return fallback;
+  return process.argv[index + 1];
 }
 
-const initMode = process.argv.includes('--init')
-const recordPath = parseArg('--record')
+const initMode = process.argv.includes("--init");
+const recordPath = parseArg("--record");
 if (!initMode && !recordPath) {
-  throw new Error('Usage: node scripts/record-fuzz-failure.mjs --init OR --record <failure.json>')
+  throw new Error(
+    "Usage: node scripts/record-fuzz-failure.mjs --init OR --record <failure.json>",
+  );
 }
 
-const record = initMode ? null : JSON.parse(readFileSync(resolve(recordPath), 'utf8'))
+const safeRecordPath = recordPath ? resolve(recordPath) : null;
+if (
+  safeRecordPath &&
+  !safeRecordPath.startsWith(resolve("security/artifacts"))
+) {
+  throw new Error(
+    "Path traversal blocked: Record path must be within security/artifacts/",
+  );
+}
+
+const record = initMode
+  ? null
+  : JSON.parse(readFileSync(safeRecordPath, "utf8"));
 
 const required = [
-  'id',
-  'invariantId',
-  'class',
-  'seed',
-  'inputFingerprint',
-  'minimizedPayloadPath',
-  'replayCommand',
-  'replayResult',
-  'severity',
-  'status',
-]
+  "id",
+  "invariantId",
+  "class",
+  "seed",
+  "inputFingerprint",
+  "minimizedPayloadPath",
+  "replayCommand",
+  "replayResult",
+  "severity",
+  "status",
+];
 
 if (record) {
   for (const field of required) {
     if (!(field in record)) {
-      throw new Error(`Missing required field: ${field}`)
+      throw new Error(`Missing required field: ${field}`);
     }
   }
 }
 
-const now = new Date().toISOString()
+const now = new Date().toISOString();
 
-const dbPath = resolve('security/artifacts/generated/fuzz-failures.json')
-mkdirSync(dirname(dbPath), { recursive: true })
+const dbPath = resolve("security/artifacts/generated/fuzz-failures.json");
+mkdirSync(dirname(dbPath), { recursive: true });
 const db = existsSync(dbPath)
-  ? JSON.parse(readFileSync(dbPath, 'utf8'))
-  : { updatedAt: now, records: [] }
+  ? JSON.parse(readFileSync(dbPath, "utf8"))
+  : { updatedAt: now, records: [] };
 
 const nextDb = record
   ? {
@@ -58,84 +72,85 @@ const nextDb = record
   : {
       updatedAt: now,
       records: db.records,
-    }
+    };
 
-writeFileSync(dbPath, `${JSON.stringify(nextDb, null, 2)}\n`)
+writeFileSync(dbPath, `${JSON.stringify(nextDb, null, 2)}\n`);
 
 function writeFailureLog() {
-  const open = nextDb.records.filter((entry) => entry.status !== 'resolved')
+  const open = nextDb.records.filter((entry) => entry.status !== "resolved");
   const header = [
-    '# Fuzz Failure Log',
-    '',
+    "# Fuzz Failure Log",
+    "",
     `Updated: ${now}`,
-    '',
-    '| ID | Invariant | Class | Severity | Status | Replay Result |',
-    '| --- | --- | --- | --- | --- | --- |',
-  ]
+    "",
+    "| ID | Invariant | Class | Severity | Status | Replay Result |",
+    "| --- | --- | --- | --- | --- | --- |",
+  ];
 
   const rows = open.length
     ? open.map(
         (entry) =>
           `| ${entry.id} | ${entry.invariantId} | ${entry.class} | ${entry.severity} | ${entry.status} | ${entry.replayResult} |`,
       )
-    : ['| none | - | - | - | resolved | none |']
+    : ["| none | - | - | - | resolved | none |"];
 
   writeFileSync(
-    resolve('security/artifacts/fuzz-failure-log.md'),
-    `${header.concat(rows).join('\n')}\n`,
-  )
+    resolve("security/artifacts/fuzz-failure-log.md"),
+    `${header.concat(rows).join("\n")}\n`,
+  );
 }
 
 function writeMinimizationLog() {
   const lines = [
-    '# Fuzz Minimization Log',
-    '',
+    "# Fuzz Minimization Log",
+    "",
     `Updated: ${now}`,
-    '',
-    '| ID | Fingerprint | Minimized Payload |',
-    '| --- | --- | --- |',
-  ]
+    "",
+    "| ID | Fingerprint | Minimized Payload |",
+    "| --- | --- | --- |",
+  ];
 
   const rows = nextDb.records.map(
-    (entry) => `| ${entry.id} | ${entry.inputFingerprint} | ${entry.minimizedPayloadPath} |`,
-  )
+    (entry) =>
+      `| ${entry.id} | ${entry.inputFingerprint} | ${entry.minimizedPayloadPath} |`,
+  );
 
   writeFileSync(
-    resolve('security/artifacts/fuzz-minimization-log.md'),
-    `${lines.concat(rows.length ? rows : ['| none | - | - |']).join('\n')}\n`,
-  )
+    resolve("security/artifacts/fuzz-minimization-log.md"),
+    `${lines.concat(rows.length ? rows : ["| none | - | - |"]).join("\n")}\n`,
+  );
 }
 
 function writeRegressionSeeds() {
   const relevant = nextDb.records.filter(
-    (entry) => entry.status === 'open' || entry.status === 'regression',
-  )
+    (entry) => entry.status === "open" || entry.status === "regression",
+  );
   const lines = [
-    '# Fuzz Regression Seeds',
-    '',
+    "# Fuzz Regression Seeds",
+    "",
     `Updated: ${now}`,
-    '',
-    'Seed source of truth: `security/corpus/manifest.json` + tracked lifecycle records.',
-    '',
-    '| ID | Class | Replay Command |',
-    '| --- | --- | --- |',
-  ]
+    "",
+    "Seed source of truth: `security/corpus/manifest.json` + tracked lifecycle records.",
+    "",
+    "| ID | Class | Replay Command |",
+    "| --- | --- | --- |",
+  ];
 
   const rows = relevant.map(
     (entry) => `| ${entry.id} | ${entry.class} | \`${entry.replayCommand}\` |`,
-  )
+  );
   writeFileSync(
-    resolve('security/artifacts/fuzz-regression-seeds.md'),
-    `${lines.concat(rows.length ? rows : ['| none | - | - |']).join('\n')}\n`,
-  )
+    resolve("security/artifacts/fuzz-regression-seeds.md"),
+    `${lines.concat(rows.length ? rows : ["| none | - | - |"]).join("\n")}\n`,
+  );
 }
 
-writeFailureLog()
-writeMinimizationLog()
-writeRegressionSeeds()
+writeFailureLog();
+writeMinimizationLog();
+writeRegressionSeeds();
 
 console.log(
   record
     ? `Recorded fuzz failure lifecycle entry: ${record.id}`
-    : 'Initialized fuzz failure lifecycle artifacts',
-)
+    : "Initialized fuzz failure lifecycle artifacts",
+);

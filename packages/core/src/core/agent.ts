@@ -268,7 +268,18 @@ export class Agent implements IAgent {
     }
 
     try {
-      const health = provider.health()
+      const healthCandidate = provider.health() as unknown
+      if (!this.isValidCoordinationHealth(healthCandidate)) {
+        this.stats.coordinationFallbackCount++
+        this.emitCoordinationWarning(
+          'invalid_contract',
+          providerId,
+          new Error('Provider health payload is invalid'),
+        )
+        return this.toDegradedHealth(providerId)
+      }
+
+      const health = healthCandidate
       if (health.mode === 'degraded') {
         this.stats.coordinationFallbackCount++
       }
@@ -331,6 +342,39 @@ export class Agent implements IAgent {
         error: error instanceof Error ? error.message : undefined,
       },
     })
+  }
+
+  private isValidCoordinationHealth(value: unknown): value is CoordinationHealth {
+    if (typeof value !== 'object' || value === null) {
+      return false
+    }
+
+    const health = value as Partial<CoordinationHealth>
+    if (!this.isValidCoordinationMode(health.mode)) {
+      return false
+    }
+
+    if (typeof health.provider !== 'string' || health.provider.length === 0) {
+      return false
+    }
+
+    if (health.lastSyncAt !== null && !this.isNonNegativeFiniteNumber(health.lastSyncAt)) {
+      return false
+    }
+
+    if (health.syncLagMs !== null && !this.isNonNegativeFiniteNumber(health.syncLagMs)) {
+      return false
+    }
+
+    return true
+  }
+
+  private isValidCoordinationMode(mode: unknown): mode is CoordinationHealth['mode'] {
+    return mode === 'local' || mode === 'degraded' || mode === 'synchronized'
+  }
+
+  private isNonNegativeFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0
   }
 }
 

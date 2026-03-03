@@ -230,6 +230,50 @@ describe('Agent', () => {
         }),
       )
     })
+
+    it('degrades and emits warning when provider returns malformed health payload', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'malformed-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth =>
+          ({
+            mode: 'unknown',
+            lastSyncAt: 'never',
+            syncLagMs: -1,
+            provider: '',
+          }) as unknown as CoordinationHealth,
+      }
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const health = localAgent.getCoordinationHealth()
+
+      expect(health.mode).toBe('degraded')
+      expect(health.provider).toBe('malformed-provider')
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'system.panic',
+        expect.objectContaining({
+          level: 'warning',
+          reason: 'coordination.invalid_contract',
+          context: expect.objectContaining({
+            providerId: 'malformed-provider',
+          }),
+        }),
+      )
+    })
   })
   describe('intercept - clean flow', () => {
     it('returns clean when no threat signal', () => {

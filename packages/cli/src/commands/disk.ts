@@ -5,6 +5,7 @@
 import { clearTraceRegistryDisk, getTraceRegistryStats } from '@tracehound/core'
 import Table from 'cli-table3'
 import { Command } from 'commander'
+import { formatBytes } from '../lib/format.js'
 
 export const diskCommand = new Command('disk').description('Manage trace registry disk state')
 
@@ -62,10 +63,3 @@ function snapshot(stats: ReturnType<typeof getTraceRegistryStats>) {
   }
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
-}

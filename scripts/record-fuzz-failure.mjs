@@ -24,7 +24,7 @@ if (safeRecordPath) {
   const relRecPath = relative(baseDirRec, safeRecordPath);
   if (isAbsolute(relRecPath) || relRecPath.startsWith("..")) {
     throw new Error(
-      "Path traversal blocked: Record path must be strictly enclosed within security/artifacts/",
+      `Path traversal blocked for --record "${recordPath}". Record path must be a relative path strictly enclosed within "security/artifacts/".`,
     );
   }
 }

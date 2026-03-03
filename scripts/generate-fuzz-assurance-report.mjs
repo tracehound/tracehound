@@ -30,9 +30,11 @@ const rawOutPath = parseArg(
 const outputPath = resolve(rawOutPath);
 const baseDirOut = resolve("security/artifacts");
 const relOutPath = relative(baseDirOut, outputPath);
+
+// Enforce that the resolved output path stays strictly within security/artifacts (CWE-23)
 if (isAbsolute(relOutPath) || relOutPath.startsWith("..")) {
   throw new Error(
-    "Path traversal blocked: Output path must be strictly enclosed within security/artifacts/",
+    `Path traversal blocked for --output "${rawOutPath}". Output path must be a relative path strictly enclosed within "security/artifacts/".`,
   );
 }
 const manifestPath = resolve("security/corpus/manifest.json");

@@ -167,4 +167,39 @@ describe('AuditChain', () => {
       expect(exported[2]!.previousHash).toBe(exported[1]!.hash)
     })
   })
+
+  describe('HMAC mode', () => {
+    it('produces different hashes than non-HMAC mode', () => {
+      const record = createRecord('hmac-test', { timestamp: 99999 })
+
+      const plain = new AuditChain()
+      plain.append(record)
+
+      const hmac = new AuditChain('my-secret-hmac-key')
+      hmac.append({ ...record })
+
+      expect(plain.lastHash).not.toBe(hmac.lastHash)
+    })
+
+    it('verifies chain with HMAC secret', () => {
+      const hmac = new AuditChain('secret-key-for-hmac')
+      hmac.append(createRecord('h1'))
+      hmac.append(createRecord('h2'))
+      hmac.append(createRecord('h3'))
+
+      expect(hmac.verify()).toBe(true)
+    })
+
+    it('different secrets produce different hashes', () => {
+      const record = createRecord('s-test', { timestamp: 11111 })
+
+      const chain1 = new AuditChain('secret-a')
+      chain1.append(record)
+
+      const chain2 = new AuditChain('secret-b')
+      chain2.append({ ...record })
+
+      expect(chain1.lastHash).not.toBe(chain2.lastHash)
+    })
+  })
 })

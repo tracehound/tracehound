@@ -192,8 +192,10 @@ export class SecurityState implements ISecurityState {
   private _licenseStatus: LicenseState['status'] = 'none'
   private _licenseDaysRemaining: number | undefined = undefined
 
-  // History
+  // History (ring buffer)
   private _history: SecurityHistoryEntry[] = []
+  private _historyWriteIndex = 0
+  private _historyFull = false
 
   constructor(config: SecurityStateConfig = {}) {
     this.config = {
@@ -304,31 +306,39 @@ export class SecurityState implements ISecurityState {
   }
 
   get history(): readonly SecurityHistoryEntry[] {
-    return this._history
+    if (!this._historyFull) return this._history.slice(0, this._historyWriteIndex)
+    return [
+      ...this._history.slice(this._historyWriteIndex),
+      ...this._history.slice(0, this._historyWriteIndex),
+    ]
   }
 
   get stats(): SecurityStateStats {
+    const orderedHistory = this.history
     return {
-      historySize: this._history.length,
-      oldestEntry: this._history.length > 0 ? this._history[0]!.timestamp : null,
+      historySize: orderedHistory.length,
+      oldestEntry: orderedHistory.length > 0 ? orderedHistory[0]!.timestamp : null,
       newestEntry:
-        this._history.length > 0 ? this._history[this._history.length - 1]!.timestamp : null,
+        orderedHistory.length > 0 ? orderedHistory[orderedHistory.length - 1]!.timestamp : null,
     }
   }
 
   // ─── Private Methods ─────────────────────────────────────────────────────────
 
   private addHistory(type: SecurityHistoryEntry['type'], data: Record<string, unknown>): void {
-    this._history.push({
+    const entry: SecurityHistoryEntry = {
       timestamp: Date.now(),
       type,
       data,
-    })
-
-    // Prune if exceeds max
-    if (this._history.length > this.config.maxHistorySize) {
-      this._history.shift()
     }
+
+    if (this._history.length < this.config.maxHistorySize) {
+      this._history.push(entry)
+    } else {
+      this._history[this._historyWriteIndex] = entry
+      this._historyFull = true
+    }
+    this._historyWriteIndex = (this._historyWriteIndex + 1) % this.config.maxHistorySize
   }
 }
 

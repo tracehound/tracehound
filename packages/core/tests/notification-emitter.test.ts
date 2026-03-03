@@ -116,17 +116,68 @@ describe('NotificationEmitter', () => {
 
   describe('webhook registration', () => {
     it('registers webhooks and returns ID', () => {
-      const id = emitter.registerWebhook({ url: 'https://example.com/webhook' })
+      const id = emitter.registerWebhook({
+        url: 'https://example.com/webhook',
+      })
 
-      expect(id).toMatch(/^webhook-/)
+      expect(id).toMatch(/^[0-9a-f-]+$/)
       expect(emitter.stats.activeWebhooks).toBe(1)
     })
 
     it('unregisters webhooks', () => {
-      const id = emitter.registerWebhook({ url: 'https://example.com/webhook' })
+      const id = emitter.registerWebhook({
+        url: 'https://example.com/webhook',
+      })
       emitter.unregisterWebhook(id)
 
       expect(emitter.stats.activeWebhooks).toBe(0)
+    })
+
+    it('rejects private/internal webhook URLs (SSRF protection)', () => {
+      const blocked = [
+        'http://127.0.0.1/hook',
+        'http://localhost/hook',
+        'http://0.0.0.0/hook',
+        'http://10.0.0.1/hook',
+        'http://172.16.0.1/hook',
+        'http://172.31.255.255/hook',
+        'http://192.168.1.1/hook',
+        'http://169.254.169.254/latest/meta-data/',
+        'http://metadata.google.internal/computeMetadata/v1/',
+        'http://[::1]/hook',
+      ]
+      for (const url of blocked) {
+        expect(() => emitter.registerWebhook({ url })).toThrow(/private\/internal/)
+      }
+    })
+
+    it('allows public webhook URLs', () => {
+      const allowed = [
+        'https://example.com/webhook',
+        'https://hooks.slack.com/services/T/B/X',
+        'https://8.8.8.8/hook',
+      ]
+      for (const url of allowed) {
+        expect(() => emitter.registerWebhook({ url })).not.toThrow()
+      }
+    })
+
+    it('rejects webhook secrets shorter than 16 characters', () => {
+      expect(() =>
+        emitter.registerWebhook({
+          url: 'https://example.com/hook',
+          secret: 'short',
+        }),
+      ).toThrow(/at least 16 characters/)
+    })
+
+    it('accepts webhook secrets of 16+ characters', () => {
+      expect(() =>
+        emitter.registerWebhook({
+          url: 'https://example.com/hook',
+          secret: 'a-very-long-secret-key',
+        }),
+      ).not.toThrow()
     })
 
     describe('dispatch', () => {
@@ -173,7 +224,7 @@ describe('NotificationEmitter', () => {
       it('includes HMAC signature if secret provided', async () => {
         emitter.registerWebhook({
           url: 'https://secure.webhook',
-          secret: 'test-secret',
+          secret: 'test-secret-that-is-long-enough',
         })
 
         emitter.emit('threat.detected', { data: 1 })
@@ -259,7 +310,7 @@ describe('NotificationEmitter', () => {
 
       expect(capturedEvent).not.toBeNull()
       expect(capturedEvent!.timestamp).toBeGreaterThan(0)
-      expect(capturedEvent!.id).toMatch(/^evt-/)
+      expect(capturedEvent!.id).toMatch(/^[0-9a-f-]+$/)
     })
   })
 

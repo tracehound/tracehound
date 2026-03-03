@@ -164,6 +164,31 @@ describe('SecurityState', () => {
       expect(state.stats.oldestEntry).toBeNull()
       expect(state.stats.newestEntry).toBeNull()
     })
+
+    it('correctly reports oldest and newest entries when history wraps around (ring buffer)', async () => {
+      const smallState = new SecurityState({ maxHistorySize: 3 })
+
+      // Add 1
+      smallState.recordThreat('type1', 'low')
+      await new Promise((resolve) => setTimeout(resolve, 5))
+
+      // Add 2
+      smallState.recordThreat('type2', 'low')
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      const oldestExpected = smallState.history[1]!.timestamp
+
+      // Add 3
+      smallState.recordThreat('type3', 'low')
+      await new Promise((resolve) => setTimeout(resolve, 5))
+
+      // Add 4 (overwrites 1)
+      smallState.recordThreat('type4', 'low')
+      const newestExpected = smallState.history[2]!.timestamp
+
+      expect(smallState.stats.historySize).toBe(3)
+      expect(smallState.stats.oldestEntry).toBe(oldestExpected)
+      expect(smallState.stats.newestEntry).toBe(newestExpected)
+    })
   })
 
   describe('factory function', () => {

@@ -7,9 +7,13 @@
  * - tracehound stats      : Show threat statistics
  * - tracehound inspect    : Inspect quarantine
  * - tracehound watch      : Live TUI dashboard
+ * - tracehound history     : Trace history lifecycle commands
+ * - tracehound disk        : Trace registry disk lifecycle commands
  */
 
 import { Command } from 'commander'
+import { diskCommand } from './commands/disk.js'
+import { historyCommand } from './commands/history.js'
 import { inspectCommand } from './commands/inspect.js'
 import { statsCommand } from './commands/stats.js'
 import { statusCommand } from './commands/status.js'
@@ -30,6 +34,8 @@ program.addCommand(statusCommand)
 program.addCommand(statsCommand)
 program.addCommand(inspectCommand)
 program.addCommand(watchCommand)
+program.addCommand(historyCommand)
+program.addCommand(diskCommand)
 
 // Only parse if executed directly
 const isMain =
@@ -38,3 +44,4 @@ const isMain =
 if (isMain || process.env.NODE_ENV === 'cli-run') {
   program.parse()
 }
+

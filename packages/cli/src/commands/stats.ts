@@ -2,8 +2,10 @@
  * Stats command - Show threat statistics
  */
 
+import { getTraceRegistryStats } from '@tracehound/core'
 import Table from 'cli-table3'
 import { Command } from 'commander'
+import { formatBytes, formatDurationMs } from '../lib/format.js'
 
 export const statsCommand = new Command('stats')
   .description('Show threat statistics')
@@ -39,12 +41,31 @@ interface ThreatStats {
     clean: number
     ignored: number
   }
+  traceRegistry: {
+    path: string
+    fileExists: boolean
+    retainedEntries: number
+    uniqueTraceIds: number
+    fileBytes: number
+    maxFileBytes: number
+    fileUsagePct: number
+    queueDepth: number
+    maxQueueEntries: number
+    droppedCount: number
+    blocked: boolean
+    ttlMs: number
+    maxEntries: number
+  }
 }
 
-function getStats(_since: string): ThreatStats {
-  // TODO: Connect to real core when available
+function getStats(since: string): ThreatStats {
+  const registry = getTraceRegistryStats()
+  const fileUsagePct =
+    registry.maxFileBytes > 0 ? Number(((registry.fileBytes / registry.maxFileBytes) * 100).toFixed(2)) : 0
+
+  // TODO: Threat stream counters are still pending core integration.
   return {
-    window: _since,
+    window: since,
     total: 0,
     bySeverity: {
       critical: 0,
@@ -62,6 +83,21 @@ function getStats(_since: string): ThreatStats {
       rateLimited: 0,
       clean: 0,
       ignored: 0,
+    },
+    traceRegistry: {
+      path: registry.path,
+      fileExists: registry.fileExists,
+      retainedEntries: registry.retainedEntries,
+      uniqueTraceIds: registry.uniqueTraceIds,
+      fileBytes: registry.fileBytes,
+      maxFileBytes: registry.maxFileBytes,
+      fileUsagePct,
+      queueDepth: registry.queueDepth,
+      maxQueueEntries: registry.maxQueueEntries,
+      droppedCount: registry.droppedCount,
+      blocked: registry.blocked,
+      ttlMs: registry.ttlMs,
+      maxEntries: registry.maxEntries,
     },
   }
 }
@@ -120,5 +156,31 @@ function printStats(stats: ThreatStats): void {
     ['⏭️  Ignored', String(stats.outcomes.ignored)]
   )
   console.log(outcomesTable.toString())
+  console.log()
+
+  // Trace registry visibility (explicit data lifecycle controls)
+  const registryTable = new Table({
+    head: ['TRACE REGISTRY', 'Value'],
+    style: { head: ['magenta'], border: ['gray'] },
+  })
+  registryTable.push(
+    ['Path', stats.traceRegistry.path],
+    ['File Exists', stats.traceRegistry.fileExists ? 'yes' : 'no'],
+    ['Retained Entries', String(stats.traceRegistry.retainedEntries)],
+    ['Unique Trace IDs', String(stats.traceRegistry.uniqueTraceIds)],
+    [
+      'Disk Usage',
+      `${formatBytes(stats.traceRegistry.fileBytes)} / ${formatBytes(stats.traceRegistry.maxFileBytes)} (${stats.traceRegistry.fileUsagePct.toFixed(2)}%)`,
+    ],
+    [
+      'Queue Depth',
+      `${stats.traceRegistry.queueDepth} / ${stats.traceRegistry.maxQueueEntries}`,
+    ],
+    ['Dropped (in-memory)', String(stats.traceRegistry.droppedCount)],
+    ['Writes Blocked', stats.traceRegistry.blocked ? 'yes' : 'no'],
+    ['Retention TTL', formatDurationMs(stats.traceRegistry.ttlMs)],
+    ['Read Max Entries', String(stats.traceRegistry.maxEntries)],
+  )
+  console.log(registryTable.toString())
   console.log()
 }

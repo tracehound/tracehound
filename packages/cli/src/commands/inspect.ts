@@ -2,48 +2,62 @@
  * Inspect command - Inspect quarantine contents
  */
 
+import {
+  findTraceInspectionEntryBySignature,
+  getTraceInspectionEntry,
+  listTraceInspectionEntries,
+  type TraceInspectionEntry,
+} from '@tracehound/core'
 import Table from 'cli-table3'
 import { Command } from 'commander'
 
+const DEFAULT_LIMIT = 10
+
+type LookupMode = 'signature' | 'traceId'
+
+type QuarantineEntry = TraceInspectionEntry
+
 export const inspectCommand = new Command('inspect')
   .description('Inspect quarantine contents')
+  .argument('[traceId]', 'Inspect specific trace ID from x-tracehound-trace-id')
   .option('-s, --signature <sig>', 'Inspect specific signature')
-  .option('-l, --limit <n>', 'Limit results', '10')
+  .option('-t, --trace-id <id>', 'Inspect specific trace ID')
+  .option('-l, --limit <n>', 'Limit results', String(DEFAULT_LIMIT))
   .option('-j, --json', 'Output as JSON')
-  .action((options) => {
-    if (options.signature) {
-      inspectSingle(options.signature, options.json)
-    } else {
-      inspectList(parseInt(options.limit), options.json)
+  .action((traceIdArg: string | undefined, options) => {
+    const traceId = options.traceId ?? traceIdArg
+    const json = Boolean(options.json)
+
+    if (traceId) {
+      inspectSingle(traceId, 'traceId', json)
+      return
     }
+
+    if (options.signature) {
+      inspectSingle(options.signature, 'signature', json)
+      return
+    }
+
+    inspectList(Number.parseInt(options.limit, 10), json)
   })
 
-interface QuarantineEntry {
-  signature: string
-  severity: 'critical' | 'high' | 'medium' | 'low'
-  category: string
-  size: number
-  captured: number
-  source: string
-}
-
 function getQuarantineEntries(limit: number): QuarantineEntry[] {
-  // TODO: Connect to real core when available
-  void limit
-  return []
+  const normalizedLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : DEFAULT_LIMIT
+  return listTraceInspectionEntries(normalizedLimit)
 }
 
-function getEntry(signature: string): QuarantineEntry | null {
-  // TODO: Connect to real core when available
-  void signature
-  return null
+function getEntry(identifier: string, mode: LookupMode): QuarantineEntry | null {
+  return mode === 'traceId'
+    ? getTraceInspectionEntry(identifier)
+    : findTraceInspectionEntryBySignature(identifier)
 }
 
-function inspectSingle(signature: string, json: boolean): void {
-  const entry = getEntry(signature)
+function inspectSingle(identifier: string, mode: LookupMode, json: boolean): void {
+  const entry = getEntry(identifier, mode)
 
   if (!entry) {
-    console.log(`\n  ❌ Evidence not found: ${signature}\n`)
+    const label = mode === 'traceId' ? 'trace id' : 'signature'
+    console.log(`\n  ❌ Evidence not found for ${label}: ${identifier}\n`)
     return
   }
 
@@ -67,25 +81,24 @@ function inspectList(limit: number, json: boolean): void {
     return
   }
 
-  // Header
   console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
   console.log('  ║                    QUARANTINE CONTENTS                       ║')
   console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
 
   const table = new Table({
-    head: ['Signature', 'Severity', 'Category', 'Size', 'Source'],
+    head: ['Trace ID', 'Severity', 'Category', 'Size', 'Source'],
     style: { head: ['cyan'], border: ['gray'] },
-    colWidths: [16, 12, 12, 12, 18],
+    colWidths: [20, 12, 12, 10, 16],
   })
 
   for (const entry of entries) {
     const severityIcon = getSeverityIcon(entry.severity)
     table.push([
-      entry.signature.slice(0, 12) + '...',
+      shorten(entry.traceId, 16),
       `${severityIcon} ${entry.severity}`,
-      entry.category,
+      inferCategory(entry.signature),
       formatBytes(entry.size),
-      entry.source.slice(0, 15),
+      shorten(entry.source, 13),
     ])
   }
 
@@ -96,7 +109,6 @@ function inspectList(limit: number, json: boolean): void {
 function printEntry(entry: QuarantineEntry): void {
   const severityIcon = getSeverityIcon(entry.severity)
 
-  // Header
   console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
   console.log('  ║                     EVIDENCE DETAILS                         ║')
   console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
@@ -106,16 +118,35 @@ function printEntry(entry: QuarantineEntry): void {
   })
 
   table.push(
+    { 'Trace ID': entry.traceId },
     { Signature: entry.signature },
     { Severity: `${severityIcon} ${entry.severity}` },
-    { Category: entry.category },
+    { Category: inferCategory(entry.signature) },
     { Size: formatBytes(entry.size) },
     { Source: entry.source },
-    { Captured: new Date(entry.captured).toISOString() }
+    { Captured: new Date(entry.captured).toISOString() },
+    { Recorded: new Date(entry.recordedAt).toISOString() },
   )
 
   console.log(table.toString())
   console.log()
+}
+
+function shorten(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value
+  }
+  return `${value.slice(0, maxLength - 3)}...`
+}
+
+function inferCategory(signature: string): string {
+  if (signature.startsWith('injection:')) {
+    return 'injection'
+  }
+  if (signature.startsWith('ddos:')) {
+    return 'ddos'
+  }
+  return 'unknown'
 }
 
 function getSeverityIcon(severity: string): string {
@@ -140,3 +171,4 @@ function formatBytes(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
 }
+

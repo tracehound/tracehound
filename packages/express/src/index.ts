@@ -4,7 +4,13 @@
  * Express middleware for Tracehound security buffer.
  */
 
-import { generateSecureId, type IAgent, type InterceptResult, type Scent } from '@tracehound/core'
+import {
+  generateSecureId,
+  recordTraceInspectionEntry,
+  type IAgent,
+  type InterceptResult,
+  type Scent,
+} from '@tracehound/core'
 import type { NextFunction, Request, RequestHandler, Response } from 'express'
 
 /**
@@ -83,7 +89,7 @@ function defaultExtractScent(req: Request): Scent {
  */
 function defaultOnIntercept(
   result: InterceptResult,
-  _req: Request,
+  req: Request,
   res: Response,
   options?: Pick<TracehoundMiddlewareOptions, 'emitSignatureInResponse' | 'emitTraceIdHeader'>,
 ): void {
@@ -105,7 +111,18 @@ function defaultOnIntercept(
 
     case 'quarantined':
       if (options?.emitTraceIdHeader) {
-        res.set('x-tracehound-trace-id', generateSecureId())
+        const traceId = generateSecureId()
+        const source = req.ip || req.socket.remoteAddress || 'unknown'
+
+        res.set('x-tracehound-trace-id', traceId)
+        recordTraceInspectionEntry({
+          traceId,
+          signature: result.handle.signature,
+          severity: result.handle.severity,
+          size: result.handle.size,
+          captured: result.handle.captured,
+          source,
+        })
       }
 
       res.status(403).json({

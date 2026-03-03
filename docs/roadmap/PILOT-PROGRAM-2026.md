@@ -1,5 +1,9 @@
 # Tracehound Pilot Strategy (2026)
 
+> [!NOTE]
+> Source module document. The authoritative technical roadmap is
+> [TRACEHOUND-UNIFIED-ROADMAP.md](./TRACEHOUND-UNIFIED-ROADMAP.md).
+
 ## Strategic Context: Moving Point-of-Proof to Reality
 
 As an early-stage security vendor, Technical Truth (unit tests, static analysis, fuzzing) is insufficient. Enterprise credibility demands **Operational Truth**.

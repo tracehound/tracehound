@@ -1,5 +1,9 @@
 # Enhanced App-Level Quarantine Protocol & Risk Analysis
 
+> [!NOTE]
+> Source module document. The authoritative technical roadmap is
+> [TRACEHOUND-UNIFIED-ROADMAP.md](./TRACEHOUND-UNIFIED-ROADMAP.md).
+
 > [!WARNING]
 > This protocol has undergone a rigorous Execution-Grade Analysis based on global architectural constraints. Severe failure modes, second-order effects, and unknowns have been identified for the proposed Membrane, Decay, and AuditChain mechanisms. A final Action Plan determines operational pivots required before implementation.
 

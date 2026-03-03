@@ -10,6 +10,7 @@ import type { INotificationEmitter } from '../src/core/notification-emitter.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
 import type { IWatcher } from '../src/core/watcher.js'
+import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
 import type { JsonSerializable, QuarantineConfig, RateLimitConfig } from '../src/types/index.js'
 import type { Scent } from '../src/types/scent.js'
 
@@ -109,6 +110,171 @@ describe('Agent', () => {
     })
   })
 
+
+  describe('coordination health fail-open', () => {
+    it('returns local coordination health when provider is absent', () => {
+      const health = agent.getCoordinationHealth()
+
+      expect(health.mode).toBe('local')
+      expect(health.provider).toBe('local')
+      expect(health.lastSyncAt).toBeNull()
+      expect(health.syncLagMs).toBeNull()
+    })
+
+    it('keeps intercept behavior unchanged when provider reports degraded', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'degraded-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => ({
+          mode: 'degraded',
+          lastSyncAt: null,
+          syncLagMs: null,
+          provider: 'degraded-provider',
+        }),
+      }
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+      )
+
+      const health = localAgent.getCoordinationHealth()
+      const result = localAgent.intercept(
+        createScent({ attack: 'degraded path' }, { category: 'injection', severity: 'high' }),
+      )
+
+      expect(health.mode).toBe('degraded')
+      expect(result.status).toBe('quarantined')
+    })
+
+    it('degrades to fail-open health and emits warning when provider health throws', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'throwing-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => {
+          throw new Error('provider unavailable')
+        },
+      }
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const health = localAgent.getCoordinationHealth()
+
+      expect(health.mode).toBe('degraded')
+      expect(health.provider).toBe('throwing-provider')
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'system.panic',
+        expect.objectContaining({
+          level: 'warning',
+          reason: 'coordination.health_failure',
+          context: expect.objectContaining({
+            providerId: 'throwing-provider',
+          }),
+        }),
+      )
+    })
+
+    it('degrades and emits warning when provider does not implement health API', () => {
+      const provider = {
+        providerId: 'invalid-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+      } as unknown as CoordinationProvider
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const health = localAgent.getCoordinationHealth()
+
+      expect(health.mode).toBe('degraded')
+      expect(health.provider).toBe('invalid-provider')
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'system.panic',
+        expect.objectContaining({
+          level: 'warning',
+          reason: 'coordination.invalid_contract',
+          context: expect.objectContaining({
+            providerId: 'invalid-provider',
+          }),
+        }),
+      )
+    })
+
+    it('degrades and emits warning when provider returns malformed health payload', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'malformed-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth =>
+          ({
+            mode: 'unknown',
+            lastSyncAt: 'never',
+            syncLagMs: -1,
+            provider: '',
+          }) as unknown as CoordinationHealth,
+      }
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const health = localAgent.getCoordinationHealth()
+
+      expect(health.mode).toBe('degraded')
+      expect(health.provider).toBe('malformed-provider')
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'system.panic',
+        expect.objectContaining({
+          level: 'warning',
+          reason: 'coordination.invalid_contract',
+          context: expect.objectContaining({
+            providerId: 'malformed-provider',
+          }),
+        }),
+      )
+    })
+  })
   describe('intercept - clean flow', () => {
     it('returns clean when no threat signal', () => {
       const scent = createScent({ data: 'test' })

@@ -15,6 +15,7 @@ import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter, type IRateLimiter } from '../src/core/rate-limiter.js'
 import { createScheduler, type IScheduler } from '../src/core/scheduler.js'
 import { createWatcher, type IWatcher } from '../src/core/watcher.js'
+import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
 import type { JsonSerializable } from '../src/types/common.js'
 import type { Scent } from '../src/types/scent.js'
 
@@ -124,6 +125,78 @@ describe('Integration: Full System Flow', () => {
 
       expect(result2.status).toBe('ignored')
       expect(quarantine.stats.count).toBe(1)
+    })
+  })
+
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Coordination Fail-Open Integration
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('Coordination fail-open integration', () => {
+    it('keeps local quarantine flow when coordination provider is degraded', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'integration-degraded-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => ({
+          mode: 'degraded',
+          lastSyncAt: null,
+          syncLagMs: null,
+          provider: 'integration-degraded-provider',
+        }),
+      }
+
+      const degradedAgent = new Agent(
+        {
+          maxPayloadSize: 100_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        rateLimiter,
+        createEvidenceFactory(),
+      )
+
+      const health = degradedAgent.getCoordinationHealth()
+      const result = degradedAgent.intercept(
+        createScent('coord-degraded', { attack: 'integration' }, true),
+      )
+
+      expect(health.mode).toBe('degraded')
+      expect(result.status).toBe('quarantined')
+      expect(quarantine.stats.count).toBeGreaterThan(0)
+    })
+
+    it('falls back to degraded health when provider health call throws', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'integration-throwing-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => {
+          throw new Error('provider health unavailable')
+        },
+      }
+
+      const degradedAgent = new Agent(
+        {
+          maxPayloadSize: 100_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        rateLimiter,
+        createEvidenceFactory(),
+      )
+
+      const health = degradedAgent.getCoordinationHealth()
+      const result = degradedAgent.intercept(
+        createScent('coord-throw', { attack: 'integration' }, true),
+      )
+
+      expect(health.mode).toBe('degraded')
+      expect(health.provider).toBe('integration-throwing-provider')
+      expect(result.status).toBe('quarantined')
     })
   })
 

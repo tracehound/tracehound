@@ -2,14 +2,15 @@
  * Agent - core orchestrator for Tracehound intercept flow.
  *
  * SECURITY: Agent does NOT perform threat detection.
- * Agent orchestrates: rate limiting → validation → factory → quarantine.
+ * Agent orchestrates: rate limiting -> validation -> factory -> quarantine.
  *
  * RFC Contract:
- * - If scent.threat present → quarantine
- * - If scent.threat absent → clean
+ * - If scent.threat present -> quarantine
+ * - If scent.threat absent -> clean
  * - Tracehound DOES NOT make threat decisions
  */
 
+import type { CoordinationHealth, CoordinationProvider } from '../types/coordination.js'
 import type { TracehoundError } from '../types/errors.js'
 import type { InterceptResult } from '../types/result.js'
 import type { Scent } from '../types/scent.js'
@@ -26,6 +27,8 @@ import type { IWatcher } from './watcher.js'
 export interface AgentConfig {
   /** Maximum payload size in bytes */
   maxPayloadSize: number
+  /** Optional external coordination provider (RFC-0009). */
+  coordinationProvider?: CoordinationProvider
 }
 
 /**
@@ -36,17 +39,25 @@ export interface IAgent {
    * Intercept a scent and process according to RFC.
    *
    * Flow:
-   * 1. Rate limit check → rate_limited
-   * 2. If no threat signal → clean
-   * 3. Validate & encode payload → payload_too_large | error
+   * 1. Rate limit check -> rate_limited
+   * 2. If no threat signal -> clean
+   * 3. Validate & encode payload -> payload_too_large | error
    * 4. Generate signature via factory
-   * 5. Check duplicate → ignored
-   * 6. Create evidence & quarantine → quarantined
+   * 5. Check duplicate -> ignored
+   * 6. Create evidence & quarantine -> quarantined
    *
    * @param scent - Input scent to process
    * @returns Intercept result
    */
   intercept(scent: Scent): InterceptResult
+
+  /**
+   * Return current coordination health snapshot.
+   *
+   * - No provider => local mode
+   * - Provider contract/health error => degraded mode (fail-open)
+   */
+  getCoordinationHealth(): CoordinationHealth
 }
 
 /**
@@ -67,6 +78,10 @@ export interface AgentStats {
   quarantinedCount: number
   /** Errors */
   errorCount: number
+  /** Coordination fallback transitions (`degraded` or provider failure) */
+  coordinationFallbackCount: number
+  /** Coordination warnings emitted via system.panic */
+  coordinationWarningCount: number
 }
 
 /**
@@ -81,7 +96,11 @@ export class Agent implements IAgent {
     ignoredCount: 0,
     quarantinedCount: 0,
     errorCount: 0,
+    coordinationFallbackCount: 0,
+    coordinationWarningCount: 0,
   }
+
+  private readonly emittedCoordinationWarnings = new Set<string>()
 
   constructor(
     private readonly config: AgentConfig,
@@ -122,7 +141,7 @@ export class Agent implements IAgent {
         return { status: 'clean' }
       }
 
-      // Record threat in Watcher (observability) — before any further processing
+      // Record threat in Watcher (observability) - before any further processing
       this.watcher?.recordThreat(scent.threat.category, scent.threat.severity)
 
       // Step 3: Create evidence via factory
@@ -183,7 +202,7 @@ export class Agent implements IAgent {
       // here (not yet narrowed to EvidenceHandle), enabling direct activation.
       this.houndPool?.activate(evidence)
 
-      // Emit observability events — fire-and-forget, must not throw
+      // Emit observability events - fire-and-forget, must not throw
       const qStats = this.quarantine.stats
       this.notifications?.emit('threat.detected', {
         scentId: scent.id,
@@ -223,10 +242,139 @@ export class Agent implements IAgent {
   }
 
   /**
+   * Get current coordination health (RFC-0009).
+   *
+   * SECURITY: Provider contract violations and health errors always degrade
+   * to local-compatible mode (fail-open), while emitting warning-level
+   * enforcement events for observability.
+   */
+  getCoordinationHealth(): CoordinationHealth {
+    const provider = this.config.coordinationProvider as Partial<CoordinationProvider> | undefined
+    if (!provider) {
+      return {
+        mode: 'local',
+        lastSyncAt: null,
+        syncLagMs: null,
+        provider: 'local',
+      }
+    }
+
+    const providerId = this.resolveProviderId(provider)
+
+    if (typeof provider.health !== 'function') {
+      this.stats.coordinationFallbackCount++
+      this.emitCoordinationWarning('invalid_contract', providerId)
+      return this.toDegradedHealth(providerId)
+    }
+
+    try {
+      const healthCandidate = provider.health() as unknown
+      if (!this.isValidCoordinationHealth(healthCandidate)) {
+        this.stats.coordinationFallbackCount++
+        this.emitCoordinationWarning(
+          'invalid_contract',
+          providerId,
+          new Error('Provider health payload is invalid'),
+        )
+        return this.toDegradedHealth(providerId)
+      }
+
+      const health = healthCandidate
+      if (health.mode === 'degraded') {
+        this.stats.coordinationFallbackCount++
+      }
+
+      return {
+        mode: health.mode,
+        lastSyncAt: health.lastSyncAt,
+        syncLagMs: health.syncLagMs,
+        provider: health.provider,
+      }
+    } catch (error: unknown) {
+      this.stats.coordinationFallbackCount++
+      this.emitCoordinationWarning('health_failure', providerId, error)
+      return this.toDegradedHealth(providerId)
+    }
+  }
+
+  /**
    * Get current agent statistics.
    */
   getStats(): Readonly<AgentStats> {
     return { ...this.stats }
+  }
+
+  private resolveProviderId(provider: Partial<CoordinationProvider>): string {
+    const id = provider.providerId
+    if (typeof id === 'string' && id.length > 0) {
+      return id
+    }
+    return 'unknown-provider'
+  }
+
+  private toDegradedHealth(providerId: string): CoordinationHealth {
+    return {
+      mode: 'degraded',
+      lastSyncAt: null,
+      syncLagMs: null,
+      provider: providerId,
+    }
+  }
+
+  private emitCoordinationWarning(
+    reason: 'invalid_contract' | 'health_failure',
+    providerId: string,
+    error?: unknown,
+  ): void {
+    const dedupeKey = `${reason}:${providerId}`
+    if (this.emittedCoordinationWarnings.has(dedupeKey)) {
+      return
+    }
+
+    this.emittedCoordinationWarnings.add(dedupeKey)
+    this.stats.coordinationWarningCount++
+
+    this.notifications?.emit('system.panic', {
+      level: 'warning',
+      reason: `coordination.${reason}`,
+      context: {
+        providerId,
+        error: error instanceof Error ? error.message : undefined,
+      },
+    })
+  }
+
+  private isValidCoordinationHealth(value: unknown): value is CoordinationHealth {
+    if (typeof value !== 'object' || value === null) {
+      return false
+    }
+
+    const health = value as Partial<CoordinationHealth>
+    if (!this.isValidCoordinationMode(health.mode)) {
+      return false
+    }
+
+    if (typeof health.provider !== 'string' || health.provider.length === 0) {
+      return false
+    }
+
+    if (health.lastSyncAt !== null && !this.isNonNegativeFiniteNumber(health.lastSyncAt)) {
+      return false
+    }
+
+    if (health.syncLagMs !== null && !this.isNonNegativeFiniteNumber(health.syncLagMs)) {
+      return false
+    }
+
+    return true
+  }
+
+  private isValidCoordinationMode(mode: unknown): mode is CoordinationHealth['mode'] {
+    return mode === 'local' || mode === 'degraded' || mode === 'synchronized'
+  }
+
+  private isNonNegativeFiniteNumber(value: unknown): value is number {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0
   }
 }
 

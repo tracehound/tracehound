@@ -24,6 +24,12 @@ export interface TracehoundPluginOptions {
   emitSignatureInResponse?: boolean
 
   /**
+   * If true, emits x-tracehound-trace-id for quarantined responses.
+   * Disabled by default for privacy-sensitive environments.
+   */
+  emitTraceIdHeader?: boolean
+
+  /**
    * Custom scent extraction function.
    * Default extracts IP, path, method, and headers safely.
    */
@@ -79,7 +85,7 @@ function defaultOnIntercept(
   result: InterceptResult,
   _req: FastifyRequest,
   reply: FastifyReply,
-  options?: Pick<TracehoundPluginOptions, 'emitSignatureInResponse'>,
+  options?: Pick<TracehoundPluginOptions, 'emitSignatureInResponse' | 'emitTraceIdHeader'>,
 ): void {
   switch (result.status) {
     case 'rate_limited':
@@ -100,6 +106,10 @@ function defaultOnIntercept(
       break
 
     case 'quarantined':
+      if (options?.emitTraceIdHeader) {
+        reply.header('x-tracehound-trace-id', result.handle.signature)
+      }
+
       reply.status(403).send({
         error: 'Forbidden',
         ...(options?.emitSignatureInResponse ? { signature: result.handle.signature } : {}),
@@ -152,14 +162,19 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
     if (onIntercept) {
       onIntercept(result, req, reply)
     } else {
-      defaultOnIntercept(
-        result,
-        req,
-        reply,
-        options.emitSignatureInResponse !== undefined
-          ? { emitSignatureInResponse: options.emitSignatureInResponse }
-          : {},
-      )
+      const interceptOptions: Pick<
+        TracehoundPluginOptions,
+        'emitSignatureInResponse' | 'emitTraceIdHeader'
+      > = {}
+
+      if (options.emitSignatureInResponse !== undefined) {
+        interceptOptions.emitSignatureInResponse = options.emitSignatureInResponse
+      }
+      if (options.emitTraceIdHeader !== undefined) {
+        interceptOptions.emitTraceIdHeader = options.emitTraceIdHeader
+      }
+
+      defaultOnIntercept(result, req, reply, interceptOptions)
     }
     // Don't call hookDone() - response is already sent
   })
@@ -177,3 +192,5 @@ export default tracehoundPlugin
 
 // Re-export types for convenience
 export type { InterceptResult, Scent } from '@tracehound/core'
+
+

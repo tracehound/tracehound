@@ -122,10 +122,11 @@ describe('tracehound middleware', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ signature: 'test-sig' }))
   })
 
-  it('should emit x-tracehound-trace-id header when enabled for quarantined result', () => {
+  it('should emit opaque x-tracehound-trace-id header when enabled for quarantined result', () => {
+    const signature = 'trace-123'
     const agent = createMockAgent({
       status: 'quarantined',
-      handle: { signature: 'trace-123' } as any,
+      handle: { signature } as any,
     })
     const middleware = tracehound({ agent, emitTraceIdHeader: true })
     const res = createMockRes()
@@ -133,7 +134,15 @@ describe('tracehound middleware', () => {
     middleware(createMockReq(), res, next)
 
     expect(res.status).toHaveBeenCalledWith(403)
-    expect(res.set).toHaveBeenCalledWith('x-tracehound-trace-id', 'trace-123')
+
+    const traceIdCall = (res.set as any).mock.calls.find(
+      ([name]: [string]) => name === 'x-tracehound-trace-id',
+    )
+    expect(traceIdCall).toBeDefined()
+
+    const [, traceId] = traceIdCall as [string, string]
+    expect(traceId).toEqual(expect.any(String))
+    expect(traceId).not.toBe(signature)
   })
   it('should return 500 for error result', () => {
     const agent = createMockAgent({

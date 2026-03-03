@@ -105,7 +105,7 @@ function defaultOnIntercept(
 
     case 'quarantined':
       if (options?.emitTraceIdHeader) {
-        res.set('x-tracehound-trace-id', result.handle.signature)
+        res.set('x-tracehound-trace-id', generateSecureId())
       }
 
       res.status(403).json({
@@ -182,5 +182,4 @@ export const createMiddleware = tracehound
 
 // Re-export types for convenience
 export type { InterceptResult, Scent } from '@tracehound/core'
-
 

@@ -107,7 +107,7 @@ function defaultOnIntercept(
 
     case 'quarantined':
       if (options?.emitTraceIdHeader) {
-        reply.header('x-tracehound-trace-id', result.handle.signature)
+        reply.header('x-tracehound-trace-id', generateSecureId())
       }
 
       reply.status(403).send({
@@ -192,5 +192,4 @@ export default tracehoundPlugin
 
 // Re-export types for convenience
 export type { InterceptResult, Scent } from '@tracehound/core'
-
 

@@ -2,7 +2,7 @@
 
 // @ts-nocheck
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 const REQUIRED_CLASSES = [
   "boundary",
@@ -28,9 +28,11 @@ const rawOutPath = parseArg(
   "security/artifacts/generated/fuzz-assurance-metrics.json",
 );
 const outputPath = resolve(rawOutPath);
-if (!outputPath.startsWith(resolve("security/artifacts"))) {
+const baseDirOut = resolve("security/artifacts");
+const relOutPath = relative(baseDirOut, outputPath);
+if (isAbsolute(relOutPath) || relOutPath.startsWith("..")) {
   throw new Error(
-    "Path traversal blocked: Output path must be within security/artifacts/",
+    "Path traversal blocked: Output path must be strictly enclosed within security/artifacts/",
   );
 }
 const manifestPath = resolve("security/corpus/manifest.json");

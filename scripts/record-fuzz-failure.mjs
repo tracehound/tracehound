@@ -2,7 +2,7 @@
 
 // @ts-nocheck
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 function parseArg(flag, fallback = null) {
   const index = process.argv.indexOf(flag);
@@ -19,13 +19,14 @@ if (!initMode && !recordPath) {
 }
 
 const safeRecordPath = recordPath ? resolve(recordPath) : null;
-if (
-  safeRecordPath &&
-  !safeRecordPath.startsWith(resolve("security/artifacts"))
-) {
-  throw new Error(
-    "Path traversal blocked: Record path must be within security/artifacts/",
-  );
+if (safeRecordPath) {
+  const baseDirRec = resolve("security/artifacts");
+  const relRecPath = relative(baseDirRec, safeRecordPath);
+  if (isAbsolute(relRecPath) || relRecPath.startsWith("..")) {
+    throw new Error(
+      "Path traversal blocked: Record path must be strictly enclosed within security/artifacts/",
+    );
+  }
 }
 
 const record = initMode

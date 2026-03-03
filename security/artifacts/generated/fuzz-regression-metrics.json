@@ -1,0 +1,7 @@
+{
+  "mode": "regression",
+  "generatedAt": "2026-03-03T22:38:06.939Z",
+  "corpusAvailable": false,
+  "note": "Corpus lives in tracehound/security-harness. Skipping regression gate.",
+  "pass": true
+}

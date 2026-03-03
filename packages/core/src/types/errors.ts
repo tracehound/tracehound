@@ -12,6 +12,7 @@
  * - PROCESS_*    : Hound process errors
  * - RATE_*       : Rate limiting
  * - RUNTIME_*    : Runtime environment
+ * - SCHEDULER_*  : Scheduler status
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ export function createError(
   state: ErrorState,
   code: string,
   message: string,
-  options?: { context?: unknown; recoverable?: boolean }
+  options?: { context?: unknown; recoverable?: boolean },
 ): TracehoundError {
   return {
     state,
@@ -177,7 +178,7 @@ export const Errors = {
       {
         context: { signature },
         recoverable: false,
-      }
+      },
     ),
 
   evidenceEmpty: () =>
@@ -198,7 +199,7 @@ export const Errors = {
       {
         context: { expected, actual },
         recoverable: false,
-      }
+      },
     ),
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -308,6 +309,16 @@ export const Errors = {
       recoverable: false,
     }),
 
+  runtimeMembraneViolation: (operation: string) =>
+    createError(
+      'runtime',
+      'RUNTIME_MEMBRANE_VIOLATION',
+      `Runtime membrane blocked payload egress via ${operation}`,
+      {
+        context: { operation },
+        recoverable: false,
+      },
+    ),
   // ─────────────────────────────────────────────────────────────────────────
   // Scheduler Errors
   // ─────────────────────────────────────────────────────────────────────────
@@ -343,7 +354,7 @@ export const Errors = {
       {
         context: { expected, actual },
         recoverable: false,
-      }
+      },
     ),
 
   /** @deprecated Use evidenceInvalidBytes */
@@ -415,6 +426,7 @@ export const ErrorCodes = {
   // Runtime
   RUNTIME_FLAG_MISSING: 'RUNTIME_FLAG_MISSING',
   RUNTIME_INTRINSICS_NOT_FROZEN: 'RUNTIME_INTRINSICS_NOT_FROZEN',
+  RUNTIME_MEMBRANE_VIOLATION: 'RUNTIME_MEMBRANE_VIOLATION',
 
   // Scheduler
   SCHEDULER_TASK_FAILED: 'SCHEDULER_TASK_FAILED',

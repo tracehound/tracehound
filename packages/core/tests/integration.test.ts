@@ -334,8 +334,10 @@ describe('Integration: Full System Flow', () => {
 
       // Hound activation is separate (fire-and-forget)
       if (result.status === 'quarantined') {
-        // Cast handle to Evidence for HoundPool (in real code, Agent returns Evidence directly)
-        const houndResult = houndPool.activate(result.handle as unknown as Evidence)
+        const evidence = quarantine.get(result.handle.signature)
+        expect(evidence).not.toBeNull()
+
+        const houndResult = houndPool.activate(evidence as Evidence)
         expect(houndResult).toBeUndefined() // Returns void, not Promise
       }
     })
@@ -356,7 +358,10 @@ describe('Integration: Full System Flow', () => {
       const agentResult = agent.intercept(scent)
 
       if (agentResult.status === 'quarantined') {
-        shortPool.activate(agentResult.handle as unknown as Evidence)
+        const evidence = quarantine.get(agentResult.handle.signature)
+        expect(evidence).not.toBeNull()
+
+        shortPool.activate(evidence as Evidence)
       }
 
       // Advance past timeout

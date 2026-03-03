@@ -31,7 +31,7 @@ export type {
   PurgeRecord,
 } from './evidence.js'
 export { isClean, isError, isIgnored, isQuarantined, isRateLimited } from './result.js'
-export type { InterceptResult } from './result.js'
+export type { InterceptResult, RuntimeEvidenceHandle } from './result.js'
 export type { Scent, ThreatCategory, ThreatSignal } from './scent.js'
 export { compareSignatures, generateSignature, validateSignature } from './signature.js'
 export type { GenerateSignatureOptions } from './signature.js'

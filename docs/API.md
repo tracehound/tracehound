@@ -116,9 +116,11 @@ const result = th.agent.intercept(scent)
 - `{ status: 'clean' }` - No threat detected
 - `{ status: 'rate_limited', retryAfter: number }` - Rate limit exceeded
 - `{ status: 'payload_too_large', limit: number }` - Payload exceeds limit
-- `{ status: 'quarantined', handle: EvidenceHandle }` - Threat quarantined
+- `{ status: 'quarantined', handle: RuntimeEvidenceHandle }` - Threat quarantined (metadata-only membrane handle)
 - `{ status: 'ignored', signature: string }` - Duplicate threat
 - `{ status: 'error', error: TracehoundError }` - Processing error
+
+Quarantined runtime handle is membrane-guarded: `bytes`, `transfer()`, `neutralize()`, and `evacuate()` are rejected in runtime path. Forensic byte access remains quarantine-local (`th.quarantine.get(signature)`).
 
 Agent also exposes coordination health in a fail-open model:
 

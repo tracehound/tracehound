@@ -273,7 +273,7 @@ describe('Cross-Component Consistency', () => {
       }
     })
 
-    it('evidence hash is verifiable after transfer', () => {
+    it('evidence hash is verifiable after forensic transfer', () => {
       const { agent, quarantine } = createTestSetup()
       const payload = { verify: 'hash consistency' }
 
@@ -287,7 +287,12 @@ describe('Cross-Component Consistency', () => {
 
       expect(result.status).toBe('quarantined')
       if (result.status === 'quarantined') {
-        const bytes = result.handle.transfer()
+        // Runtime handle is membrane-guarded; forensic bytes are available only
+        // via quarantine-local capability path.
+        const evidence = quarantine.get(result.handle.signature)
+        expect(evidence).not.toBeNull()
+
+        const bytes = evidence!.transfer()
         const computedHash = hashBuffer(new Uint8Array(bytes))
 
         expect(computedHash).toBe(result.handle.hash)

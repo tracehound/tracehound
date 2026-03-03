@@ -11,8 +11,8 @@
  */
 
 import type { CoordinationHealth, CoordinationProvider } from '../types/coordination.js'
-import type { TracehoundError } from '../types/errors.js'
-import type { InterceptResult } from '../types/result.js'
+import { Errors, type TracehoundError } from '../types/errors.js'
+import type { InterceptResult, RuntimeEvidenceHandle } from '../types/result.js'
 import type { Scent } from '../types/scent.js'
 import type { IEvidenceFactory } from './evidence-factory.js'
 import type { IHoundPool } from './hound-pool.js'
@@ -82,6 +82,8 @@ export interface AgentStats {
   coordinationFallbackCount: number
   /** Coordination warnings emitted via system.panic */
   coordinationWarningCount: number
+  /** Runtime membrane payload egress rejections */
+  membraneRejectionCount: number
 }
 
 /**
@@ -98,6 +100,7 @@ export class Agent implements IAgent {
     errorCount: 0,
     coordinationFallbackCount: 0,
     coordinationWarningCount: 0,
+    membraneRejectionCount: 0,
   }
 
   private readonly emittedCoordinationWarnings = new Set<string>()
@@ -221,7 +224,7 @@ export class Agent implements IAgent {
       this.stats.quarantinedCount++
       return {
         status: 'quarantined',
-        handle: evidence,
+        handle: this.createRuntimeEvidenceHandle(evidence),
       }
     } catch (error: unknown) {
       this.stats.errorCount++
@@ -304,6 +307,70 @@ export class Agent implements IAgent {
     return { ...this.stats }
   }
 
+  private createRuntimeEvidenceHandle(evidence: {
+    readonly size: number
+    readonly hash: string
+    readonly signature: string
+    readonly captured: number
+    readonly severity: RuntimeEvidenceHandle['severity']
+    readonly disposed: boolean
+  }): RuntimeEvidenceHandle {
+    const signature = evidence.signature
+    const agent = this
+
+    return Object.freeze({
+      membrane: 'metadata_only' as const,
+      get size(): number {
+        return evidence.size
+      },
+      get hash(): string {
+        return evidence.hash
+      },
+      get signature(): string {
+        return evidence.signature
+      },
+      get captured(): number {
+        return evidence.captured
+      },
+      get severity(): RuntimeEvidenceHandle['severity'] {
+        return evidence.severity
+      },
+      get disposed(): boolean {
+        return evidence.disposed
+      },
+      get bytes(): never {
+        return agent.rejectRuntimePayloadEgress('bytes', signature)
+      },
+      transfer(): never {
+        return agent.rejectRuntimePayloadEgress('transfer', signature)
+      },
+      neutralize(_previousHash: string): never {
+        return agent.rejectRuntimePayloadEgress('neutralize', signature)
+      },
+      evacuate(_destination: string): never {
+        return agent.rejectRuntimePayloadEgress('evacuate', signature)
+      },
+    })
+  }
+
+  private rejectRuntimePayloadEgress(
+    operation: 'bytes' | 'transfer' | 'neutralize' | 'evacuate',
+    signature: string,
+  ): never {
+    this.stats.membraneRejectionCount++
+
+    this.notifications?.emit('system.panic', {
+      level: 'warning',
+      reason: 'membrane.payload_egress_blocked',
+      context: {
+        operation,
+        signature,
+        code: 'RUNTIME_MEMBRANE_VIOLATION',
+      },
+    })
+
+    throw Errors.runtimeMembraneViolation(operation)
+  }
   private resolveProviderId(provider: Partial<CoordinationProvider>): string {
     const id = provider.providerId
     if (typeof id === 'string' && id.length > 0) {

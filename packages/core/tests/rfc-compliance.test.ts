@@ -454,6 +454,45 @@ describe('RFC-0000 Compliance', () => {
       expect(provider.health().mode).toBe('local')
       expect(provider.features.has('shared_blocklist')).toBe(true)
     })
+
+    it('coordination health failure degrades safely without changing intercept flow', () => {
+      const { quarantine } = createTestSetup()
+      const provider: CoordinationProvider = {
+        providerId: 'rfc-0009-throwing-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => {
+          throw new Error('coordination unavailable')
+        },
+      }
+
+      const agent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter({
+          windowMs: 60_000,
+          maxRequests: 100,
+          blockDurationMs: 300_000,
+        }),
+        createEvidenceFactory(),
+      )
+
+      const health = agent.getCoordinationHealth()
+      const result = agent.intercept({
+        id: 'coord-rfc-throw',
+        payload: { attack: 'test' },
+        source: 'rfc-source',
+        timestamp: Date.now(),
+        threat: { category: 'injection', severity: 'high' },
+      })
+
+      expect(health.mode).toBe('degraded')
+      expect(result.status).toBe('quarantined')
+    })
   })
 })
 
@@ -478,6 +517,3 @@ function createTestSetup(options: { maxRequests?: number } = {}) {
 
   return { agent, quarantine, auditChain, rateLimiter }
 }
-
-
-

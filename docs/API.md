@@ -120,6 +120,17 @@ const result = th.agent.intercept(scent)
 - `{ status: 'ignored', signature: string }` - Duplicate threat
 - `{ status: 'error', error: TracehoundError }` - Processing error
 
+Agent also exposes coordination health in a fail-open model:
+
+```ts
+const health = th.agent.getCoordinationHealth()
+// health.mode: 'local' | 'degraded' | 'synchronized'
+```
+
+If no coordination provider is configured, `mode` is `local`.
+If provider health retrieval fails, Agent returns `degraded` without interrupting intercept flow.
+If provider contract is invalid or health lookup throws, Agent emits `system.panic` with warning level (`coordination.invalid_contract` or `coordination.health_failure`).
+
 ### Quarantine (`th.quarantine`)
 
 Evidence buffer with priority-based eviction. Evicts the lowest severity evidence first when limits are reached.

@@ -91,6 +91,24 @@ describe('tracehound middleware', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ limit: 1000000 }))
   })
 
+  it('should return 413 without destroying socket when result is payload_too_large', () => {
+    const destroy = vi.fn()
+    const agent = createMockAgent({ status: 'payload_too_large', limit: 2048 })
+    const middleware = tracehound({ agent })
+    const req = createMockReq({
+      socket: {
+        remoteAddress: '127.0.0.1',
+        destroy,
+      } as unknown as Request['socket'],
+    })
+    const res = createMockRes()
+
+    middleware(req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(413)
+    expect(destroy).not.toHaveBeenCalled()
+  })
+
   it('should NOT return signature by default for quarantined result', () => {
     const agent = createMockAgent({
       status: 'quarantined',
@@ -248,6 +266,22 @@ describe('tracehound middleware', () => {
     middleware(req, res, next)
 
     expect(onIntercept).toHaveBeenCalledWith({ status: 'rate_limited', retryAfter: 1000 }, req, res)
+  })
+
+  it('should fail open and call next when intercept throws', () => {
+    const agent = {
+      intercept: vi.fn(() => {
+        throw new Error('intercept failed')
+      }),
+      stats: { intercepted: 0, quarantined: 0, rateLimited: 0, errors: 0 },
+    } as unknown as IAgent
+    const middleware = tracehound({ agent })
+    const res = createMockRes()
+
+    middleware(createMockReq(), res, next)
+
+    expect(next).toHaveBeenCalled()
+    expect(res.status).not.toHaveBeenCalled()
   })
 })
 

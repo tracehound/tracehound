@@ -188,15 +188,22 @@ export function tracehound(
     });
 
   return (req: Request, res: Response, next: NextFunction): void => {
-    const scent = extractScent(req);
-    const result = agent.intercept(scent);
+    try {
+      const scent = extractScent(req);
+      const result = agent.intercept(scent);
 
-    if (result.status === "clean" || result.status === "ignored") {
-      next();
-      return;
+      if (result.status === "clean" || result.status === "ignored") {
+        next();
+        return;
+      }
+
+      interceptHandler(result, req, res);
+    } catch {
+      // Fail-open invariant: adapter failures must never block host traffic flow.
+      if (!res.headersSent) {
+        next();
+      }
     }
-
-    interceptHandler(result, req, res);
   };
 }
 

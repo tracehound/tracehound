@@ -185,6 +185,29 @@ describe('tracehoundPlugin', () => {
     expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ limit: 1000 }))
   })
 
+  it('should return 413 without destroying socket when result is payload_too_large', () => {
+    const destroy = vi.fn()
+    const agent = createMockAgent({ status: 'payload_too_large', limit: 2048 })
+    const fastify = createMockFastify()
+
+    tracehoundPlugin(fastify as any, { agent }, () => {})
+
+    const req = createMockReq({
+      raw: {
+        socket: {
+          destroy,
+        },
+      } as unknown as FastifyRequest['raw'],
+    })
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, () => {})
+
+    expect(reply.status).toHaveBeenCalledWith(413)
+    expect(destroy).not.toHaveBeenCalled()
+  })
+
   it('should return 500 for error result', async () => {
     const agent = createMockAgent({
       status: 'error',
@@ -305,6 +328,28 @@ describe('tracehoundPlugin', () => {
 
     expect(extractScent).toHaveBeenCalled()
     expect(agent.intercept).toHaveBeenCalledWith(customScent)
+  })
+
+  it('should fail open and call hookDone when intercept throws', () => {
+    const agent = {
+      intercept: vi.fn(() => {
+        throw new Error('intercept failed')
+      }),
+      stats: { intercepted: 0, quarantined: 0, rateLimited: 0, errors: 0 },
+    } as unknown as IAgent
+    const fastify = createMockFastify()
+    const next = vi.fn()
+
+    tracehoundPlugin(fastify as any, { agent }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, next)
+
+    expect(next).toHaveBeenCalled()
+    expect(reply.status).not.toHaveBeenCalled()
   })
 })
 

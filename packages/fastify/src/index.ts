@@ -168,32 +168,39 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
   const { agent, extractScent = defaultExtractScent, onIntercept } = options
 
   fastify.addHook('onRequest', (req, reply, hookDone) => {
-    const scent = extractScent(req)
-    const result = agent.intercept(scent)
+    try {
+      const scent = extractScent(req)
+      const result = agent.intercept(scent)
 
-    if (result.status === 'clean' || result.status === 'ignored') {
-      hookDone()
-      return
-    }
-
-    if (onIntercept) {
-      onIntercept(result, req, reply)
-    } else {
-      const interceptOptions: Pick<
-        TracehoundPluginOptions,
-        'emitSignatureInResponse' | 'emitTraceIdHeader'
-      > = {}
-
-      if (options.emitSignatureInResponse !== undefined) {
-        interceptOptions.emitSignatureInResponse = options.emitSignatureInResponse
-      }
-      if (options.emitTraceIdHeader !== undefined) {
-        interceptOptions.emitTraceIdHeader = options.emitTraceIdHeader
+      if (result.status === 'clean' || result.status === 'ignored') {
+        hookDone()
+        return
       }
 
-      defaultOnIntercept(result, req, reply, interceptOptions)
+      if (onIntercept) {
+        onIntercept(result, req, reply)
+      } else {
+        const interceptOptions: Pick<
+          TracehoundPluginOptions,
+          'emitSignatureInResponse' | 'emitTraceIdHeader'
+        > = {}
+
+        if (options.emitSignatureInResponse !== undefined) {
+          interceptOptions.emitSignatureInResponse = options.emitSignatureInResponse
+        }
+        if (options.emitTraceIdHeader !== undefined) {
+          interceptOptions.emitTraceIdHeader = options.emitTraceIdHeader
+        }
+
+        defaultOnIntercept(result, req, reply, interceptOptions)
+      }
+      // Don't call hookDone() - response is already sent
+    } catch {
+      // Fail-open invariant: adapter failures must never block host traffic flow.
+      if (!reply.sent) {
+        hookDone()
+      }
     }
-    // Don't call hookDone() - response is already sent
   })
 
   done()
@@ -209,4 +216,3 @@ export default tracehoundPlugin
 
 // Re-export types for convenience
 export type { InterceptResult, Scent } from '@tracehound/core'
-

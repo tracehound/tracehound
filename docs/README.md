@@ -1,7 +1,7 @@
 # Documentation Index
 
-> **Last Updated:** 2026-03-03
-> **Version:** v1.0.0 Stable
+> **Last Updated:** 2026-03-04
+> **Version:** v1.5.0
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
 ---
@@ -11,7 +11,8 @@
 | Category         | Document                                   | Purpose                    |
 | ---------------- | ------------------------------------------ | -------------------------- |
 | **Start Here**   | [GETTING-STARTED.md](./GETTING-STARTED.md) | Installation & quick start |
-| **API & Config** | [API.md](./API.md)                         | Public API reference       |
+| **API**          | [API.md](./API.md)                         | Public API reference       |
+| **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)    | Runtime and adapter configuration defaults |
 
 ---
 

@@ -1,4 +1,5 @@
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { recordTraceInspectionEntry } from '@tracehound/core'
@@ -9,6 +10,9 @@ import { inspectCommand } from '../src/commands/inspect.js'
 import { statsCommand } from '../src/commands/stats.js'
 import { statusCommand } from '../src/commands/status.js'
 import { watchCommand } from '../src/commands/watch.js'
+
+const require = createRequire(import.meta.url)
+const { version: cliVersion } = require('../package.json')
 
 const SEEDED_TRACE_ID = 'trace-seeded-0001'
 const SEEDED_SIGNATURE = 'injection:seeded-signature'
@@ -157,7 +161,7 @@ describe('CLI Commands', () => {
       statusCommand.parse(['status', '--json'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
-      expect(output).toContain('"version": "1.4.4"')
+      expect(output).toContain(`"version": "${cliVersion}"`)
     })
 
     it('stats command action should print stats', () => {
@@ -323,7 +327,7 @@ describe('CLI Commands', () => {
     it('should get system snapshot', async () => {
       const { getSnapshot } = await import('../src/commands/watch.js')
       const snapshot = getSnapshot()
-      expect(snapshot.system.version).toBe('1.4.4')
+      expect(snapshot.system.version).toBe(cliVersion)
       expect(snapshot.timestamp).toBeDefined()
     })
 

@@ -198,11 +198,15 @@ export function tracehound(
       }
 
       interceptHandler(result, req, res);
-    } catch {
-      // Fail-open invariant: adapter failures must never block host traffic flow.
-      if (!res.headersSent) {
-        next();
+    } catch (error: unknown) {
+      // Preserve Express error pipeline after partial writes from custom handlers.
+      if (res.headersSent) {
+        next(error);
+        return;
       }
+
+      // Fail-open invariant: adapter failures must never block host traffic flow.
+      next();
     }
   };
 }

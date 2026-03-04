@@ -268,6 +268,25 @@ describe('tracehound middleware', () => {
     expect(onIntercept).toHaveBeenCalledWith({ status: 'rate_limited', retryAfter: 1000 }, req, res)
   })
 
+  it('should propagate error when custom onIntercept throws after headers are sent', () => {
+    const expected = new Error('custom intercept failed')
+    const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
+    const onIntercept = vi.fn((_, __, res: Response) => {
+      ;(res as any).headersSent = true
+      throw expected
+    })
+
+    const middleware = tracehound({ agent, onIntercept })
+    const req = createMockReq()
+    const res = createMockRes() as any
+    res.headersSent = false
+
+    middleware(req, res, next)
+
+    expect(onIntercept).toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith(expected)
+  })
+
   it('should fail open and call next when intercept throws', () => {
     const agent = {
       intercept: vi.fn(() => {

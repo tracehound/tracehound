@@ -330,6 +330,47 @@ describe('tracehoundPlugin', () => {
     expect(agent.intercept).toHaveBeenCalledWith(customScent)
   })
 
+  it('should use custom onIntercept handler', () => {
+    const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
+    const onIntercept = vi.fn()
+    const fastify = createMockFastify()
+    const next = vi.fn()
+
+    tracehoundPlugin(fastify as any, { agent, onIntercept }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, next)
+
+    expect(onIntercept).toHaveBeenCalledWith({ status: 'rate_limited', retryAfter: 1000 }, req, reply)
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('should propagate error when custom onIntercept throws after reply is sent', () => {
+    const expected = new Error('custom intercept failed')
+    const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
+    const onIntercept = vi.fn((_, __, reply: FastifyReply) => {
+      ;(reply as any).sent = true
+      throw expected
+    })
+    const fastify = createMockFastify()
+    const next = vi.fn()
+
+    tracehoundPlugin(fastify as any, { agent, onIntercept }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply() as any
+    reply.sent = false
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, next)
+
+    expect(onIntercept).toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith(expected)
+  })
+
   it('should fail open and call hookDone when intercept throws', () => {
     const agent = {
       intercept: vi.fn(() => {

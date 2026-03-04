@@ -195,11 +195,15 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
         defaultOnIntercept(result, req, reply, interceptOptions)
       }
       // Don't call hookDone() - response is already sent
-    } catch {
-      // Fail-open invariant: adapter failures must never block host traffic flow.
-      if (!reply.sent) {
-        hookDone()
+    } catch (error: unknown) {
+      // Preserve Fastify error pipeline after partial writes from custom handlers.
+      if (reply.sent) {
+        hookDone(error instanceof Error ? error : undefined)
+        return
       }
+
+      // Fail-open invariant: adapter failures must never block host traffic flow.
+      hookDone()
     }
   })
 

@@ -6,20 +6,48 @@ All notable changes to this project will be documented in this file.
 
 ## Release Notes
 
-Covers merged work for TH-M3-0011-02, TH-M3-0011-03, TH-M3-0011-04, and TH-M3-0000-DOC.
+Covers the complete Sprint Bootstrap Governance Pack Post-Sprint Implementation Backlog.
+
+Ticket coverage:
+
+- `TH-M3-0009-01`
+- `TH-M3-0009-02`
+- `TH-M3-0010-01`
+- `TH-M3-0010-02`
+- `TH-M3-0010-03`
+- `TH-M3-0011-01`
+- `TH-M3-0011-02`
+- `TH-M3-0011-03`
+- `TH-M3-0011-04`
+- `TH-M3-0000-DOC`
 
 ## Engineering and Infrastructure
 
-- **Memory-first buffering default (TH-M3-0011-02)**: `MemoryColdStorage` now runs bounded in-memory buffering as the default posture; disk buffering remains explicit opt-in via `diskBuffer.enabled`.
-- **Graceful 413 shielding in adapters (TH-M3-0011-03)**: Express and Fastify adapters map oversized outcomes to HTTP `413 Payload Too Large` without destructive socket reset semantics.
-- **Adapter fail-open hardening**: Interception failures before response start remain transparent pass-through; post-header custom handler failures are delegated to framework error pipelines.
-- **Scenario + regression expansion (TH-M3-0011-04)**: Added pressure containment scenario and regression suites covering deterministic drop/count behavior, degraded coordination fail-open continuity, and runtime membrane rejection paths.
+### RFC-0009 Delivery (Coordination Contract)
+
+- Coordination provider contract types are formalized in public core type surface (`CoordinationProvider`, `CoordinationHealth`, `CoordinationFeature`).
+- Agent coordination health flow is fail-open: invalid/throwing provider health resolves safely to `degraded` without interrupting intercept path.
+- Coordination contract integration paths are covered in unit/integration/regression tests.
+
+### RFC-0010 Delivery (One-Way Membrane + Trace Signaling)
+
+- Runtime membrane enforces metadata-only evidence handles and blocks direct payload egress attempts (`bytes`, `transfer`, `neutralize`, `evacuate`) with typed runtime violations.
+- Optional adapter trace id signaling (`x-tracehound-trace-id`) is available behind explicit opt-in configuration.
+- CLI inspect workflow supports trace-id based evidence metadata lookup without raw payload leakage defaults.
+
+### RFC-0011 Delivery (Pressure Containment + Graceful Shielding)
+
+- Deterministic Drop and Count behavior is enforced under pressure boundaries in quarantine/cold-path workflows.
+- `MemoryColdStorage` runs memory-first buffering by default; disk buffering remains explicit opt-in via `diskBuffer.enabled`.
+- Express/Fastify oversized handling maps to graceful HTTP `413` and avoids destructive socket reset semantics.
+- Adapter fail-open paths are hardened: pre-response failures pass through safely, post-header custom-handler failures are delegated to framework error pipelines.
+- Scenario and regression suites include explicit coverage for pressure behavior, degraded coordination continuity, and membrane enforcement.
 
 ## Documentation and Governance
 
-- Added `docs/CONFIGURATION.md` as explicit runtime and adapter configuration reference.
+- Added `docs/CONFIGURATION.md` as explicit runtime, buffering, and adapter configuration reference.
 - Updated `docs/API.md` with adapter runtime guarantees for graceful `413`, fail-open behavior, and framework error delegation semantics.
-- Updated documentation index with `v1.5.0` and configuration reference linkage.
+- Updated documentation index and release metadata for `v1.5.0`.
 
 ## [1.4.4] - 2026-02-26 - Tracehound Inline Protection Validation Harness (TIPVH) & Enterprise Hardening
 

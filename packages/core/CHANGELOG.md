@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-03-04 - M3 Pressure Containment and Governance Delivery
+
+## Release Notes
+
+Covers merged work for TH-M3-0011-02, TH-M3-0011-03, TH-M3-0011-04, and TH-M3-0000-DOC.
+
+## Engineering and Infrastructure
+
+- **Memory-first buffering default (TH-M3-0011-02)**: `MemoryColdStorage` now runs bounded in-memory buffering as the default posture; disk buffering remains explicit opt-in via `diskBuffer.enabled`.
+- **Graceful 413 shielding in adapters (TH-M3-0011-03)**: Express and Fastify adapters map oversized outcomes to HTTP `413 Payload Too Large` without destructive socket reset semantics.
+- **Adapter fail-open hardening**: Interception failures before response start remain transparent pass-through; post-header custom handler failures are delegated to framework error pipelines.
+- **Scenario + regression expansion (TH-M3-0011-04)**: Added pressure containment scenario and regression suites covering deterministic drop/count behavior, degraded coordination fail-open continuity, and runtime membrane rejection paths.
+
+## Documentation and Governance
+
+- Added `docs/CONFIGURATION.md` as explicit runtime and adapter configuration reference.
+- Updated `docs/API.md` with adapter runtime guarantees for graceful `413`, fail-open behavior, and framework error delegation semantics.
+- Updated documentation index with `v1.5.0` and configuration reference linkage.
+
 ## [1.4.4] - 2026-02-26 - Tracehound Inline Protection Validation Harness (TIPVH) & Enterprise Hardening
 
 ## Release Notes

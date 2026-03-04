@@ -1,6 +1,8 @@
-# API & Configuration Reference
+# API Reference
 
 > **Tracehound Core v1.4+** uses a unified `createTracehound` factory that encapsulates all sub-components (Agent, Quarantine, Watcher, HoundPool, etc.) behind a single, cohesive facade.
+
+For configuration defaults and adapter behavior flags, see [CONFIGURATION.md](./CONFIGURATION.md).
 
 ## Installation
 
@@ -44,7 +46,7 @@ const th = createTracehound({
 const { agent, quarantine, rateLimiter, watcher, auditChain, notifications, houndPool } = th
 ```
 
-### TracehoundOptions Configuration
+### TracehoundOptions Overview
 
 Complete configuration options for `createTracehound`:
 
@@ -132,6 +134,13 @@ const health = th.agent.getCoordinationHealth()
 If no coordination provider is configured, `mode` is `local`.
 If provider health retrieval fails, Agent returns `degraded` without interrupting intercept flow.
 If provider contract is invalid or health lookup throws, Agent emits `system.panic` with warning level (`coordination.invalid_contract` or `coordination.health_failure`).
+
+### Adapter Runtime Guarantees (Express/Fastify)
+
+1. `payload_too_large` outcomes map to graceful HTTP `413`.
+2. Oversized handling avoids destructive socket reset semantics by default.
+3. Adapter interception errors are fail-open before response start.
+4. If a custom intercept handler throws after headers are sent, adapters delegate to framework error pipelines.
 
 ### Quarantine (`th.quarantine`)
 

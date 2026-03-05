@@ -196,6 +196,17 @@ tracehound inspect   # Quarantine contents
 tracehound watch     # Live TUI dashboard
 ```
 
+CLI `status/stats/watch` commands require a signed runtime snapshot.
+If snapshot input is missing or unverifiable, commands return explicit `NO_INSTANCE` / `INTEGRITY_VIOLATION` states.
+`NO_INSTANCE` is also returned when the snapshot is stale (older than freshness window).
+
+```bash
+export TRACEHOUND_SYSTEM_SNAPSHOT_PATH=/var/run/tracehound/system-snapshot.json
+export TRACEHOUND_SNAPSHOT_SECRET=your-shared-secret
+# Optional: freshness window override (default 5000ms)
+export TRACEHOUND_SNAPSHOT_MAX_AGE_MS=5000
+```
+
 ---
 
 ## Core Concepts

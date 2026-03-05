@@ -167,7 +167,7 @@ describe('Tracehound Factory', () => {
       const snapshot = tracehound.watcher.snapshot()
       expect(snapshot.totalAlerts).toBeGreaterThanOrEqual(1)
       expect(snapshot.lastAlert?.type).toBe('hound_timeout')
-      tracehound.houndPool.shutdown()
+      tracehound.shutdown()
       vi.useRealTimers()
     })
   })
@@ -185,15 +185,24 @@ describe('Tracehound Factory', () => {
     it('throws when snapshot export is enabled without secret', () => {
       const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-config-'))
       const path = join(dir, 'snapshot.json')
-      delete process.env['TRACEHOUND_SNAPSHOT_SECRET']
+      const previousSnapshotSecret = process.env['TRACEHOUND_SNAPSHOT_SECRET']
 
-      expect(() =>
-        createTracehound({
-          snapshot: { path },
-        }),
-      ).toThrow()
+      try {
+        delete process.env['TRACEHOUND_SNAPSHOT_SECRET']
 
-      rmSync(dir, { recursive: true, force: true })
+        expect(() =>
+          createTracehound({
+            snapshot: { path },
+          }),
+        ).toThrow()
+      } finally {
+        if (previousSnapshotSecret === undefined) {
+          delete process.env['TRACEHOUND_SNAPSHOT_SECRET']
+        } else {
+          process.env['TRACEHOUND_SNAPSHOT_SECRET'] = previousSnapshotSecret
+        }
+        rmSync(dir, { recursive: true, force: true })
+      }
     })
 
     it('writes signed snapshot file when snapshot export is enabled', () => {
@@ -210,8 +219,35 @@ describe('Tracehound Factory', () => {
       expect(existsSync(path)).toBe(true)
       const read = readSystemSnapshotFromDisk(path, 'test-secret')
       expect(read.ok).toBe(true)
-      tracehound.houndPool.shutdown()
+      tracehound.shutdown()
       rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('stops snapshot writes after shutdown', async () => {
+      vi.useFakeTimers()
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-stop-'))
+      const path = join(dir, 'snapshot.json')
+
+      try {
+        const tracehound = createTracehound({
+          snapshot: {
+            path,
+            secret: 'test-secret',
+            intervalMs: 100,
+          },
+        })
+
+        expect(existsSync(path)).toBe(true)
+        rmSync(path, { force: true })
+
+        tracehound.shutdown()
+        await vi.advanceTimersByTimeAsync(500)
+
+        expect(existsSync(path)).toBe(false)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+        vi.useRealTimers()
+      }
     })
   })
 })

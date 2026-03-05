@@ -395,13 +395,14 @@ export class HoundPool implements IHoundPool {
         }
       }
       // Ignore 'processing' status - just acknowledgment
-    } catch {
+    } catch (error: unknown) {
       // Decode error - terminate
       this._totalErrors++
+      const decodeError = Errors.processIpcDecodeFailed(toErrorMessage(error))
       this.terminateProcess(
         processState,
         'error',
-        Errors.processIpcDecodeFailed('malformed frame').code,
+        decodeError.message,
       )
     }
   }

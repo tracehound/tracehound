@@ -3,6 +3,16 @@
 Security buffer system for threat quarantine.
 Part of the Tracehound Cyberimmune System.
 
+## Migration Note
+
+If you implement `IAgent` outside core internals, interface parity now requires:
+
+```ts
+getStats(): Readonly<AgentStats>
+```
+
+See [`docs/BREAKING-CHANGES.md`](../../docs/BREAKING-CHANGES.md) for full upgrade notes.
+
 ## Status
 
 **Phase 1-4 Complete:** ✅

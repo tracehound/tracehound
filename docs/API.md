@@ -3,6 +3,14 @@
 > **Tracehound Core v1.4+** uses a unified `createTracehound` factory that encapsulates all sub-components (Agent, Quarantine, Watcher, HoundPool, etc.) behind a single, cohesive facade.
 
 For configuration defaults and adapter behavior flags, see [CONFIGURATION.md](./CONFIGURATION.md).
+For upgrade-impacting changes, see [BREAKING-CHANGES.md](./BREAKING-CHANGES.md).
+
+## Migration Note (Post v1.5.0)
+
+1. `@tracehound/fastify` now uses named export only (`tracehoundPlugin`).
+2. Custom `IAgent` implementations must expose `getStats(): Readonly<AgentStats>`.
+3. CLI `status/stats/watch` requires verified runtime snapshot input; no fabricated fallback state exists.
+4. `ITracehound` now exposes `shutdown()` for runtime teardown.
 
 ## Installation
 
@@ -210,6 +218,14 @@ const verified = readSystemSnapshotFromDisk('/tmp/tracehound/system-snapshot.jso
 if (verified.ok) {
   console.log(verified.snapshot.generatedAt)
 }
+```
+
+### Runtime Teardown (`th.shutdown()`)
+
+Stop runtime background resources (snapshot interval and hound processes):
+
+```ts
+th.shutdown()
 ```
 
 ### Notifications (`th.notifications`)

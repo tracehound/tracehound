@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const DEFAULT_SNAPSHOT_PATH = join(tmpdir(), 'tracehound', 'system-snapshot.json')
+const DEFAULT_MAX_SNAPSHOT_AGE_MS = 5_000
 
 export interface CliSystemSnapshot {
   generatedAt: number
@@ -86,14 +87,15 @@ export type CliSnapshotLoadResult =
 
 export function loadSystemSnapshot(): CliSnapshotLoadResult {
   const path = resolveSnapshotPath()
-  const secret = resolveSnapshotSecret()
-
-  if (!secret) {
-    return { ok: false, code: 'INTEGRITY_VIOLATION', path }
-  }
 
   if (!existsSync(path)) {
     return { ok: false, code: 'NO_INSTANCE', path }
+  }
+
+  const secret = resolveSnapshotSecret()
+  const maxSnapshotAgeMs = resolveSnapshotMaxAgeMs()
+  if (!secret) {
+    return { ok: false, code: 'INTEGRITY_VIOLATION', path }
   }
 
   try {
@@ -108,6 +110,9 @@ export function loadSystemSnapshot(): CliSnapshotLoadResult {
     const expected = createHmac('sha256', secret).update(payloadText).digest('hex')
     if (!constantTimeHexEqual(expected, parsed.signature)) {
       return { ok: false, code: 'INTEGRITY_VIOLATION', path }
+    }
+    if (isSnapshotStale(parsed.payload.generatedAt, maxSnapshotAgeMs)) {
+      return { ok: false, code: 'NO_INSTANCE', path }
     }
 
     return {
@@ -136,6 +141,24 @@ function resolveSnapshotSecret(): string | null {
   }
 
   return null
+}
+
+function resolveSnapshotMaxAgeMs(): number {
+  const raw = process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS
+  if (typeof raw !== 'string' || raw.length === 0) {
+    return DEFAULT_MAX_SNAPSHOT_AGE_MS
+  }
+
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_MAX_SNAPSHOT_AGE_MS
+  }
+
+  return Math.floor(parsed)
+}
+
+function isSnapshotStale(generatedAt: number, maxAgeMs: number): boolean {
+  return Date.now() - generatedAt > maxAgeMs
 }
 
 function constantTimeHexEqual(left: string, right: string): boolean {

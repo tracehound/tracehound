@@ -11,6 +11,7 @@ For complete option schemas and adapter-specific behavior flags, see:
 
 1. [API & Configuration Reference](./API.md)
 2. [Getting Started](./GETTING-STARTED.md)
+3. [Breaking Changes / Migration](./BREAKING-CHANGES.md)
 
 ## What This Covers
 
@@ -55,8 +56,9 @@ CLI commands (`status`, `stats`, `watch`) read:
 
 1. `TRACEHOUND_SYSTEM_SNAPSHOT_PATH` (snapshot file path)
 2. `TRACEHOUND_SNAPSHOT_SECRET` (verification secret)
+3. `TRACEHOUND_SNAPSHOT_MAX_AGE_MS` (optional freshness window override, default `5000`)
 
 If snapshot cannot be trusted:
 
-1. `NO_INSTANCE` when file is absent.
+1. `NO_INSTANCE` when file is absent or stale.
 2. `INTEGRITY_VIOLATION` when signature/format/secret validation fails.

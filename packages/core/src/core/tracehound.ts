@@ -102,6 +102,11 @@ export interface ITracehound {
    * Return immutable runtime snapshot.
    */
   snapshot(): SystemSnapshot
+
+  /**
+   * Dispose runtime resources (snapshot loop and hound processes).
+   */
+  shutdown(): void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,6 +249,11 @@ class Tracehound implements ITracehound {
     return exportSystemSnapshot(this)
   }
 
+  shutdown(): void {
+    this.stopSnapshotLoop()
+    this.houndPool.shutdown()
+  }
+
   private startSnapshotLoop(): void {
     if (!this.snapshotPath || !this.snapshotSecret || !this.snapshotIntervalMs) {
       return
@@ -267,6 +277,15 @@ class Tracehound implements ITracehound {
     if (typeof this.snapshotIntervalId.unref === 'function') {
       this.snapshotIntervalId.unref()
     }
+  }
+
+  private stopSnapshotLoop(): void {
+    if (!this.snapshotIntervalId) {
+      return
+    }
+
+    clearInterval(this.snapshotIntervalId)
+    this.snapshotIntervalId = null
   }
 }
 

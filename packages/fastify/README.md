@@ -2,6 +2,22 @@
 
 Fastify plugin for Tracehound security buffer.
 
+## Breaking Change Notice
+
+Default export has been removed. Use named export only.
+
+### Before
+
+```ts
+import tracehoundPlugin from '@tracehound/fastify'
+```
+
+### After
+
+```ts
+import { tracehoundPlugin } from '@tracehound/fastify'
+```
+
 ## Installation
 
 ```bash

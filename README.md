@@ -22,7 +22,7 @@ The system does not classify threats or enforce policies. Instead, it guarantees
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 
-[Official Website](https://tracehoundlabs.com) · [Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
+[Official Website](https://tracehoundlabs.com) · [Documentation](./docs/README.md) · [Migration Guide](./docs/BREAKING-CHANGES.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
 
 </div>
 
@@ -155,6 +155,7 @@ app.register(tracehoundPlugin, { agent: th.agent });
 - **[Getting Started](./docs/GETTING-STARTED.md)**
 - **[API Reference](./docs/API.md)**
 - **[Configuration Reference](./docs/CONFIGURATION.md)**
+- **[Breaking Changes / Migration](./docs/BREAKING-CHANGES.md)**
 - **[Evidence Lifecycle](./docs/EVIDENCE-LIFECYCLE-POLICY.md)**
 - **[Security Assurance & Chaos Testing](./docs/SECURITY-ASSURANCE.md)**
 

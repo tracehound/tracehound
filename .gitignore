@@ -12,6 +12,7 @@ dist/
 # Test coverage
 coverage/
 semgrep/
+security/artifacts/generated/
 
 # IDE
 .vscode/

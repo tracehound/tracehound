@@ -22,14 +22,18 @@
   ],
   "type": "module",
   "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "bin": {
     "tracehound": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node ../../scripts/build/clean-dist.mjs dist && tsc",
     "dev": "tsx src/index.ts",
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "clean": "node ../../scripts/build/clean-dist.mjs dist"
   },
   "dependencies": {
     "@tracehound/core": "workspace:*",

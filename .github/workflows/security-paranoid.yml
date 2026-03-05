@@ -1,0 +1,111 @@
+name: security-paranoid
+
+on:
+  schedule:
+    - cron: "11 3 * * 6"
+  workflow_dispatch:
+
+concurrency:
+  group: security-paranoid-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: 9.1.4
+  NODE_VERSION: "20"
+
+jobs:
+  paranoid_validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint all workspaces
+        run: pnpm lint
+
+      - name: Build all workspaces
+        run: pnpm build
+
+      - name: Run full test suite
+        run: pnpm test
+
+      - name: Run coverage suite
+        run: pnpm test:coverage
+
+      - name: Run chaos and invariant suite
+        run: pnpm test:chaos
+
+      - name: Verify publish packages
+        run: node scripts/release/verify-publish-packages.mjs
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paranoid-coverage
+          path: coverage
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-package-verification
+          path: security/artifacts/generated/release-packages
+          if-no-files-found: error
+
+  supply_chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Scan SBOM for high vulnerabilities
+        uses: anchore/scan-action@v6
+        with:
+          sbom: sbom.spdx.json
+          fail-build: true
+          severity-cutoff: high
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paranoid-sbom
+          path: sbom.spdx.json
+          if-no-files-found: error

@@ -10,6 +10,8 @@
     "test": "pnpm -r test",
     "test:coverage": "vitest run --coverage",
     "test:chaos": "tsx scripts/chaos/run-chaos-suite.ts",
+    "verify:release": "node scripts/release/verify-publish-packages.mjs",
+    "validate:paranoid": "pnpm lint && pnpm build && pnpm test && pnpm test:coverage && pnpm test:chaos && node scripts/release/verify-publish-packages.mjs",
     "review:branch": "node scripts/review/pr-branch-review.mjs",
     "prelint": "pnpm --filter @tracehound/core build",
     "lint": "pnpm -r lint",

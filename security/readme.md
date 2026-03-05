@@ -16,6 +16,7 @@ The audit package is built from these core documents:
 - static-analysis
 - logging-model
 - residual-risk
+- paranoid-validation-playbook
 
 ## Expected Outcomes
 
@@ -52,6 +53,10 @@ A strong-maturity, near-full-closure program is tracked in:
 - `security/artifacts/audit-program-3-sprints.md`
 
 Program gates G1..G7 in that file define when external audit booking is allowed.
+
+Operational deep-validation procedure is tracked in:
+
+- `security/paranoid-validation-playbook.md`
 
 ## Audit Package Checklist
 

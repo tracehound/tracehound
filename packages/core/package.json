@@ -34,11 +34,11 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node ../../scripts/build/clean-dist.mjs dist && tsc",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "node ../../scripts/build/clean-dist.mjs dist"
   },
   "dependencies": {
     "uuid": "^10.0.0"

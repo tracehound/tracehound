@@ -14,6 +14,7 @@
 | **API**          | [API.md](./API.md)                         | Public API reference       |
 | **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)    | Runtime and adapter configuration defaults |
 | **Migration**    | [BREAKING-CHANGES.md](./BREAKING-CHANGES.md) | Breaking changes and upgrade path |
+| **Validation**   | [../security/paranoid-validation-playbook.md](../security/paranoid-validation-playbook.md) | Deep security review and release validation path |
 
 ---
 

@@ -124,6 +124,7 @@ export { HOUND_PRESSURE_ERRORS, isHoundPressureError } from './core/hound-pool.j
 export type {
   HoundPoolConfig,
   HoundPoolStats,
+  HoundPressureErrorCode,
   HoundResult,
   IHoundPool,
   PoolExhaustedAction,
@@ -345,5 +346,4 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
-
 

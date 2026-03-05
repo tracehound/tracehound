@@ -11,6 +11,10 @@ import { createMockAdapter } from '../src/core/hound-pool.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk } from '../src/utils/system-snapshot.js'
 
+async function flushMicrotasks(): Promise<void> {
+  await new Promise<void>((resolve) => queueMicrotask(resolve))
+}
+
 describe('Tracehound Factory', () => {
   describe('createTracehound', () => {
     it('should create tracehound instance with default config', () => {
@@ -262,7 +266,7 @@ describe('Tracehound Factory', () => {
       const completeMessage = encodeHoundMessage({ type: 'status', state: 'complete' })
       adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
 
-      await Promise.resolve()
+      await flushMicrotasks()
       expect(tracehound.watcher.snapshot().overloaded).toBe(false)
       tracehound.shutdown()
     })
@@ -351,14 +355,82 @@ describe('Tracehound Factory', () => {
 
       adapter.simulateMessage(pid, new Uint8Array(analysisMessage.subarray(4)).buffer)
       adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
-      await Promise.resolve()
+      await flushMicrotasks()
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
       adapter.simulateMessage(pid, new Uint8Array(analysisMessage.subarray(4)).buffer)
       adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
-      await Promise.resolve()
+      await flushMicrotasks()
       expect(tracehound.watcher.snapshot().overloaded).toBe(false)
 
+      tracehound.shutdown()
+    })
+
+    it('clears overload after timeout recovers capacity in drop mode', async () => {
+      vi.useFakeTimers()
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 5,
+          rotationJitterMs: 10,
+          onPoolExhausted: 'drop',
+          adapter,
+        },
+      })
+
+      try {
+        tracehound.agent.intercept({
+          id: '11',
+          timestamp: Date.now(),
+          source: '1.2.3.12',
+          threat: { category: 'injection', severity: 'high' },
+          payload: { first: true },
+        })
+        tracehound.agent.intercept({
+          id: '12',
+          timestamp: Date.now(),
+          source: '1.2.3.13',
+          threat: { category: 'injection', severity: 'high' },
+          payload: { second: true },
+        })
+
+        expect(tracehound.watcher.snapshot().overloaded).toBe(true)
+        await vi.advanceTimersByTimeAsync(6)
+        await flushMicrotasks()
+        expect(tracehound.watcher.snapshot().overloaded).toBe(false)
+      } finally {
+        tracehound.shutdown()
+        vi.useRealTimers()
+      }
+    })
+
+    it('marks overload on descriptive spawn failure errors', () => {
+      const adapter = createMockAdapter()
+      const originalSpawn = adapter.spawn
+      adapter.spawn = ((...args: Parameters<typeof originalSpawn>) => {
+        void args
+        throw new Error('Failed to spawn process: access denied')
+      }) as typeof originalSpawn
+
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 1000,
+          rotationJitterMs: 10,
+          adapter,
+        },
+      })
+
+      tracehound.agent.intercept({
+        id: '13',
+        timestamp: Date.now(),
+        source: '1.2.3.14',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { spawn: true },
+      })
+
+      expect(tracehound.watcher.snapshot().overloaded).toBe(true)
       tracehound.shutdown()
     })
   })

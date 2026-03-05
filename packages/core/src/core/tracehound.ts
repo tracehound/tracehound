@@ -130,6 +130,20 @@ const DEFAULT_POOL_CONFIG: HoundPoolConfig = {
   deferQueueLimit: 100,
 }
 
+const PRESSURE_ERROR_CODES: ReadonlySet<string> = new Set([
+  'pool_exhausted',
+  'pool_exhausted_escalated',
+  'defer_queue_full',
+  'spawn_failed',
+  'ipc_timeout',
+])
+
+const SPAWN_PRESSURE_PATTERNS: ReadonlyArray<RegExp> = [
+  /^spawn_failed(?:\b|:)/i,
+  /\bfailed to spawn process\b/i,
+  /\bprocess spawn failed\b/i,
+]
+
 /**
  * Tracehound runtime implementation.
  */
@@ -316,18 +330,17 @@ class Tracehound implements ITracehound {
   }
 
   private syncOverloadState(result: HoundResult): void {
-    if (this.isOverloadSignal(result)) {
+    const overloadSignal = this.isOverloadSignal(result)
+    if (overloadSignal) {
       this.watcher.setOverloaded(true)
+    }
+
+    if (!this.shouldEvaluateOverloadRecovery(result)) {
       return
     }
 
-    if (result.status !== 'processed') {
-      return
-    }
-
-    // HoundPool emits processed before deferred queue reassignment, so the
-    // immediate snapshot can transiently show idle headroom. Defer clear check
-    // to microtask to observe post-reassignment state.
+    // HoundPool emits results before deferred queue reassignment in the same
+    // tick, so recovery checks must run in a microtask.
     queueMicrotask(() => {
       const stats = this.houndPool.stats
       const hasHeadroom =
@@ -336,6 +349,22 @@ class Tracehound implements ITracehound {
         this.watcher.setOverloaded(false)
       }
     })
+  }
+
+  private shouldEvaluateOverloadRecovery(result: HoundResult): boolean {
+    if (result.status === 'processed' || result.status === 'timeout') {
+      return true
+    }
+
+    if (result.status !== 'error') {
+      return false
+    }
+
+    if (!result.error) {
+      return true
+    }
+
+    return !this.isCapacityPressureError(result.error)
   }
 
   private isOverloadSignal(result: HoundResult): boolean {
@@ -355,15 +384,17 @@ class Tracehound implements ITracehound {
   }
 
   private isCapacityPressureError(errorCode: string): boolean {
-    const pressureErrorCodes: ReadonlySet<string> = new Set([
-      'pool_exhausted',
-      'pool_exhausted_escalated',
-      'defer_queue_full',
-      'spawn_failed',
-      'ipc_timeout',
-    ])
+    if (PRESSURE_ERROR_CODES.has(errorCode)) {
+      return true
+    }
 
-    return pressureErrorCodes.has(errorCode)
+    for (const pattern of SPAWN_PRESSURE_PATTERNS) {
+      if (pattern.test(errorCode)) {
+        return true
+      }
+    }
+
+    return false
   }
 }
 

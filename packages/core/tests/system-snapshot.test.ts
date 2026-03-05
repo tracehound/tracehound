@@ -233,6 +233,34 @@ describe("system-snapshot utilities", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("should accept decimal maxMemoryMB in isolation telemetry", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
+    const path = join(dir, "snapshot.json");
+    const telemetry = createIsolationTelemetry();
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot(),
+        createHoundPoolStats({
+          isolationTelemetry: {
+            ...telemetry,
+            constraints: {
+              ...telemetry.constraints,
+              maxMemoryMB: 64.5,
+            },
+          },
+        }),
+      ),
+    );
+
+    writeSystemSnapshotToDisk(snapshot, path, "secret");
+    const result = readSystemSnapshotFromDisk(path, "secret");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.houndPool.isolationTelemetry?.constraints.maxMemoryMB).toBe(64.5);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("should accept legacy hound pool stats without isolation telemetry", () => {
     const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
     const path = join(dir, "snapshot.json");

@@ -571,7 +571,7 @@ function isProcessConstraints(value: unknown): boolean {
 
   const hasValidMemory =
     constraints.maxMemoryMB === undefined ||
-    isNonNegativeInteger(constraints.maxMemoryMB);
+    isNonNegativeFiniteNumber(constraints.maxMemoryMB);
 
   return (
     hasValidMemory &&

@@ -13,6 +13,7 @@ import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
 import { createWatcher, type IWatcher } from './watcher.js'
 import { Errors } from '../types/errors.js'
+import { existsSync, unlinkSync } from 'node:fs'
 import {
   exportSystemSnapshot,
   resolveSystemSnapshotPath,
@@ -251,6 +252,7 @@ class Tracehound implements ITracehound {
 
   shutdown(): void {
     this.stopSnapshotLoop()
+    this.cleanupSnapshotFile()
     this.houndPool.shutdown()
   }
 
@@ -286,6 +288,24 @@ class Tracehound implements ITracehound {
 
     clearInterval(this.snapshotIntervalId)
     this.snapshotIntervalId = null
+  }
+
+  private cleanupSnapshotFile(): void {
+    if (!this.snapshotPath) {
+      return
+    }
+
+    try {
+      if (existsSync(this.snapshotPath)) {
+        unlinkSync(this.snapshotPath)
+      }
+    } catch (error: unknown) {
+      this.notifications.emit('system.panic', {
+        level: 'warning',
+        reason: 'snapshot_cleanup_failed',
+        context: { error: error instanceof Error ? error.message : 'unknown' },
+      })
+    }
   }
 }
 

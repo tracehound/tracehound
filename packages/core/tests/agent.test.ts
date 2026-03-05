@@ -611,6 +611,27 @@ describe('Agent', () => {
     })
   })
 
+  describe('intercept - typed error model', () => {
+    it('returns AGENT_INTERCEPT_FAILED when unexpected runtime exception occurs', () => {
+      vi.spyOn(mockNotifications, 'emit').mockImplementation(() => {
+        throw new Error('notification emitter failure')
+      })
+
+      const result = agent.intercept(
+        createScent({ attack: 'runtime-throw' }, { category: 'injection', severity: 'high' }),
+      )
+
+      expect(result.status).toBe('error')
+      if (result.status !== 'error') return
+      expect(result.error.code).toBe('AGENT_INTERCEPT_FAILED')
+      expect(result.error.state).toBe('agent')
+      expect(result.error.context).toMatchObject({
+        reason: 'notification emitter failure',
+        scentId: expect.any(String),
+      })
+    })
+  })
+
   describe('createAgent factory', () => {
     it('creates an agent instance', () => {
       const agentInstance = createAgent(

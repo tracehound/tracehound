@@ -173,6 +173,7 @@ export class HoundPool implements IHoundPool {
   private _totalActivations = 0;
   private _totalTimeouts = 0;
   private _totalErrors = 0;
+  private shuttingDown = false;
 
   constructor(private readonly config: HoundPoolConfig) {
     // Determine default script path relative to this file
@@ -199,6 +200,10 @@ export class HoundPool implements IHoundPool {
   static readonly DEFAULT_CONSTRAINTS = DEFAULT_CONSTRAINTS;
 
   activate(evidence: Evidence): void {
+    if (this.shuttingDown) {
+      return;
+    }
+
     this._totalActivations++;
 
     // Find available process
@@ -292,12 +297,24 @@ export class HoundPool implements IHoundPool {
   }
 
   shutdown(): void {
+    this.shuttingDown = true;
+
     for (const [, processState] of this.processes) {
       if (processState.timeoutId) {
         clearTimeout(processState.timeoutId);
+        processState.timeoutId = null;
       }
+
+      // Planned shutdown must not emit timeout/error lifecycle noise.
+      processState.busy = false;
+      processState.currentSignature = null;
+      processState.currentAnalysis = null;
+      processState.startTime = null;
+
       if (processState.handle) {
         this.adapter.kill(processState.handle);
+        processState.handle = null;
+        processState.pid = null;
       }
     }
     this.processes.clear();
@@ -389,6 +406,15 @@ export class HoundPool implements IHoundPool {
       const message = decodeHoundMessage(payload);
 
       if (message.type === "status" && message.state === "complete") {
+        if (!processState.currentAnalysis) {
+          this._totalErrors++;
+          this.terminateProcess(
+            processState,
+            "error",
+            "process_ipc_missing_analysis",
+          );
+          return;
+        }
         this.completeProcessing(processState, "processed");
       } else if (message.type === "status" && message.state === "error") {
         this._totalErrors++;
@@ -439,6 +465,7 @@ export class HoundPool implements IHoundPool {
     const signature = processState.currentSignature;
     const analysis = processState.currentAnalysis;
     const startTime = processState.startTime;
+    const handle = processState.handle;
 
     // Clear timeout
     if (processState.timeoutId) {
@@ -446,21 +473,21 @@ export class HoundPool implements IHoundPool {
       processState.timeoutId = null;
     }
 
-    // Kill process if alive
-    if (processState.handle) {
-      this.adapter.kill(processState.handle);
-      processState.handle = null;
-      processState.pid = null;
-    }
-
-    // Reset state
+    // Reset state before kill so sync exit callbacks cannot emit duplicate lifecycle results.
     processState.busy = false;
     processState.currentSignature = null;
     processState.currentAnalysis = null;
     processState.startTime = null;
+    processState.handle = null;
+    processState.pid = null;
+
+    // Kill process if alive
+    if (handle) {
+      this.adapter.kill(handle);
+    }
 
     // Emit result
-    if (signature && startTime) {
+    if (signature && startTime !== null) {
       const durationMs = Date.now() - startTime;
 
       const result: HoundResult = {
@@ -502,7 +529,7 @@ export class HoundPool implements IHoundPool {
     processState.startTime = null;
 
     // Emit result
-    if (signature && startTime) {
+    if (signature && startTime !== null) {
       const durationMs = Date.now() - startTime;
       this.processingTimes.push(durationMs);
 
@@ -539,6 +566,10 @@ export class HoundPool implements IHoundPool {
   }
 
   private emitResult(result: HoundResult): void {
+    if (this.shuttingDown) {
+      return;
+    }
+
     for (const handler of this.resultHandlers) {
       try {
         handler(result);

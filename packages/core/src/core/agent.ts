@@ -11,7 +11,7 @@
  */
 
 import type { CoordinationHealth, CoordinationProvider } from '../types/coordination.js'
-import { Errors, type TracehoundError } from '../types/errors.js'
+import { Errors } from '../types/errors.js'
 import type { InterceptResult, RuntimeEvidenceHandle } from '../types/result.js'
 import type { Scent } from '../types/scent.js'
 import type { IEvidenceFactory } from './evidence-factory.js'
@@ -243,17 +243,11 @@ export class Agent implements IAgent {
     } catch (error: unknown) {
       this.stats.errorCount++
 
-      const tracehoundError: TracehoundError = {
-        state: 'agent',
-        code: 'INTERCEPT_FAILED',
-        message: error instanceof Error ? error.message : 'Unknown error during intercept',
-        context: { scentId: scent.id },
-        recoverable: false,
-      }
+      const reason = error instanceof Error ? error.message : 'Unknown error during intercept'
 
       return {
         status: 'error',
-        error: tracehoundError,
+        error: Errors.interceptFailed(reason, { scentId: scent.id }),
       }
     }
   }

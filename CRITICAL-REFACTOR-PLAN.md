@@ -157,3 +157,37 @@ IPC/Pool genisletmeleri:
    - p50/p95/p99 `avgProcessingMs` ve timeout oranlari izlenecek.
 4. "Snapshot error pattern nedir?" belirsizligi:
    - `NO_INSTANCE` ve `INTEGRITY_VIOLATION` olay sayaci izlenecek.
+
+## 8) Nerede Kaldik (2026-03-05 / Session Update)
+
+### Tamamlandi (bu session)
+
+1. CLI `stats --json` disconnected modeli sertlestirildi:
+   - `connected: false` durumunda explicit `error` + `path` donuyor.
+   - Fabricated runtime zero threat metrikleri disconnected JSON'dan kaldirildi.
+2. Snapshot freshness/integrity korumasi guclendirildi:
+   - Future-dated snapshot reject (default skew: 5000ms).
+   - `TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS` override eklendi.
+3. Graceful shutdown operational-truth duzeltmesi:
+   - `Tracehound.shutdown()` snapshot dosyasini best-effort temizliyor.
+   - Shutdown sonrasi stale healthy gorunum penceresi kapatildi.
+4. Core typed error model uyumu:
+   - `Agent.intercept()` catch blogunda manuel error objesi kaldirildi.
+   - `Errors.interceptFailed(...)` factory zorunlu yolu kullanildi.
+5. IPC guvenligi ve lifecycle sertlestirme:
+   - Hound `status=complete` mesaji analysis metadata yoksa error'a dusuyor.
+   - Planned shutdown sirasinda lifecycle noise/panic emission bastirildi.
+   - Re-entrant exit callback durumunda duplicate/yanlis error emission onlendi.
+6. Negatif/regression test kapsami genisletildi:
+   - future snapshot reject
+   - disconnected stats json error payload
+   - missing analysis -> IPC error
+   - planned shutdown no lifecycle error emission
+   - agent typed error regression
+   - snapshot cleanup on shutdown
+
+### Kalanlar (Wave 2 backlog)
+
+1. Process capability/telemetry raporlamasi (declarative kisit gozlemi) henuz yok.
+2. RFC-0011 pressure containment 2.2'nin tam metrik/watcher wiring audit'i tamamlanmadi.
+3. Core genelinde `throw new Error` temizligi runtime path disinda (ornek: codec class hierarchy) ayri review dalinda tamamlanacak.

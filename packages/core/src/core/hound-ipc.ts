@@ -8,6 +8,8 @@
  * - Fire-and-forget
  */
 
+import { Errors } from '../types/errors.js'
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -16,9 +18,21 @@
  * Message types that can be sent over IPC.
  * Matches RFC-0000 HoundMessage types.
  */
-export type HoundMessageType = 'status' | 'metrics'
+export type HoundMessageType = 'status' | 'metrics' | 'analysis'
 
 export type HoundStatus = 'processing' | 'complete' | 'error'
+
+export type HoundContentType =
+  | 'unknown'
+  | 'text'
+  | 'json'
+  | 'binary'
+  | 'gzip'
+  | 'zip'
+  | 'pdf'
+  | 'png'
+  | 'jpeg'
+  | 'gif'
 
 export interface HoundStatusMessage {
   type: 'status'
@@ -32,7 +46,15 @@ export interface HoundMetricsMessage {
   memoryUsed: number
 }
 
-export type HoundMessage = HoundStatusMessage | HoundMetricsMessage
+export interface HoundAnalysisMessage {
+  type: 'analysis'
+  hash: string
+  entropy: number
+  contentType: HoundContentType
+  sizeBytes: number
+}
+
+export type HoundMessage = HoundStatusMessage | HoundMetricsMessage | HoundAnalysisMessage
 
 /**
  * Parsed message from IPC stream.
@@ -51,6 +73,7 @@ const LENGTH_PREFIX_SIZE = 4
 
 /** Maximum message size (1MB) */
 const MAX_MESSAGE_SIZE = 1024 * 1024
+const MAX_UINT32 = 0xffff_ffff
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Encoding
@@ -69,7 +92,7 @@ export function encodeMessage(payload: ArrayBuffer): Buffer {
   const length = payloadBuffer.length
 
   if (length > MAX_MESSAGE_SIZE) {
-    throw new Error(`Message too large: ${length} > ${MAX_MESSAGE_SIZE}`)
+    throw Errors.processIpcMessageTooLarge(length, MAX_MESSAGE_SIZE)
   }
 
   const result = Buffer.allocUnsafe(LENGTH_PREFIX_SIZE + length)
@@ -90,9 +113,6 @@ export function encodeMessage(payload: ArrayBuffer): Buffer {
  * @returns Length-prefixed buffer
  */
 export function encodeHoundMessage(message: HoundMessage): Buffer {
-  // Use minimal binary encoding (not JSON)
-  // Format: [1 byte type][payload bytes]
-
   if (message.type === 'status') {
     // Type 0x01 = status
     // [1 byte type][1 byte state][optional error string]
@@ -107,7 +127,9 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
     return encodeMessage(
       payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length),
     )
-  } else {
+  }
+
+  if (message.type === 'metrics') {
     // Type 0x02 = metrics
     // [1 byte type][8 bytes processingTime][8 bytes memoryUsed]
     const payload = Buffer.allocUnsafe(17)
@@ -119,6 +141,39 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
       payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length),
     )
   }
+
+  if (message.type !== 'analysis') {
+    const rawType = (message as { type?: unknown }).type
+    if (typeof rawType === 'number' && Number.isInteger(rawType)) {
+      throw Errors.processIpcUnknownMessageType(rawType)
+    }
+    throw Errors.processIpcInvalidAnalysisMessage()
+  }
+
+  if (!isValidAnalysisMessage(message)) {
+    throw Errors.processIpcInvalidAnalysisMessage()
+  }
+
+  // Type 0x03 = analysis
+  // [1 byte type][2 bytes hashLen][hash utf8][8 bytes entropy][1 byte contentType][4 bytes sizeBytes]
+  const hashBytes = Buffer.from(message.hash, 'utf8')
+  if (hashBytes.length > 0xffff) {
+    throw Errors.processIpcInvalidAnalysisMessage()
+  }
+
+  const payload = Buffer.allocUnsafe(1 + 2 + hashBytes.length + 8 + 1 + 4)
+  payload[0] = 0x03
+  payload.writeUInt16BE(hashBytes.length, 1)
+  hashBytes.copy(payload, 3)
+
+  let offset = 3 + hashBytes.length
+  payload.writeDoubleBE(message.entropy, offset)
+  offset += 8
+  payload[offset] = encodeContentType(message.contentType)
+  offset += 1
+  payload.writeUInt32BE(message.sizeBytes, offset)
+
+  return encodeMessage(payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length))
 }
 
 function encodeStatusState(state: HoundStatus): number {
@@ -130,8 +185,49 @@ function encodeStatusState(state: HoundStatus): number {
     case 'error':
       return 0x03
     default:
-      return 0x00
+      throw Errors.processIpcInvalidStatusMessage()
   }
+}
+
+function encodeContentType(contentType: HoundContentType): number {
+  switch (contentType) {
+    case 'unknown':
+      return 0x00
+    case 'text':
+      return 0x01
+    case 'json':
+      return 0x02
+    case 'binary':
+      return 0x03
+    case 'gzip':
+      return 0x04
+    case 'zip':
+      return 0x05
+    case 'pdf':
+      return 0x06
+    case 'png':
+      return 0x07
+    case 'jpeg':
+      return 0x08
+    case 'gif':
+      return 0x09
+    default:
+      throw Errors.processIpcInvalidAnalysisMessage()
+  }
+}
+
+function isValidAnalysisMessage(message: HoundAnalysisMessage): boolean {
+  return (
+    typeof message.hash === 'string' &&
+    message.hash.length > 0 &&
+    typeof message.contentType === 'string' &&
+    typeof message.entropy === 'number' &&
+    Number.isFinite(message.entropy) &&
+    typeof message.sizeBytes === 'number' &&
+    Number.isInteger(message.sizeBytes) &&
+    message.sizeBytes >= 0 &&
+    message.sizeBytes <= MAX_UINT32
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -155,7 +251,7 @@ export function tryParseMessage(buffer: Buffer): ParsedMessage | null {
 
   // Validate length
   if (length > MAX_MESSAGE_SIZE) {
-    throw new Error(`Invalid message length: ${length}`)
+    throw Errors.processIpcMessageTooLarge(length, MAX_MESSAGE_SIZE)
   }
 
   const totalSize = LENGTH_PREFIX_SIZE + length
@@ -184,15 +280,15 @@ export function decodeHoundMessage(payload: ArrayBuffer): HoundMessage {
   const buffer = Buffer.from(payload)
 
   if (buffer.length < 1) {
-    throw new Error('Empty message payload')
+    throw Errors.processIpcEmptyPayload()
   }
 
-  const type = buffer[0]
+  const type = buffer[0] ?? 0
 
   if (type === 0x01) {
     // Status message
     if (buffer.length < 2) {
-      throw new Error('Invalid status message: too short')
+      throw Errors.processIpcInvalidStatusMessage()
     }
 
     const stateCode = buffer[1] ?? 0
@@ -204,19 +300,57 @@ export function decodeHoundMessage(payload: ArrayBuffer): HoundMessage {
       result.error = errorStr
     }
     return result
-  } else if (type === 0x02) {
+  }
+
+  if (type === 0x02) {
     // Metrics message
     if (buffer.length < 17) {
-      throw new Error('Invalid metrics message: too short')
+      throw Errors.processIpcInvalidMetricsMessage()
     }
 
     const processingTime = buffer.readDoubleBE(1)
     const memoryUsed = buffer.readDoubleBE(9)
 
     return { type: 'metrics', processingTime, memoryUsed }
-  } else {
-    throw new Error(`Unknown message type: ${type}`)
   }
+
+  if (type === 0x03) {
+    if (buffer.length < 16) {
+      throw Errors.processIpcInvalidAnalysisMessage()
+    }
+
+    const hashLen = buffer.readUInt16BE(1)
+    const hashStart = 3
+    const hashEnd = hashStart + hashLen
+    const entropyStart = hashEnd
+    const entropyEnd = entropyStart + 8
+    const contentTypeIndex = entropyEnd
+    const sizeStart = contentTypeIndex + 1
+    const sizeEnd = sizeStart + 4
+
+    if (buffer.length < sizeEnd) {
+      throw Errors.processIpcInvalidAnalysisMessage()
+    }
+
+    const hash = buffer.subarray(hashStart, hashEnd).toString('utf8')
+    const entropy = buffer.readDoubleBE(entropyStart)
+    const contentType = decodeContentType(buffer[contentTypeIndex] ?? 0)
+    const sizeBytes = buffer.readUInt32BE(sizeStart)
+
+    const analysis = {
+      type: 'analysis' as const,
+      hash,
+      entropy,
+      contentType,
+      sizeBytes,
+    }
+    if (!isValidAnalysisMessage(analysis)) {
+      throw Errors.processIpcInvalidAnalysisMessage()
+    }
+    return analysis
+  }
+
+  throw Errors.processIpcUnknownMessageType(type)
 }
 
 function decodeStatusState(code: number): HoundStatus {
@@ -228,7 +362,34 @@ function decodeStatusState(code: number): HoundStatus {
     case 0x03:
       return 'error'
     default:
-      throw new Error(`Unknown status state: ${code}`)
+      throw Errors.processIpcUnknownStatusState(code)
+  }
+}
+
+function decodeContentType(code: number): HoundContentType {
+  switch (code) {
+    case 0x00:
+      return 'unknown'
+    case 0x01:
+      return 'text'
+    case 0x02:
+      return 'json'
+    case 0x03:
+      return 'binary'
+    case 0x04:
+      return 'gzip'
+    case 0x05:
+      return 'zip'
+    case 0x06:
+      return 'pdf'
+    case 0x07:
+      return 'png'
+    case 0x08:
+      return 'jpeg'
+    case 0x09:
+      return 'gif'
+    default:
+      throw Errors.processIpcUnknownContentType(code)
   }
 }
 

@@ -47,6 +47,34 @@ describe('Error Factories', () => {
       const error = Errors.invalidConfigScheduler('test')
       expect(error.state).toBe('config')
     })
+
+    it('should create snapshot and webhook config errors', () => {
+      const snapshotError = Errors.invalidConfigSnapshot('bad-interval')
+      const secretError = Errors.snapshotSecretMissing()
+      const webhookUrlError = Errors.invalidConfigWebhookUrl('http://127.0.0.1')
+      const webhookSecretError = Errors.invalidConfigWebhookSecret(32)
+
+      expect(snapshotError.code).toBe('CONFIG_SNAPSHOT_INVALID')
+      expect(secretError.code).toBe('CONFIG_SNAPSHOT_SECRET_MISSING')
+      expect(webhookUrlError.code).toBe('CONFIG_WEBHOOK_URL_INVALID')
+      expect(webhookSecretError.code).toBe('CONFIG_WEBHOOK_SECRET_INVALID')
+    })
+  })
+
+  describe('Scent Errors', () => {
+    it('should create scent errors', () => {
+      expect(Errors.scentPayloadInvalid('bad').code).toBe('SCENT_PAYLOAD_INVALID')
+      expect(Errors.scentSourceMissing().code).toBe('SCENT_SOURCE_MISSING')
+      expect(Errors.scentIdInvalid('!').code).toBe('SCENT_ID_INVALID')
+    })
+  })
+
+  describe('Agent Errors', () => {
+    it('should create payload and intercept errors', () => {
+      expect(Errors.payloadTooLarge(2, 1).code).toBe('AGENT_PAYLOAD_TOO_LARGE')
+      expect(Errors.serializationFailed('json').code).toBe('AGENT_SERIALIZATION_FAILED')
+      expect(Errors.interceptFailed('panic').code).toBe('AGENT_INTERCEPT_FAILED')
+    })
   })
 
   describe('Quarantine Errors', () => {
@@ -147,6 +175,14 @@ describe('Error Factories', () => {
       const error = Errors.processPoolExhausted('drop')
       expect(error.state).toBe('process')
     })
+
+    it('should create process IPC specific errors', () => {
+      expect(Errors.processIpcInvalidAnalysisMessage().code).toBe('PROCESS_IPC_INVALID_ANALYSIS_MESSAGE')
+      expect(Errors.processIpcUnknownMessageType(255).code).toBe('PROCESS_IPC_UNKNOWN_MESSAGE_TYPE')
+      expect(Errors.processIpcUnknownStatusState(0).code).toBe('PROCESS_IPC_UNKNOWN_STATUS_STATE')
+      expect(Errors.processIpcUnknownContentType(99).code).toBe('PROCESS_IPC_UNKNOWN_CONTENT_TYPE')
+      expect(Errors.processIpcDecodeFailed('malformed').code).toBe('PROCESS_IPC_DECODE_FAILED')
+    })
   })
 
   describe('Rate Limit Errors', () => {
@@ -171,6 +207,13 @@ describe('Error Factories', () => {
       const error = Errors.runtimeIntrinsicsNotFrozen()
       expect(error.state).toBe('runtime')
     })
+
+    it('should create runtime membrane and snapshot errors', () => {
+      expect(Errors.runtimeMembraneViolation('stdout').code).toBe('RUNTIME_MEMBRANE_VIOLATION')
+      expect(Errors.snapshotWriteFailed('io').code).toBe('RUNTIME_SNAPSHOT_WRITE_FAILED')
+      expect(Errors.snapshotReadFailed('io').code).toBe('RUNTIME_SNAPSHOT_READ_FAILED')
+      expect(Errors.snapshotIntegrityViolation().code).toBe('RUNTIME_SNAPSHOT_INTEGRITY_VIOLATION')
+    })
   })
 
   describe('Scheduler Errors', () => {
@@ -182,6 +225,15 @@ describe('Error Factories', () => {
     it('should create schedulerAlreadyRunning', () => {
       const error = Errors.schedulerAlreadyRunning()
       expect(error.state).toBe('scheduler')
+    })
+  })
+
+  describe('Legacy aliases', () => {
+    it('should create legacy compatibility errors', () => {
+      expect(Errors.houndTimeout('h1', 50).code).toBe('PROCESS_TIMEOUT')
+      expect(Errors.hashMismatch('a', 'b').code).toBe('EVIDENCE_HASH_MISMATCH')
+      expect(Errors.invalidBytesType().code).toBe('EVIDENCE_INVALID_BYTES')
+      expect(Errors.emptyEvidence().code).toBe('EVIDENCE_EMPTY')
     })
   })
 })

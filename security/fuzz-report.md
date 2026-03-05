@@ -1,83 +1,35 @@
-# Fuzz Assurance Report Model
+# Fuzz Assurance Program (External)
 
 ## Objective
 
-Deliver audit-grade assurance for deterministic security invariants **without** coverage-guided fuzzers.
+Keep deterministic invariant assurance active while separating offensive corpus ownership from the public code repository.
 
-## Assurance Strategy
+## Current Ownership Model
 
-1. **Primary semantic fuzz:** deterministic property-based fuzzing harness (fast-check-equivalent) for deterministic invariants.
-2. **Versioned adversarial corpus:** curated replayable seeds under `security/corpus/`.
-3. **Structural parser stress:** malformed framing/partial payload replay.
-4. **State-machine adversarial checks:** append permutation, partial failure ordering, duplicate replay, fork/rollback attempts.
+The full fuzz assurance and corpus lifecycle is managed in the private repository:
 
-## Required Invariants
+- `tracehound/security-harness` (restricted SecOps access)
 
-- Determinism
-- Canonical idempotency
-- Integrity enforcement
-- Bounded failure
-- State non-amplification
-- Duplicate stability
-- IPC logical safety
+This repository no longer ships assurance gate scripts, nightly fuzz-assurance workflows, or local corpus files.
 
-See `security/invariants.md` for invariant IDs and test mapping.
+## What Still Runs in This Repository
 
-## Assurance Metrics (Coverage-Independent)
+- Core unit/integration tests (`pnpm --filter @tracehound/core test`)
+- Deterministic chaos/invariant verification (`npm run test:chaos`)
+- Static and CI controls (lint, coverage, CodeQL, Semgrep)
 
-| Metric                          | Target |
-| ------------------------------- | ------ |
-| Invariant violation count       | `0`    |
-| Unresolved crash count          | `0`    |
-| State corruption findings       | `0`    |
-| Bounded failure preservation    | pass   |
-| Corpus classes covered          | all    |
-| Reproducibility (seed + replay) | pass   |
+## Invariant Scope
 
-## Corpus Lifecycle
+Security invariants remain the same (determinism, bounded failure, integrity, non-amplification, IPC safety).  
+The execution source for corpus replay and long-run assurance is now external.
 
-For each finding: **detect → minimize → classify → persist → replay in CI**.
+## Evidence Contract
 
-Seed classes:
+- This repository keeps architecture/security documentation.
+- Corpus replay evidence and long-run assurance artifacts are produced in `tracehound/security-harness`.
+- Public-repo references must not require private corpus files to run baseline CI.
 
-- invariant seeds
-- boundary seeds
-- regression seeds
-- crash seeds (if any)
+## CI Policy
 
-## CI Integration
-
-- **Regression (every PR):** replay corpus deterministically (`test:fuzz:regression`).
-- **Assurance (nightly):** property fuzz + corpus replay with bounded runtime (`test:fuzz:assurance`).
-
-Failure conditions:
-
-- invariant violation
-- non-deterministic output
-- state drift
-- unbounded resource behavior
-
-## Linked Artifacts
-
-- `security/artifacts/fuzz-corpus-summary.md`
-- `security/artifacts/fuzz-assurance-report.md`
-- `security/artifacts/generated/fuzz-assurance-metrics.json`
-- `security/artifacts/generated/fuzz-regression-metrics.json`
-- `security/artifacts/fuzz-failure-lifecycle.md`
-
-## Phase 4 Evidence
-
-- Property suite: `packages/core/tests/fuzz/state-machine-adversarial.property.test.ts`
-- Corpus replay seeds: permutation ordering, partial failure ordering, fork rollback attempt
-
-## Phase 6 Automation
-
-- Lifecycle records are maintained by `scripts/record-fuzz-failure.mjs`.
-- Lifecycle ledger path: `security/artifacts/generated/fuzz-failures.json`.
-- Logs regenerated on each lifecycle update: failure log, minimization log, regression seeds.
-
-## Phase 7 Gate Enforcement
-
-- `pnpm assurance:gate:regression` is executed in PR regression CI and fails on unresolved lifecycle records.
-- `pnpm assurance:gate` is executed in nightly assurance CI and fails on unresolved lifecycle records.
-- Gate source of truth: `security/artifacts/generated/fuzz-failures.json`.
+- PR CI in this repository must stay green without private corpus access.
+- Nightly/extended corpus assurance is tracked by SecOps in the external harness pipeline.

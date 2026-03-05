@@ -11,14 +11,8 @@
  * This script runs in an isolated child process.
  */
 
+import { analyzePayload } from './hound-analysis.js'
 import { createMessageParser, encodeHoundMessage, type HoundStatusMessage } from './hound-ipc.js'
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Processing delay in ms — overridable via HOUND_PROCESSING_DELAY_MS env for chaos testing */
-const PROCESSING_DELAY_MS = parseInt(process.env['HOUND_PROCESSING_DELAY_MS'] ?? '10', 10)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State
@@ -46,6 +40,18 @@ function sendMetrics(processingTime: number): void {
   process.stdout.write(encoded)
 }
 
+function sendAnalysis(payload: ArrayBuffer): void {
+  const analysis = analyzePayload(payload)
+  const encoded = encodeHoundMessage({
+    type: 'analysis',
+    hash: analysis.hash,
+    entropy: analysis.entropy,
+    contentType: analysis.contentType,
+    sizeBytes: analysis.sizeBytes,
+  })
+  process.stdout.write(encoded)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Processing
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,12 +59,9 @@ function sendMetrics(processingTime: number): void {
 /**
  * Process evidence payload.
  *
- * Current implementation: simulation.
- * Future: actual evidence analysis.
- *
  * @param payload - Evidence bytes
  */
-async function processPayload(_payload: ArrayBuffer): Promise<void> {
+async function processPayload(payload: ArrayBuffer): Promise<void> {
   if (isProcessing) {
     // Already processing - drop (single request at a time)
     return
@@ -69,10 +72,7 @@ async function processPayload(_payload: ArrayBuffer): Promise<void> {
 
   try {
     sendStatus('processing')
-
-    // Simulate processing
-    // TODO: Replace with actual evidence analysis
-    await new Promise((resolve) => setTimeout(resolve, PROCESSING_DELAY_MS))
+    sendAnalysis(payload)
 
     const processingTime = Date.now() - startTime
     sendMetrics(processingTime)

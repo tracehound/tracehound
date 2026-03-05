@@ -1,6 +1,6 @@
 # Documentation Index
 
-> **Last Updated:** 2026-03-04
+> **Last Updated:** 2026-03-05
 > **Version:** v1.5.0
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
@@ -13,6 +13,7 @@
 | **Start Here**   | [GETTING-STARTED.md](./GETTING-STARTED.md) | Installation & quick start |
 | **API**          | [API.md](./API.md)                         | Public API reference       |
 | **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)    | Runtime and adapter configuration defaults |
+| **Migration**    | [BREAKING-CHANGES.md](./BREAKING-CHANGES.md) | Breaking changes and upgrade path |
 
 ---
 
@@ -45,6 +46,7 @@
 | [0009-CoordinationProviderContract.md](./rfc/0009-CoordinationProviderContract.md) | ⚠️ Draft | External coordination contract |
 | [0010-OneWayMembrane.md](./rfc/0010-OneWayMembrane.md) | ⚠️ Draft | One-way membrane and trace id signaling |
 | [0011-PressureContainment.md](./rfc/0011-PressureContainment.md) | ⚠️ Draft | Pressure containment and graceful shielding |
+| [0013-OperationalTruthAndHoundAnalysis.md](./rfc/0013-OperationalTruthAndHoundAnalysis.md) | ⚠️ Draft | Signed operational truth and deterministic hound analysis |
 
 ---
 

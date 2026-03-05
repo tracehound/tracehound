@@ -186,6 +186,14 @@ export type {
   TraceRegistryOptions,
   TraceRegistryStats,
 } from './utils/trace-registry.js'
+export {
+  exportSystemSnapshot,
+  readSystemSnapshotFromDisk,
+  resolveSystemSnapshotPath,
+  resolveSystemSnapshotSecret,
+  writeSystemSnapshotToDisk,
+} from './utils/system-snapshot.js'
+export type { SnapshotReadResult, SystemHealth, SystemSnapshot } from './utils/system-snapshot.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utils - Serialization

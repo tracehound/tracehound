@@ -22,5 +22,5 @@ See: [Codecov breach (2021)](https://about.codecov.io/security-update/),
 
 - `security/*.md` — Security review documentation (threat model, crypto review, etc.)
 - `infrastructure/chaos/` — Defensive chaos testing (self-contained, no external tools)
-- `.github/workflows/` — CodeQL, Semgrep, fuzz-assurance, chaos-verify (all defensive)
+- `.github/workflows/` — CodeQL, Semgrep, chaos-verify (all defensive)
 - `SECURITY.md` — Vulnerability disclosure policy

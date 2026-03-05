@@ -1,120 +1,80 @@
 /**
- * Hound Process unit tests.
- *
- * Tests coverage for hound-process.ts by importing and verifying dependencies.
+ * Hound process analysis behavior tests.
  */
 
 import { describe, expect, it } from 'vitest'
+import { analyzePayload } from '../src/core/hound-analysis.js'
+import { decodeHoundMessage, encodeHoundMessage, type HoundMessage } from '../src/core/hound-ipc.js'
 
-describe('HoundProcess', () => {
-  it('should import hound-ipc dependencies', async () => {
-    const { createMessageParser, encodeHoundMessage, decodeHoundMessage } =
-      await import('../src/core/hound-ipc.js')
+describe('HoundProcess Analysis', () => {
+  it('produces deterministic hash for identical payload', () => {
+    const payload = new TextEncoder().encode('{"hello":"world"}').buffer
+    const a = analyzePayload(payload)
+    const b = analyzePayload(payload)
 
-    expect(createMessageParser).toBeDefined()
-    expect(encodeHoundMessage).toBeDefined()
-    expect(decodeHoundMessage).toBeDefined()
+    expect(a.hash).toBe(b.hash)
+    expect(a.sizeBytes).toBe(17)
   })
 
-  it('should create message parser', async () => {
-    const { createMessageParser } = await import('../src/core/hound-ipc.js')
-    const parser = createMessageParser()
+  it('detects json content type', () => {
+    const payload = new TextEncoder().encode('{"ok":true}').buffer
+    const analysis = analyzePayload(payload)
 
-    expect(parser).toBeDefined()
-    expect(parser.feed).toBeTypeOf('function')
-    expect(parser.reset).toBeTypeOf('function')
-    expect(parser.bufferedBytes).toBe(0)
+    expect(analysis.contentType).toBe('json')
   })
 
-  it('should encode status messages for IPC', async () => {
-    const { encodeHoundMessage } = await import('../src/core/hound-ipc.js')
+  it('detects binary content type for random-looking bytes', () => {
+    const payload = new Uint8Array([0xff, 0x00, 0x13, 0x88, 0x7f, 0xa2]).buffer
+    const analysis = analyzePayload(payload)
 
-    const processing = encodeHoundMessage({ type: 'status', state: 'processing' })
-    const complete = encodeHoundMessage({ type: 'status', state: 'complete' })
-    const error = encodeHoundMessage({ type: 'status', state: 'error', error: 'test' })
-
-    expect(processing.length).toBeGreaterThan(4)
-    expect(complete.length).toBeGreaterThan(4)
-    expect(error.length).toBeGreaterThan(4)
+    expect(analysis.contentType).toBe('binary')
+    expect(analysis.entropy).toBeGreaterThan(0)
   })
 
-  it('should encode metrics messages for IPC', async () => {
-    const { encodeHoundMessage } = await import('../src/core/hound-ipc.js')
+  it('detects magic-byte content types', () => {
+    const cases: Array<{ bytes: number[]; expected: string }> = [
+      { bytes: [0x1f, 0x8b, 0x08], expected: 'gzip' },
+      { bytes: [0x50, 0x4b, 0x03, 0x04], expected: 'zip' },
+      { bytes: [0x25, 0x50, 0x44, 0x46], expected: 'pdf' },
+      { bytes: [0x89, 0x50, 0x4e, 0x47], expected: 'png' },
+      { bytes: [0xff, 0xd8, 0xff, 0x00], expected: 'jpeg' },
+      { bytes: [0x47, 0x49, 0x46, 0x38], expected: 'gif' },
+    ]
 
-    const metrics = encodeHoundMessage({
-      type: 'metrics',
-      processingTime: 10.5,
-      memoryUsed: 2048,
-    })
-
-    expect(metrics.length).toBeGreaterThan(4)
+    for (const entry of cases) {
+      const analysis = analyzePayload(new Uint8Array(entry.bytes).buffer)
+      expect(analysis.contentType).toBe(entry.expected)
+    }
   })
 
-  it('should verify hound-process module structure', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const { fileURLToPath } = await import('node:url')
+  it('detects unknown and text branches correctly', () => {
+    const empty = analyzePayload(new Uint8Array([]).buffer)
+    expect(empty.contentType).toBe('unknown')
+    expect(empty.entropy).toBe(0)
 
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = path.dirname(__filename)
-    const processPath = path.join(__dirname, '../src/core/hound-process.ts')
-
-    const content = fs.readFileSync(processPath, 'utf-8')
-
-    // Verify key components exist
-    expect(content).toContain('createMessageParser')
-    expect(content).toContain('encodeHoundMessage')
-    expect(content).toContain('sendStatus')
-    expect(content).toContain('sendMetrics')
-    expect(content).toContain('processPayload')
-    expect(content).toContain('PROCESSING_DELAY_MS')
+    const text = analyzePayload(new TextEncoder().encode('hello world').buffer)
+    expect(text.contentType).toBe('text')
   })
 
-  it('should handle process.stdin events', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const { fileURLToPath } = await import('node:url')
-
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = path.dirname(__filename)
-    const processPath = path.join(__dirname, '../src/core/hound-process.ts')
-
-    const content = fs.readFileSync(processPath, 'utf-8')
-
-    // Verify stdin handlers
-    expect(content).toContain("process.stdin.on('data'")
-    expect(content).toContain("process.stdin.on('end'")
-    expect(content).toContain("process.stdin.on('error'")
+  it('detects json with leading whitespace', () => {
+    const payload = new TextEncoder().encode(' \n\t {"k":1}').buffer
+    const analysis = analyzePayload(payload)
+    expect(analysis.contentType).toBe('json')
   })
 
-  it('should handle uncaught exceptions', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const { fileURLToPath } = await import('node:url')
+  it('encodes/decodes analysis IPC message round-trip', () => {
+    const analysis: HoundMessage = {
+      type: 'analysis',
+      hash: 'deadbeef',
+      entropy: 6.33,
+      contentType: 'text',
+      sizeBytes: 42,
+    }
+    const encoded = encodeHoundMessage(analysis)
+    const length = encoded.readUInt32BE(0)
+    const payload = encoded.subarray(4, 4 + length)
+    const decoded = decodeHoundMessage(new Uint8Array(payload).buffer)
 
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = path.dirname(__filename)
-    const processPath = path.join(__dirname, '../src/core/hound-process.ts')
-
-    const content = fs.readFileSync(processPath, 'utf-8')
-
-    // Verify exception handlers
-    expect(content).toContain("process.on('uncaughtException'")
-    expect(content).toContain("process.on('unhandledRejection'")
-  })
-
-  it('should send initial ready signal', async () => {
-    const fs = await import('node:fs')
-    const path = await import('node:path')
-    const { fileURLToPath } = await import('node:url')
-
-    const __filename = fileURLToPath(import.meta.url)
-    const __dirname = path.dirname(__filename)
-    const processPath = path.join(__dirname, '../src/core/hound-process.ts')
-
-    const content = fs.readFileSync(processPath, 'utf-8')
-
-    // Verify ready signal at end of file
-    expect(content).toContain("sendStatus('processing')")
+    expect(decoded).toEqual(analysis)
   })
 })

@@ -17,8 +17,8 @@ This register defines deterministic security invariants verified by fuzz/propert
 ## Validation Mapping
 
 - Code evidence: `encode`, `signature`, `agent`, `quarantine`, `hound-ipc`.
-- Replay evidence: versioned corpus under `security/corpus/` with deterministic replay in CI.
-- Program artifacts: `security/artifacts/fuzz-assurance-report.md`, `security/artifacts/fuzz-corpus-summary.md`.
+- Replay evidence: versioned corpus is maintained in `tracehound/security-harness` and replayed in that pipeline.
+- Program artifacts: public architecture docs remain here; corpus assurance artifacts are produced in the private harness repository.
 
 ## Exit Criteria
 

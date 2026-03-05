@@ -6,22 +6,29 @@ import { getTraceRegistryStats } from '@tracehound/core'
 import Table from 'cli-table3'
 import { Command } from 'commander'
 import { formatBytes, formatDurationMs } from '../lib/format.js'
+import {
+  loadSystemSnapshot,
+  type CliSnapshotLoadResult,
+  type CliSystemSnapshot,
+} from '../lib/system-snapshot.js'
 
 export const statsCommand = new Command('stats')
   .description('Show threat statistics')
   .option('-j, --json', 'Output as JSON')
   .option('--since <duration>', 'Time window (e.g., 1h, 24h, 7d)', '24h')
   .action((options) => {
-    const stats = getStats(options.since)
+    const snapshotResult = loadSystemSnapshot()
+    const stats = getStats(snapshotResult, options.since)
 
     if (options.json) {
       console.log(JSON.stringify(stats, null, 2))
     } else {
-      printStats(stats)
+      printStats(snapshotResult, stats)
     }
   })
 
 interface ThreatStats {
+  connected: boolean
   window: string
   total: number
   bySeverity: {
@@ -58,13 +65,13 @@ interface ThreatStats {
   }
 }
 
-function getStats(since: string): ThreatStats {
+function getStats(snapshotResult: CliSnapshotLoadResult, since: string): ThreatStats {
   const registry = getTraceRegistryStats()
   const fileUsagePct =
     registry.maxFileBytes > 0 ? Number(((registry.fileBytes / registry.maxFileBytes) * 100).toFixed(2)) : 0
 
-  // TODO: Threat stream counters are still pending core integration.
-  return {
+  const base: ThreatStats = {
+    connected: snapshotResult.ok,
     window: since,
     total: 0,
     bySeverity: {
@@ -100,13 +107,34 @@ function getStats(since: string): ThreatStats {
       maxEntries: registry.maxEntries,
     },
   }
+
+  if (!snapshotResult.ok) {
+    return base
+  }
+
+  const runtime = mapRuntimeThreatStats(snapshotResult.snapshot)
+
+  return {
+    ...base,
+    total: runtime.total,
+    bySeverity: runtime.bySeverity,
+    byCategory: runtime.byCategory,
+    outcomes: runtime.outcomes,
+  }
 }
 
-function printStats(stats: ThreatStats): void {
+function printStats(snapshotResult: CliSnapshotLoadResult, stats: ThreatStats): void {
   // Header
   console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
   console.log(`  ║              THREAT STATISTICS (${stats.window.padEnd(24)})  ║`)
   console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
+
+  if (!snapshotResult.ok) {
+    console.log(`  ❌ Snapshot unavailable: ${snapshotResult.code}`)
+    console.log(`  Path: ${snapshotResult.path}\n`)
+    printTraceRegistry(stats)
+    return
+  }
 
   // Summary
   const summaryTable = new Table({
@@ -158,6 +186,10 @@ function printStats(stats: ThreatStats): void {
   console.log(outcomesTable.toString())
   console.log()
 
+  printTraceRegistry(stats)
+}
+
+function printTraceRegistry(stats: ThreatStats): void {
   // Trace registry visibility (explicit data lifecycle controls)
   const registryTable = new Table({
     head: ['TRACE REGISTRY', 'Value'],
@@ -183,4 +215,38 @@ function printStats(stats: ThreatStats): void {
   )
   console.log(registryTable.toString())
   console.log()
+}
+
+function mapRuntimeThreatStats(snapshot: CliSystemSnapshot): {
+  total: number
+  bySeverity: ThreatStats['bySeverity']
+  byCategory: ThreatStats['byCategory']
+  outcomes: ThreatStats['outcomes']
+} {
+  const byCategory = snapshot.watcher.threats.byCategory
+  const injection = byCategory['injection'] ?? 0
+  const ddos = byCategory['ddos'] ?? 0
+  const known = injection + ddos
+  const other = Math.max(0, snapshot.watcher.threats.total - known)
+
+  return {
+    total: snapshot.watcher.threats.total,
+    bySeverity: {
+      critical: snapshot.watcher.threats.bySeverity.critical,
+      high: snapshot.watcher.threats.bySeverity.high,
+      medium: snapshot.watcher.threats.bySeverity.medium,
+      low: snapshot.watcher.threats.bySeverity.low,
+    },
+    byCategory: {
+      injection,
+      ddos,
+      other,
+    },
+    outcomes: {
+      quarantined: snapshot.agent.quarantinedCount,
+      rateLimited: snapshot.agent.rateLimitedCount,
+      clean: snapshot.agent.cleanCount,
+      ignored: snapshot.agent.ignoredCount,
+    },
+  }
 }

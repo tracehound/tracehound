@@ -12,6 +12,14 @@ import { createNotificationEmitter, type INotificationEmitter } from './notifica
 import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
 import { createWatcher, type IWatcher } from './watcher.js'
+import { Errors } from '../types/errors.js'
+import {
+  exportSystemSnapshot,
+  resolveSystemSnapshotPath,
+  resolveSystemSnapshotSecret,
+  type SystemSnapshot,
+  writeSystemSnapshotToDisk,
+} from '../utils/system-snapshot.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -57,6 +65,18 @@ export interface TracehoundOptions {
    * Hound pool configuration.
    */
   houndPool?: Partial<HoundPoolConfig>
+
+  /**
+   * System snapshot export configuration.
+   */
+  snapshot?: {
+    /** Snapshot output path (required when snapshot export is enabled). */
+    path: string
+    /** Snapshot HMAC secret (falls back to TRACEHOUND_SNAPSHOT_SECRET). */
+    secret?: string
+    /** Flush interval in ms. Default: 1000 */
+    intervalMs?: number
+  }
 }
 
 /**
@@ -77,6 +97,16 @@ export interface ITracehound {
   readonly notifications: INotificationEmitter
   /** The Hound Pool */
   readonly houndPool: IHoundPool
+
+  /**
+   * Return immutable runtime snapshot.
+   */
+  snapshot(): SystemSnapshot
+
+  /**
+   * Dispose runtime resources (snapshot loop and hound processes).
+   */
+  shutdown(): void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -107,6 +137,10 @@ class Tracehound implements ITracehound {
   readonly houndPool: IHoundPool
 
   private readonly evidenceFactory: IEvidenceFactory
+  private readonly snapshotPath: string | null
+  private readonly snapshotSecret: string | null
+  private readonly snapshotIntervalMs: number | null
+  private snapshotIntervalId: ReturnType<typeof setInterval> | null = null
 
   constructor(options: TracehoundOptions = {}) {
     // Initialize components
@@ -183,7 +217,88 @@ class Tracehound implements ITracehound {
         })
       }
     })
+
+    const snapshotConfig = options.snapshot
+    if (snapshotConfig) {
+      if (typeof snapshotConfig.path !== 'string' || snapshotConfig.path.length === 0) {
+        throw Errors.invalidConfigSnapshot('path is required when snapshot export is enabled')
+      }
+
+      const resolvedSecret = resolveSystemSnapshotSecret(snapshotConfig.secret)
+      if (!resolvedSecret) {
+        throw Errors.snapshotSecretMissing()
+      }
+
+      const intervalMs = normalizeSnapshotInterval(snapshotConfig.intervalMs)
+      if (intervalMs <= 0) {
+        throw Errors.invalidConfigSnapshot('intervalMs must be positive')
+      }
+
+      this.snapshotPath = resolveSystemSnapshotPath(snapshotConfig.path)
+      this.snapshotSecret = resolvedSecret
+      this.snapshotIntervalMs = intervalMs
+      this.startSnapshotLoop()
+    } else {
+      this.snapshotPath = null
+      this.snapshotSecret = null
+      this.snapshotIntervalMs = null
+    }
   }
+
+  snapshot(): SystemSnapshot {
+    return exportSystemSnapshot(this)
+  }
+
+  shutdown(): void {
+    this.stopSnapshotLoop()
+    this.houndPool.shutdown()
+  }
+
+  private startSnapshotLoop(): void {
+    if (!this.snapshotPath || !this.snapshotSecret || !this.snapshotIntervalMs) {
+      return
+    }
+
+    const flush = (): void => {
+      try {
+        const snapshot = this.snapshot()
+        writeSystemSnapshotToDisk(snapshot, this.snapshotPath!, this.snapshotSecret!)
+      } catch (error: unknown) {
+        this.notifications.emit('system.panic', {
+          level: 'warning',
+          reason: 'snapshot_write_failed',
+          context: { error: error instanceof Error ? error.message : 'unknown' },
+        })
+      }
+    }
+
+    flush()
+    this.snapshotIntervalId = setInterval(flush, this.snapshotIntervalMs)
+    if (typeof this.snapshotIntervalId.unref === 'function') {
+      this.snapshotIntervalId.unref()
+    }
+  }
+
+  private stopSnapshotLoop(): void {
+    if (!this.snapshotIntervalId) {
+      return
+    }
+
+    clearInterval(this.snapshotIntervalId)
+    this.snapshotIntervalId = null
+  }
+}
+
+function normalizeSnapshotInterval(intervalMs: number | undefined): number {
+  if (intervalMs === undefined) {
+    return 1000
+  }
+
+  if (!Number.isFinite(intervalMs)) {
+    return 0
+  }
+
+  return Math.floor(intervalMs)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

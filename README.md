@@ -17,12 +17,11 @@ The system does not classify threats or enforce policies. Instead, it guarantees
 [![CI](https://github.com/tracehound/tracehound/actions/workflows/ci.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/ci.yml)
 [![Chaos Suite](https://github.com/tracehound/tracehound/actions/workflows/chaos-verify.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/chaos-verify.yml)
 [![Copilot code review](https://github.com/tracehound/tracehound/actions/workflows/copilot-pull-request-reviewer/copilot-pull-request-reviewer/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/copilot-pull-request-reviewer/copilot-pull-request-reviewer)
-[![Fuzz Assurance Nightly](https://github.com/tracehound/tracehound/actions/workflows/fuzz-assurance-nightly.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/fuzz-assurance-nightly.yml)
 [![License: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/license/apache-2-0)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 
-[Official Website](https://tracehoundlabs.com) · [Documentation](./docs/README.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
+[Official Website](https://tracehoundlabs.com) · [Documentation](./docs/README.md) · [Migration Guide](./docs/BREAKING-CHANGES.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
 
 </div>
 
@@ -155,6 +154,7 @@ app.register(tracehoundPlugin, { agent: th.agent });
 - **[Getting Started](./docs/GETTING-STARTED.md)**
 - **[API Reference](./docs/API.md)**
 - **[Configuration Reference](./docs/CONFIGURATION.md)**
+- **[Breaking Changes / Migration](./docs/BREAKING-CHANGES.md)**
 - **[Evidence Lifecycle](./docs/EVIDENCE-LIFECYCLE-POLICY.md)**
 - **[Security Assurance & Chaos Testing](./docs/SECURITY-ASSURANCE.md)**
 

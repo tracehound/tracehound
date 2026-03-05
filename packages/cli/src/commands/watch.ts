@@ -2,6 +2,7 @@
  * Watch command - Live dashboard (Pure ANSI, no React)
  */
 
+import { listTraceInspectionEntries } from '@tracehound/core'
 import Table from 'cli-table3'
 import { Command } from 'commander'
 import { createRequire } from 'module'
@@ -17,6 +18,7 @@ import {
   showCursor,
   theme,
 } from '../lib/theme.js'
+import { loadSystemSnapshot, type CliSnapshotLoadResult } from '../lib/system-snapshot.js'
 
 const require = createRequire(import.meta.url)
 const { version } = require('../../package.json')
@@ -25,7 +27,7 @@ export const watchCommand = new Command('watch')
   .description('Launch live dashboard')
   .option('-r, --refresh <ms>', 'Refresh interval in ms', '1000')
   .action((options) => {
-    const refreshMs = parseInt(options.refresh)
+    const refreshMs = parseInt(options.refresh, 10)
     startDashboard(refreshMs)
   })
 
@@ -35,12 +37,11 @@ interface Snapshot {
     version: string
     uptime: string
     health: 'healthy' | 'degraded' | 'critical'
-    memory: { used: number; total: number }
   }
   quarantine: {
     count: number
-    capacity: number
     bytes: number
+    maxBytes: number
     bySeverity: { critical: number; high: number; medium: number; low: number }
   }
   houndPool: {
@@ -58,29 +59,49 @@ interface Snapshot {
   }>
 }
 
-export function getSnapshot(): Snapshot {
-  // TODO: Connect to real core
+export function getSnapshot(): CliSnapshotLoadResult {
+  return loadSystemSnapshot()
+}
+
+function toDashboardSnapshot(snapshotResult: Extract<CliSnapshotLoadResult, { ok: true }>): Snapshot {
+  const snapshot = snapshotResult.snapshot
+  const totalProcesses = snapshot.houndPool.totalProcesses
+  const recentThreats = listTraceInspectionEntries(5).map((entry) => {
+    const signature = entry.signature ?? ''
+    const category = parseSignatureCategory(signature)
+
+    return {
+      signature: entry.signature,
+      severity: entry.severity,
+      category,
+      size: formatBytes(entry.size),
+      time: new Date(entry.captured).toLocaleTimeString(),
+    }
+  })
+
   return {
-    timestamp: new Date().toISOString(),
+    timestamp: new Date(snapshot.generatedAt).toISOString(),
     system: {
-      version: version,
-      uptime: formatUptime(Math.floor(process.uptime())),
-      health: 'healthy',
-      memory: { used: 45, total: 256 },
+      version,
+      uptime: formatUptime(Math.floor(snapshot.watcher.uptimeMs / 1000)),
+      health: snapshot.systemHealth,
     },
     quarantine: {
-      count: 0,
-      capacity: 1000,
-      bytes: 0,
-      bySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
+      count: snapshot.quarantine.count,
+      bytes: snapshot.quarantine.bytes,
+      maxBytes: snapshot.quarantineMaxBytes,
+      bySeverity: snapshot.quarantine.bySeverity,
     },
     houndPool: {
-      active: 0,
-      dormant: 0,
-      total: 0,
-      status: 'ok',
+      active: snapshot.houndPool.activeProcesses,
+      dormant: Math.max(0, totalProcesses - snapshot.houndPool.activeProcesses),
+      total: totalProcesses,
+      status:
+        totalProcesses > 0 && snapshot.houndPool.activeProcesses >= totalProcesses
+          ? 'exhausted'
+          : 'ok',
     },
-    recentThreats: [],
+    recentThreats,
   }
 }
 
@@ -97,8 +118,14 @@ function startDashboard(refreshMs: number): void {
 
   const render = () => {
     clearScreen()
-    const snapshot = getSnapshot()
-    renderDashboard(snapshot, refreshMs)
+    const snapshotResult = getSnapshot()
+
+    if (snapshotResult.ok) {
+      renderDashboard(toDashboardSnapshot(snapshotResult), refreshMs)
+      return
+    }
+
+    renderDisconnected(snapshotResult, refreshMs)
   }
 
   render()
@@ -124,19 +151,13 @@ export function renderDashboard(s: Snapshot, refreshMs: number): void {
   const systemTable = new Table({
     chars: getTableChars(),
     style: { head: [], border: [] },
-    head: [secondary('Version'), secondary('Uptime'), secondary('Health'), secondary('Memory')],
+    head: [secondary('Version'), secondary('Uptime'), secondary('Health')],
   })
 
   const healthIcon =
     s.system.health === 'healthy' ? '✅' : s.system.health === 'degraded' ? '⚠️' : '🔴'
-  const memBar = progressBar(s.system.memory.used, s.system.memory.total, 10)
 
-  systemTable.push([
-    s.system.version,
-    s.system.uptime,
-    `${healthIcon} ${s.system.health}`,
-    `${memBar} ${s.system.memory.used}/${s.system.memory.total} MB`,
-  ])
+  systemTable.push([s.system.version, s.system.uptime, `${healthIcon} ${s.system.health}`])
 
   console.log(muted('  SYSTEM'))
   console.log(indent(systemTable.toString()))
@@ -149,13 +170,13 @@ export function renderDashboard(s: Snapshot, refreshMs: number): void {
     head: [secondary('QUARANTINE'), secondary('Value')],
   })
 
-  const qUsage = s.quarantine.capacity > 0 ? (s.quarantine.count / s.quarantine.capacity) * 100 : 0
-  const qBar = progressBar(s.quarantine.count, s.quarantine.capacity, 8)
+  const qUsage = s.quarantine.maxBytes > 0 ? (s.quarantine.bytes / s.quarantine.maxBytes) * 100 : 0
+  const qBar = progressBar(s.quarantine.bytes, s.quarantine.maxBytes || 1, 8)
 
   quarantineTable.push(
-    ['Count', `${s.quarantine.count} / ${s.quarantine.capacity}`],
+    ['Count', String(s.quarantine.count)],
     ['Usage', `${qBar} ${qUsage.toFixed(1)}%`],
-    ['Bytes', formatBytes(s.quarantine.bytes)],
+    ['Bytes', `${formatBytes(s.quarantine.bytes)} / ${formatBytes(s.quarantine.maxBytes)}`],
     [
       'Split',
       `${severity('critical').slice(0, 15)} ${s.quarantine.bySeverity.critical}  ${severity(
@@ -202,7 +223,7 @@ export function renderDashboard(s: Snapshot, refreshMs: number): void {
 
     for (const t of s.recentThreats.slice(0, 5)) {
       threatTable.push([
-        t.signature.slice(0, 12) + '...',
+        `${t.signature.slice(0, 12)}...`,
         severity(t.severity),
         t.category,
         t.size,
@@ -220,6 +241,39 @@ export function renderDashboard(s: Snapshot, refreshMs: number): void {
   }
 
   // Footer
+  console.log(muted(`  ${'─'.repeat(width)}`))
+  console.log(
+    muted(
+      `  Press Ctrl+C to exit │ Refresh: ${refreshMs}ms │ ${theme.reset}${secondary(
+        new Date().toLocaleTimeString(),
+      )}`,
+    ),
+  )
+}
+
+function renderDisconnected(
+  snapshotResult: Extract<CliSnapshotLoadResult, { ok: false }>,
+  refreshMs: number,
+): void {
+  const width = 76
+
+  console.log()
+  console.log(primary(`  ╔${'═'.repeat(width)}╗`))
+  console.log(
+    primary(`  ║${' '.repeat(20)}`) +
+      bold('🐕 TRACEHOUND LIVE DASHBOARD') +
+      primary(`${' '.repeat(28)}║`),
+  )
+  console.log(
+    primary(`  ║${' '.repeat(14)}`) +
+      muted('Runtime snapshot unavailable') +
+      primary(`${' '.repeat(35)}║`),
+  )
+  console.log(primary(`  ╚${'═'.repeat(width)}╝`))
+  console.log()
+  console.log(muted(`  ❌ ${snapshotResult.code}`))
+  console.log(muted(`  Snapshot path: ${snapshotResult.path}`))
+  console.log()
   console.log(muted(`  ${'─'.repeat(width)}`))
   console.log(
     muted(
@@ -270,4 +324,9 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+}
+
+function parseSignatureCategory(signature: string): string {
+  const colonIndex = signature.indexOf(':')
+  return colonIndex > 0 ? signature.slice(0, colonIndex) : 'unknown'
 }

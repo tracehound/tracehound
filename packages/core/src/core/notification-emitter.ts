@@ -8,6 +8,7 @@
  */
 
 import { generateSecureId } from "../utils/id.js";
+import { Errors } from "../types/errors.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Event Types
@@ -294,17 +295,13 @@ export class NotificationEmitter implements INotificationEmitter {
 
   registerWebhook(config: WebhookConfig): string {
     if (!isAllowedWebhookUrl(config.url)) {
-      throw new Error(
-        `Webhook URL rejected: private/internal targets are not allowed`,
-      );
+      throw Errors.invalidConfigWebhookUrl(config.url);
     }
     if (
       config.secret !== undefined &&
       config.secret.length < MIN_SECRET_LENGTH
     ) {
-      throw new Error(
-        `Webhook secret must be at least ${MIN_SECRET_LENGTH} characters`,
-      );
+      throw Errors.invalidConfigWebhookSecret(MIN_SECRET_LENGTH);
     }
     const id = generateSecureId();
     this.webhooks.set(id, { ...config, id });

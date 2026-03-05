@@ -85,6 +85,23 @@ describe('HoundIPC', () => {
       expect(payload.subarray(2).toString('utf8')).toBe('test_error')
     })
 
+    it('should throw when status state is invalid at runtime', () => {
+      const invalid = {
+        type: 'status',
+        state: 'invalid',
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/status/i)
+    })
+
+    it('should throw when message type is unknown at runtime', () => {
+      const invalid = {
+        type: 'unknown',
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/analysis/i)
+    })
+
     it('should encode metrics message', () => {
       const message: HoundMessage = { type: 'metrics', processingTime: 123.45, memoryUsed: 678.9 }
       const encoded = encodeHoundMessage(message)
@@ -94,6 +111,81 @@ describe('HoundIPC', () => {
 
       expect(payload[0]).toBe(0x02) // type: metrics
       expect(payload.length).toBe(17) // 1 + 8 + 8
+    })
+
+    it('should encode analysis message', () => {
+      const message: HoundMessage = {
+        type: 'analysis',
+        hash: 'abc123',
+        entropy: 7.42,
+        contentType: 'json',
+        sizeBytes: 256,
+      }
+      const encoded = encodeHoundMessage(message)
+      const length = encoded.readUInt32BE(0)
+      const payload = encoded.subarray(4, 4 + length)
+
+      expect(payload[0]).toBe(0x03) // type: analysis
+      expect(payload.length).toBeGreaterThan(16)
+    })
+
+    it('should encode/decode all analysis content types', () => {
+      const contentTypes = ['unknown', 'gzip', 'zip', 'pdf', 'png', 'jpeg', 'gif'] as const
+
+      for (const contentType of contentTypes) {
+        const encoded = encodeHoundMessage({
+          type: 'analysis',
+          hash: 'abc',
+          entropy: 1.23,
+          contentType,
+          sizeBytes: 12,
+        })
+        const length = encoded.readUInt32BE(0)
+        const payload = encoded.subarray(4, 4 + length)
+        const decoded = decodeHoundMessage(new Uint8Array(payload).buffer)
+
+        expect(decoded.type).toBe('analysis')
+        if (decoded.type === 'analysis') {
+          expect(decoded.contentType).toBe(contentType)
+        }
+      }
+    })
+
+    it('should throw when analysis contentType is invalid at runtime', () => {
+      const invalid = {
+        type: 'analysis',
+        hash: 'abc',
+        entropy: 1.23,
+        contentType: 'exe',
+        sizeBytes: 12,
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/analysis/i)
+    })
+
+    it('should throw when analysis payload is structurally invalid at runtime', () => {
+      const invalid = {
+        type: 'analysis',
+        hash: undefined,
+        entropy: Number.NaN,
+        contentType: 'json',
+        sizeBytes: -1,
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/analysis/i)
+    })
+
+    it('should throw when analysis hash length exceeds uint16', () => {
+      const oversizedHash = 'a'.repeat(70_000)
+      expect(() =>
+        encodeHoundMessage({
+          type: 'analysis',
+          hash: oversizedHash,
+          entropy: 1,
+          contentType: 'binary',
+          sizeBytes: 1,
+        }),
+      ).toThrow(/analysis/i)
     })
   })
 
@@ -130,7 +222,7 @@ describe('HoundIPC', () => {
       const buffer = Buffer.alloc(4)
       buffer.writeUInt32BE(2 * 1024 * 1024, 0) // 2MB > max
 
-      expect(() => tryParseMessage(buffer)).toThrow('Invalid message length')
+      expect(() => tryParseMessage(buffer)).toThrow('Message too large')
     })
   })
 
@@ -197,6 +289,28 @@ describe('HoundIPC', () => {
       }
     })
 
+    it('should decode analysis message', () => {
+      const encoded = encodeHoundMessage({
+        type: 'analysis',
+        hash: 'ff00aa',
+        entropy: 5.5,
+        contentType: 'text',
+        sizeBytes: 77,
+      })
+      const length = encoded.readUInt32BE(0)
+      const payload = encoded.subarray(4, 4 + length)
+
+      const decoded = decodeHoundMessage(new Uint8Array(payload).buffer)
+
+      expect(decoded.type).toBe('analysis')
+      if (decoded.type === 'analysis') {
+        expect(decoded.hash).toBe('ff00aa')
+        expect(decoded.entropy).toBeCloseTo(5.5)
+        expect(decoded.contentType).toBe('text')
+        expect(decoded.sizeBytes).toBe(77)
+      }
+    })
+
     it('should throw on empty payload', () => {
       const empty = Buffer.alloc(0)
       expect(() => decodeHoundMessage(empty.buffer as ArrayBuffer)).toThrow(/Empty/)
@@ -223,6 +337,61 @@ describe('HoundIPC', () => {
         truncated.byteOffset + truncated.byteLength,
       )
       expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*metrics/)
+    })
+
+    it('should throw on unknown status state code', () => {
+      const payload = Buffer.from([0x01, 0x00]) // status with invalid state code
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Unknown.*status/i)
+    })
+
+    it('should throw on unknown analysis content type code', () => {
+      const hash = Buffer.from('h', 'utf8')
+      const payload = Buffer.alloc(1 + 2 + hash.length + 8 + 1 + 4)
+      payload[0] = 0x03
+      payload.writeUInt16BE(hash.length, 1)
+      hash.copy(payload, 3)
+      let offset = 3 + hash.length
+      payload.writeDoubleBE(1.5, offset)
+      offset += 8
+      payload[offset] = 0x7f // invalid content type
+      offset += 1
+      payload.writeUInt32BE(10, offset)
+
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Unknown.*content/i)
+    })
+
+    it('should reject analysis message with empty hash', () => {
+      const payload = Buffer.alloc(1 + 2 + 0 + 8 + 1 + 4)
+      payload[0] = 0x03
+      payload.writeUInt16BE(0, 1)
+      let offset = 3
+      payload.writeDoubleBE(1.23, offset)
+      offset += 8
+      payload[offset] = 0x02 // json
+      offset += 1
+      payload.writeUInt32BE(10, offset)
+
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*analysis/i)
+    })
+
+    it('should reject analysis message with non-finite entropy', () => {
+      const hash = Buffer.from('hash', 'utf8')
+      const payload = Buffer.alloc(1 + 2 + hash.length + 8 + 1 + 4)
+      payload[0] = 0x03
+      payload.writeUInt16BE(hash.length, 1)
+      hash.copy(payload, 3)
+      let offset = 3 + hash.length
+      payload.writeDoubleBE(Number.NaN, offset)
+      offset += 8
+      payload[offset] = 0x01 // text
+      offset += 1
+      payload.writeUInt32BE(10, offset)
+
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*analysis/i)
     })
   })
 
@@ -311,6 +480,22 @@ describe('HoundIPC', () => {
         expect(decoded.processingTime).toBeCloseTo(original.processingTime)
         expect(decoded.memoryUsed).toBeCloseTo(original.memoryUsed)
       }
+    })
+
+    it('should preserve analysis messages', () => {
+      const original: HoundMessage = {
+        type: 'analysis',
+        hash: 'feedbeef',
+        entropy: 7.91,
+        contentType: 'binary',
+        sizeBytes: 512,
+      }
+      const encoded = encodeHoundMessage(original)
+      const length = encoded.readUInt32BE(0)
+      const payload = encoded.subarray(4, 4 + length)
+      const decoded = decodeHoundMessage(new Uint8Array(payload).buffer)
+
+      expect(decoded).toEqual(original)
     })
   })
 })

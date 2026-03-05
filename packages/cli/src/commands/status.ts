@@ -4,35 +4,36 @@
 
 import Table from 'cli-table3'
 import { Command } from 'commander'
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
-const { version } = require('../../package.json')
+import {
+  loadSystemSnapshot,
+  type CliSnapshotLoadResult,
+  type CliSystemSnapshot,
+} from '../lib/system-snapshot.js'
 
 export const statusCommand = new Command('status')
   .description('Show current Tracehound system status')
   .option('-j, --json', 'Output as JSON')
   .action((options) => {
-    const status = getSystemStatus()
+    const snapshotResult = loadSystemSnapshot()
 
     if (options.json) {
-      console.log(JSON.stringify(status, null, 2))
+      console.log(JSON.stringify(toJsonOutput(snapshotResult), null, 2))
     } else {
-      printStatus(status)
+      printStatus(snapshotResult)
     }
   })
 
 interface SystemStatus {
-  version: string
   uptime: number
-  health: 'healthy' | 'degraded' | 'critical'
+  health: CliSystemSnapshot['systemHealth']
   quarantine: {
     count: number
     bytes: number
-    capacity: number
+    maxBytes: number
   }
   rateLimit: {
     blocked: number
-    active: number
+    sources: number
   }
   houndPool: {
     active: number
@@ -41,30 +42,36 @@ interface SystemStatus {
   }
 }
 
-function getSystemStatus(): SystemStatus {
-  // TODO: Connect to real core when available
+function getSystemStatus(snapshot: CliSystemSnapshot): SystemStatus {
+  const total = snapshot.houndPool.totalProcesses
+
   return {
-    version: version,
-    uptime: Math.floor(process.uptime()),
-    health: 'healthy',
+    uptime: Math.floor(snapshot.watcher.uptimeMs / 1000),
+    health: snapshot.systemHealth,
     quarantine: {
-      count: 0,
-      bytes: 0,
-      capacity: 1000,
+      count: snapshot.quarantine.count,
+      bytes: snapshot.quarantine.bytes,
+      maxBytes: snapshot.quarantineMaxBytes,
     },
     rateLimit: {
-      blocked: 0,
-      active: 0,
+      blocked: snapshot.rateLimiter.blocked,
+      sources: snapshot.rateLimiter.sources,
     },
     houndPool: {
-      active: 0,
-      dormant: 0,
-      total: 0,
+      active: snapshot.houndPool.activeProcesses,
+      dormant: Math.max(0, total - snapshot.houndPool.activeProcesses),
+      total,
     },
   }
 }
 
-function printStatus(status: SystemStatus): void {
+function printStatus(snapshotResult: CliSnapshotLoadResult): void {
+  if (!snapshotResult.ok) {
+    printSnapshotError(snapshotResult)
+    return
+  }
+
+  const status = getSystemStatus(snapshotResult.snapshot)
   const healthIcon = status.health === 'healthy' ? '✅' : status.health === 'degraded' ? '⚠️' : '🔴'
 
   // Header
@@ -78,7 +85,7 @@ function printStatus(status: SystemStatus): void {
     style: { head: ['cyan'], border: ['gray'] },
   })
   systemTable.push(
-    ['Version', status.version],
+    ['Snapshot', new Date(snapshotResult.snapshot.generatedAt).toISOString()],
     ['Uptime', formatUptime(status.uptime)],
     ['Health', `${healthIcon} ${status.health}`],
   )
@@ -91,13 +98,13 @@ function printStatus(status: SystemStatus): void {
     style: { head: ['yellow'], border: ['gray'] },
   })
   const usage =
-    status.quarantine.capacity > 0
-      ? ((status.quarantine.count / status.quarantine.capacity) * 100).toFixed(1)
+    status.quarantine.maxBytes > 0
+      ? ((status.quarantine.bytes / status.quarantine.maxBytes) * 100).toFixed(1)
       : '0.0'
   quarantineTable.push(
-    ['Count', `${status.quarantine.count} / ${status.quarantine.capacity}`],
+    ['Count', String(status.quarantine.count)],
     ['Usage', `${usage}%`],
-    ['Bytes', formatBytes(status.quarantine.bytes)],
+    ['Bytes', `${formatBytes(status.quarantine.bytes)} / ${formatBytes(status.quarantine.maxBytes)}`],
   )
   console.log(quarantineTable.toString())
   console.log()
@@ -109,7 +116,7 @@ function printStatus(status: SystemStatus): void {
   })
   rateLimitTable.push(
     ['Blocked', String(status.rateLimit.blocked)],
-    ['Active', String(status.rateLimit.active)],
+    ['Tracked Sources', String(status.rateLimit.sources)],
   )
   console.log(rateLimitTable.toString())
   console.log()
@@ -126,6 +133,31 @@ function printStatus(status: SystemStatus): void {
   )
   console.log(poolTable.toString())
   console.log()
+}
+
+function printSnapshotError(snapshotResult: Extract<CliSnapshotLoadResult, { ok: false }>): void {
+  console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
+  console.log('  ║                    TRACEHOUND STATUS                         ║')
+  console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
+  console.log(`  ❌ Snapshot unavailable: ${snapshotResult.code}`)
+  console.log(`  Path: ${snapshotResult.path}`)
+  console.log()
+}
+
+function toJsonOutput(snapshotResult: CliSnapshotLoadResult): unknown {
+  if (!snapshotResult.ok) {
+    return {
+      connected: false,
+      error: snapshotResult.code,
+      path: snapshotResult.path,
+    }
+  }
+
+  return {
+    connected: true,
+    path: snapshotResult.path,
+    ...getSystemStatus(snapshotResult.snapshot),
+  }
 }
 
 function formatUptime(seconds: number): string {

@@ -227,6 +227,12 @@ function replaceSnapshotFile(tmpPath: string, path: string): void {
     return;
   }
 
+  if (process.platform !== "win32") {
+    // POSIX rename provides atomic replace semantics when destination exists.
+    renameSync(tmpPath, path);
+    return;
+  }
+
   const backupPath = `${path}.bak-${process.pid}-${Date.now()}`;
   renameSync(path, backupPath);
 

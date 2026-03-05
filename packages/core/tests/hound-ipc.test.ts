@@ -361,6 +361,38 @@ describe('HoundIPC', () => {
       const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
       expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Unknown.*content/i)
     })
+
+    it('should reject analysis message with empty hash', () => {
+      const payload = Buffer.alloc(1 + 2 + 0 + 8 + 1 + 4)
+      payload[0] = 0x03
+      payload.writeUInt16BE(0, 1)
+      let offset = 3
+      payload.writeDoubleBE(1.23, offset)
+      offset += 8
+      payload[offset] = 0x02 // json
+      offset += 1
+      payload.writeUInt32BE(10, offset)
+
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*analysis/i)
+    })
+
+    it('should reject analysis message with non-finite entropy', () => {
+      const hash = Buffer.from('hash', 'utf8')
+      const payload = Buffer.alloc(1 + 2 + hash.length + 8 + 1 + 4)
+      payload[0] = 0x03
+      payload.writeUInt16BE(hash.length, 1)
+      hash.copy(payload, 3)
+      let offset = 3 + hash.length
+      payload.writeDoubleBE(Number.NaN, offset)
+      offset += 8
+      payload[offset] = 0x01 // text
+      offset += 1
+      payload.writeUInt32BE(10, offset)
+
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*analysis/i)
+    })
   })
 
   describe('createMessageParser', () => {

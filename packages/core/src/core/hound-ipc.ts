@@ -337,7 +337,17 @@ export function decodeHoundMessage(payload: ArrayBuffer): HoundMessage {
     const contentType = decodeContentType(buffer[contentTypeIndex] ?? 0)
     const sizeBytes = buffer.readUInt32BE(sizeStart)
 
-    return { type: 'analysis', hash, entropy, contentType, sizeBytes }
+    const analysis = {
+      type: 'analysis' as const,
+      hash,
+      entropy,
+      contentType,
+      sizeBytes,
+    }
+    if (!isValidAnalysisMessage(analysis)) {
+      throw Errors.processIpcInvalidAnalysisMessage()
+    }
+    return analysis
   }
 
   throw Errors.processIpcUnknownMessageType(type)

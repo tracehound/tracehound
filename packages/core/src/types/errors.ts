@@ -176,9 +176,9 @@ export const Errors = {
       recoverable: false,
     }),
 
-  interceptFailed: (reason: string) =>
+  interceptFailed: (reason: string, context?: { scentId?: string }) =>
     createError('agent', 'AGENT_INTERCEPT_FAILED', `Intercept failed: ${reason}`, {
-      context: { reason },
+      context: context ? { reason, ...context } : { reason },
       recoverable: true,
     }),
 

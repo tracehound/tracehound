@@ -63,3 +63,9 @@ If snapshot cannot be trusted:
 
 1. `NO_INSTANCE` when file is absent or stale.
 2. `INTEGRITY_VIOLATION` when signature/format/secret validation fails or snapshot timestamp is implausibly in the future.
+
+### Snapshot file lifecycle
+
+While a Tracehound instance is running with snapshot export enabled, the runtime maintains the snapshot file at `TRACEHOUND_SYSTEM_SNAPSHOT_PATH` and updates it on the configured interval.
+On graceful shutdown via `Tracehound.shutdown()`, the runtime removes this snapshot file as part of cleanup.
+After this removal, CLI commands will report `NO_INSTANCE` once the absence is observed, regardless of the configured freshness window; this is expected and indicates that the instance has shut down cleanly rather than an integrity failure.

@@ -74,6 +74,10 @@ describe('Error Factories', () => {
       expect(Errors.payloadTooLarge(2, 1).code).toBe('AGENT_PAYLOAD_TOO_LARGE')
       expect(Errors.serializationFailed('json').code).toBe('AGENT_SERIALIZATION_FAILED')
       expect(Errors.interceptFailed('panic').code).toBe('AGENT_INTERCEPT_FAILED')
+      expect(Errors.interceptFailed('panic', { scentId: 'scent-1' }).context).toEqual({
+        reason: 'panic',
+        scentId: 'scent-1',
+      })
     })
   })
 

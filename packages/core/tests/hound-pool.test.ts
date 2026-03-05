@@ -559,6 +559,33 @@ describe('HoundPool', () => {
 
       expect(results.length).toBe(0)
     })
+
+    it('ignores activate calls after shutdown has started', () => {
+      const activationsBefore = pool.stats.totalActivations
+      pool.shutdown()
+
+      pool.activate(createEvidence('after-shutdown'))
+
+      expect(pool.stats.totalActivations).toBe(activationsBefore)
+      expect(pool.stats.totalProcesses).toBe(0)
+    })
+
+    it('suppresses internal result emission after shutdown', () => {
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+      pool.shutdown()
+
+      const internals = pool as unknown as { emitResult: (result: HoundResult) => void }
+      internals.emitResult({
+        signature: 'post-shutdown',
+        status: 'error',
+        durationMs: 0,
+        processId: 'pool',
+        error: 'should_not_emit',
+      })
+
+      expect(results).toHaveLength(0)
+    })
   })
 
   describe('Type-level safety', () => {

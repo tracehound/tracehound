@@ -205,6 +205,22 @@ describe('system snapshot freshness', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('should fallback to default future skew when override is negative', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS = '-1'
+    writeFixtureSnapshotToDisk(
+      createFixtureSnapshot(now.getTime() + 5_001),
+      snapshotPath,
+      SNAPSHOT_SECRET,
+    )
+
+    const result = loadSystemSnapshot()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
   it('should honor TRACEHOUND_SNAPSHOT_MAX_AGE_MS override', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)

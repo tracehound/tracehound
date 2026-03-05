@@ -625,6 +625,10 @@ describe('Agent', () => {
       if (result.status !== 'error') return
       expect(result.error.code).toBe('AGENT_INTERCEPT_FAILED')
       expect(result.error.state).toBe('agent')
+      expect(result.error.context).toMatchObject({
+        reason: 'notification emitter failure',
+        scentId: expect.any(String),
+      })
     })
   })
 

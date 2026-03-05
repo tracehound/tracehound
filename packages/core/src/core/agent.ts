@@ -247,7 +247,7 @@ export class Agent implements IAgent {
 
       return {
         status: 'error',
-        error: Errors.interceptFailed(`${reason} [scentId=${scent.id}]`),
+        error: Errors.interceptFailed(reason, { scentId: scent.id }),
       }
     }
   }

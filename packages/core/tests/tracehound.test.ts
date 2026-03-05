@@ -2,10 +2,11 @@
  * Tests for tracehound.ts - Main API factory
  */
 
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
+import { encodeHoundMessage } from '../src/core/hound-ipc.js'
 import { createMockAdapter } from '../src/core/hound-pool.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk } from '../src/utils/system-snapshot.js'
@@ -170,6 +171,45 @@ describe('Tracehound Factory', () => {
       tracehound.shutdown()
       vi.useRealTimers()
     })
+
+    it('houndPool error flow emits system_overload alert and panic', () => {
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 1000,
+          rotationJitterMs: 10,
+          adapter,
+        },
+      })
+
+      const panics: Array<{ reason: string }> = []
+      tracehound.notifications.on('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
+      })
+
+      tracehound.agent.intercept({
+        id: '4',
+        timestamp: Date.now(),
+        source: '1.2.3.5',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { a: 1 },
+      })
+
+      const pid = [...adapter.getMockProcesses().keys()][0]
+      const errorMessage = encodeHoundMessage({
+        type: 'status',
+        state: 'error',
+        error: 'boom',
+      })
+      const payload = new Uint8Array(errorMessage.subarray(4)).buffer
+      adapter.simulateMessage(pid, payload)
+
+      const snapshot = tracehound.watcher.snapshot()
+      expect(snapshot.lastAlert?.type).toBe('system_overload')
+      expect(panics.some((panic) => panic.reason.includes('hound_error'))).toBe(true)
+      tracehound.shutdown()
+    })
   })
 
   describe('Snapshot API', () => {
@@ -253,21 +293,87 @@ describe('Tracehound Factory', () => {
       rmSync(dir, { recursive: true, force: true })
     })
 
+    it('uses default snapshot interval when intervalMs is omitted', async () => {
+      vi.useFakeTimers()
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-default-interval-'))
+      const path = join(dir, 'snapshot.json')
+
+      try {
+        const tracehound = createTracehound({
+          snapshot: {
+            path,
+            secret: 'test-secret',
+          },
+        })
+
+        rmSync(path, { force: true })
+        await vi.advanceTimersByTimeAsync(999)
+        expect(existsSync(path)).toBe(false)
+
+        await vi.advanceTimersByTimeAsync(1)
+        expect(existsSync(path)).toBe(true)
+        tracehound.shutdown()
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+        vi.useRealTimers()
+      }
+    })
+
     it('removes snapshot file on shutdown to prevent stale operational truth', () => {
       const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-cleanup-'))
       const path = join(dir, 'snapshot.json')
-      const tracehound = createTracehound({
-        snapshot: {
-          path,
-          secret: 'test-secret',
-          intervalMs: 1000,
-        },
-      })
+      try {
+        const tracehound = createTracehound({
+          snapshot: {
+            path,
+            secret: 'test-secret',
+            intervalMs: 1000,
+          },
+        })
 
-      expect(existsSync(path)).toBe(true)
+        expect(existsSync(path)).toBe(true)
+        tracehound.shutdown()
+        expect(existsSync(path)).toBe(false)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it('shutdown is safe when snapshot export is disabled', () => {
+      const tracehound = createTracehound()
+      expect(() => tracehound.shutdown()).not.toThrow()
+    })
+
+    it('startSnapshotLoop is a no-op when snapshot export is disabled', () => {
+      const tracehound = createTracehound()
+      const internals = tracehound as unknown as { startSnapshotLoop: () => void }
+      expect(() => internals.startSnapshotLoop()).not.toThrow()
       tracehound.shutdown()
-      expect(existsSync(path)).toBe(false)
-      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('emits snapshot_cleanup_failed panic when cleanup cannot unlink snapshot target', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-cleanup-fail-'))
+      const snapshotTarget = join(dir, 'snapshot-target')
+
+      try {
+        // Create a directory at snapshot path so unlinkSync throws on shutdown.
+        rmSync(snapshotTarget, { recursive: true, force: true })
+        mkdirSync(snapshotTarget, { recursive: true })
+
+        const tracehound = createTracehound()
+        const internal = tracehound as unknown as { snapshotPath: string }
+        internal.snapshotPath = snapshotTarget
+
+        const panics: Array<{ reason: string }> = []
+        tracehound.notifications.on('system.panic', (event) => {
+          panics.push({ reason: event.payload.reason })
+        })
+
+        tracehound.shutdown()
+        expect(panics.some((panic) => panic.reason === 'snapshot_cleanup_failed')).toBe(true)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
     })
 
     it('stops snapshot writes after shutdown', async () => {

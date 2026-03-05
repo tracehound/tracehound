@@ -1,0 +1,160 @@
+name: ci-pr
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: 9.1.4
+  NODE_VERSION: "20"
+
+jobs:
+  affected:
+    runs-on: ubuntu-latest
+    outputs:
+      filters: ${{ steps.detect.outputs.filters }}
+      has_packages: ${{ steps.detect.outputs.has_packages }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: detect
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          mapfile -t CHANGED < <(git diff --name-only "$BASE" "$HEAD")
+
+          declare -A PKGS=()
+          RUN_ALL=0
+
+          for file in "${CHANGED[@]}"; do
+            case "$file" in
+              packages/core/*)
+                PKGS["@tracehound/core"]=1
+                PKGS["@tracehound/cli"]=1
+                PKGS["@tracehound/express"]=1
+                PKGS["@tracehound/fastify"]=1
+                ;;
+              packages/cli/*)
+                PKGS["@tracehound/cli"]=1
+                ;;
+              packages/express/*)
+                PKGS["@tracehound/express"]=1
+                ;;
+              packages/fastify/*)
+                PKGS["@tracehound/fastify"]=1
+                ;;
+              package.json|pnpm-lock.yaml|pnpm-workspace.yaml|tsconfig*.json|vitest.config.*|scripts/*|.github/workflows/*)
+                RUN_ALL=1
+                ;;
+            esac
+          done
+
+          if [ "$RUN_ALL" -eq 1 ]; then
+            FILTERS="--filter @tracehound/core --filter @tracehound/cli --filter @tracehound/express --filter @tracehound/fastify"
+            echo "filters=$FILTERS" >> "$GITHUB_OUTPUT"
+            echo "has_packages=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${#PKGS[@]}" -eq 0 ]; then
+            echo "filters=" >> "$GITHUB_OUTPUT"
+            echo "has_packages=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          FILTERS=""
+          for pkg in $(printf '%s\n' "${!PKGS[@]}" | sort); do
+            FILTERS="$FILTERS --filter $pkg"
+          done
+
+          FILTERS="${FILTERS# }"
+          echo "filters=$FILTERS" >> "$GITHUB_OUTPUT"
+          echo "has_packages=true" >> "$GITHUB_OUTPUT"
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [affected]
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.affected.outputs.has_packages == 'true'
+
+      - uses: pnpm/action-setup@v4
+        if: needs.affected.outputs.has_packages == 'true'
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        if: needs.affected.outputs.has_packages == 'true'
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        if: needs.affected.outputs.has_packages == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint affected workspaces
+        if: needs.affected.outputs.has_packages == 'true'
+        run: pnpm -r ${{ needs.affected.outputs.filters }} lint
+
+      - name: Build affected workspaces
+        if: needs.affected.outputs.has_packages == 'true'
+        run: pnpm -r ${{ needs.affected.outputs.filters }} build
+
+      - name: Test affected workspaces
+        if: needs.affected.outputs.has_packages == 'true'
+        run: pnpm -r ${{ needs.affected.outputs.filters }} test
+
+      - name: Skip package validation
+        if: needs.affected.outputs.has_packages != 'true'
+        run: echo "No package or shared build changes detected; package validation skipped."
+
+  sbom_vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: spdx-json
+          output-file: sbom.spdx.json
+
+      - name: Scan SBOM for high vulnerabilities
+        uses: anchore/scan-action@v6
+        with:
+          sbom: sbom.spdx.json
+          fail-build: true
+          severity-cutoff: high
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-spdx
+          path: sbom.spdx.json
+          if-no-files-found: error
+
+  secrets_pr_safe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

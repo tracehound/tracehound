@@ -1,0 +1,76 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      npm_tag:
+        description: npm dist-tag (latest, next, beta, etc.)
+        required: true
+        default: latest
+        type: string
+      publish_core:
+        description: Publish @tracehound/core
+        required: true
+        default: true
+        type: boolean
+      publish_express:
+        description: Publish @tracehound/express
+        required: true
+        default: true
+        type: boolean
+      publish_fastify:
+        description: Publish @tracehound/fastify
+        required: true
+        default: true
+        type: boolean
+      publish_cli:
+        description: Publish @tracehound/cli
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  PNPM_VERSION: 9.1.4
+  NODE_VERSION: "20"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm test
+
+      - name: Publish @tracehound/core
+        if: ${{ inputs.publish_core }}
+        run: pnpm -C packages/core publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}
+
+      - name: Publish @tracehound/express
+        if: ${{ inputs.publish_express }}
+        run: pnpm -C packages/express publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}
+
+      - name: Publish @tracehound/fastify
+        if: ${{ inputs.publish_fastify }}
+        run: pnpm -C packages/fastify publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}
+
+      - name: Publish @tracehound/cli
+        if: ${{ inputs.publish_cli }}
+        run: pnpm -C packages/cli publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}

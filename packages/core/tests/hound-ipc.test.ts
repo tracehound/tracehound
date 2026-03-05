@@ -111,6 +111,41 @@ describe('HoundIPC', () => {
       expect(payload[0]).toBe(0x03) // type: analysis
       expect(payload.length).toBeGreaterThan(16)
     })
+
+    it('should encode/decode all analysis content types', () => {
+      const contentTypes = ['unknown', 'gzip', 'zip', 'pdf', 'png', 'jpeg', 'gif'] as const
+
+      for (const contentType of contentTypes) {
+        const encoded = encodeHoundMessage({
+          type: 'analysis',
+          hash: 'abc',
+          entropy: 1.23,
+          contentType,
+          sizeBytes: 12,
+        })
+        const length = encoded.readUInt32BE(0)
+        const payload = encoded.subarray(4, 4 + length)
+        const decoded = decodeHoundMessage(new Uint8Array(payload).buffer)
+
+        expect(decoded.type).toBe('analysis')
+        if (decoded.type === 'analysis') {
+          expect(decoded.contentType).toBe(contentType)
+        }
+      }
+    })
+
+    it('should throw when analysis hash length exceeds uint16', () => {
+      const oversizedHash = 'a'.repeat(70_000)
+      expect(() =>
+        encodeHoundMessage({
+          type: 'analysis',
+          hash: oversizedHash,
+          entropy: 1,
+          contentType: 'binary',
+          sizeBytes: 1,
+        }),
+      ).toThrow(/analysis/i)
+    })
   })
 
   describe('tryParseMessage', () => {
@@ -261,6 +296,29 @@ describe('HoundIPC', () => {
         truncated.byteOffset + truncated.byteLength,
       )
       expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*metrics/)
+    })
+
+    it('should throw on unknown status state code', () => {
+      const payload = Buffer.from([0x01, 0x00]) // status with invalid state code
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Unknown.*status/i)
+    })
+
+    it('should throw on unknown analysis content type code', () => {
+      const hash = Buffer.from('h', 'utf8')
+      const payload = Buffer.alloc(1 + 2 + hash.length + 8 + 1 + 4)
+      payload[0] = 0x03
+      payload.writeUInt16BE(hash.length, 1)
+      hash.copy(payload, 3)
+      let offset = 3 + hash.length
+      payload.writeDoubleBE(1.5, offset)
+      offset += 8
+      payload[offset] = 0x7f // invalid content type
+      offset += 1
+      payload.writeUInt32BE(10, offset)
+
+      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Unknown.*content/i)
     })
   })
 

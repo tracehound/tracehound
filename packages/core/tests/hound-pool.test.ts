@@ -200,6 +200,36 @@ describe('HoundPool', () => {
 
       expect(pool.stats.activeProcesses).toBe(0)
     })
+
+    it('retains bounded processing time history for average calculation', () => {
+      for (let i = 0; i < 105; i++) {
+        pool.activate(createEvidence(`bounded-${i}`))
+        const processes = mockAdapter.getMockProcesses()
+        const pid = [...processes.keys()][0]
+        simulateProcessComplete(pid)
+      }
+
+      expect(pool.stats.totalActivations).toBe(105)
+      expect(pool.stats.avgProcessingMs).toBeGreaterThanOrEqual(0)
+    })
+
+    it('continues emitting when one result handler throws', () => {
+      let successfulHandlerCalls = 0
+      pool.onResult(() => {
+        throw new Error('handler-failed')
+      })
+      pool.onResult(() => {
+        successfulHandlerCalls++
+      })
+
+      pool.activate(createEvidence('handler-throw'))
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+      simulateProcessComplete(pid)
+
+      expect(successfulHandlerCalls).toBe(1)
+      expect(pool.stats.totalErrors).toBeGreaterThan(0)
+    })
   })
 
   describe('Timeout handling', () => {
@@ -225,6 +255,36 @@ describe('HoundPool', () => {
       const timeoutResults = results.filter((r) => r.status === 'timeout')
       expect(timeoutResults.length).toBeGreaterThanOrEqual(1)
       expect(pool.stats.totalTimeouts).toBe(1)
+    })
+
+    it('preserves analysis metadata on timeout results', async () => {
+      const results: HoundResult[] = []
+      pool.shutdown()
+
+      mockAdapter = createMockAdapter()
+      pool = createHoundPool({
+        poolSize: 1,
+        timeout: 5,
+        rotationJitterMs: 50,
+        adapter: mockAdapter,
+      })
+      pool.onResult((result) => results.push(result))
+
+      pool.activate(createEvidence('analysis-timeout'))
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+      simulateProcessAnalysis(pid)
+
+      await vi.advanceTimersByTimeAsync(6)
+
+      const timeoutResult = results.find((result) => result.status === 'timeout')
+      expect(timeoutResult).toBeDefined()
+      expect(timeoutResult?.analysis).toEqual({
+        hash: 'a1b2c3',
+        entropy: 7.1,
+        contentType: 'json',
+        sizeBytes: 128,
+      })
     })
   })
 
@@ -398,6 +458,7 @@ describe('HoundPool', () => {
         state: 'error',
         error: 'analysis_failed',
       })
+      simulateProcessAnalysis(pid)
       const payloadSlice = errorMessage.subarray(4)
       const payload = new Uint8Array(payloadSlice).buffer
       mockAdapter.simulateMessage(pid, payload)
@@ -405,6 +466,12 @@ describe('HoundPool', () => {
       const errorResults = results.filter((r) => r.status === 'error')
       expect(errorResults.length).toBeGreaterThan(0)
       expect(errorResults[0].error).toBeDefined()
+      expect(errorResults[0].analysis).toEqual({
+        hash: 'a1b2c3',
+        entropy: 7.1,
+        contentType: 'json',
+        sizeBytes: 128,
+      })
     })
 
     it('handles unexpected process exit', () => {

@@ -2,7 +2,7 @@
  * Tests for tracehound.ts - Main API factory
  */
 
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -205,6 +205,36 @@ describe('Tracehound Factory', () => {
       }
     })
 
+    it('throws when snapshot path is empty', () => {
+      expect(() =>
+        createTracehound({
+          snapshot: {
+            path: '',
+            secret: 'test-secret',
+          },
+        }),
+      ).toThrow()
+    })
+
+    it('throws when snapshot interval is not a positive finite value', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-config-'))
+      const path = join(dir, 'snapshot.json')
+
+      try {
+        expect(() =>
+          createTracehound({
+            snapshot: {
+              path,
+              secret: 'test-secret',
+              intervalMs: Number.NaN,
+            },
+          }),
+        ).toThrow()
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
     it('writes signed snapshot file when snapshot export is enabled', () => {
       const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-'))
       const path = join(dir, 'snapshot.json')
@@ -244,6 +274,40 @@ describe('Tracehound Factory', () => {
         await vi.advanceTimersByTimeAsync(500)
 
         expect(existsSync(path)).toBe(false)
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+        vi.useRealTimers()
+      }
+    })
+
+    it('emits snapshot_write_failed panic when snapshot flush fails', async () => {
+      vi.useFakeTimers()
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-fail-'))
+      const parentFile = join(dir, 'not-a-directory')
+      const path = join(parentFile, 'snapshot.json')
+
+      try {
+        rmSync(parentFile, { force: true })
+        // parent path must be a file so mkdir/flush fails deterministically
+        writeFileSync(parentFile, 'x')
+
+        const tracehound = createTracehound({
+          snapshot: {
+            path,
+            secret: 'test-secret',
+            intervalMs: 50,
+          },
+        })
+
+        const panics: Array<{ reason: string }> = []
+        tracehound.notifications.on('system.panic', (event) => {
+          panics.push({ reason: event.payload.reason })
+        })
+
+        await vi.advanceTimersByTimeAsync(100)
+        expect(panics.some((panic) => panic.reason === 'snapshot_write_failed')).toBe(true)
+
+        tracehound.shutdown()
       } finally {
         rmSync(dir, { recursive: true, force: true })
         vi.useRealTimers()

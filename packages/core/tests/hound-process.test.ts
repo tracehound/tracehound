@@ -31,6 +31,37 @@ describe('HoundProcess Analysis', () => {
     expect(analysis.entropy).toBeGreaterThan(0)
   })
 
+  it('detects magic-byte content types', () => {
+    const cases: Array<{ bytes: number[]; expected: string }> = [
+      { bytes: [0x1f, 0x8b, 0x08], expected: 'gzip' },
+      { bytes: [0x50, 0x4b, 0x03, 0x04], expected: 'zip' },
+      { bytes: [0x25, 0x50, 0x44, 0x46], expected: 'pdf' },
+      { bytes: [0x89, 0x50, 0x4e, 0x47], expected: 'png' },
+      { bytes: [0xff, 0xd8, 0xff, 0x00], expected: 'jpeg' },
+      { bytes: [0x47, 0x49, 0x46, 0x38], expected: 'gif' },
+    ]
+
+    for (const entry of cases) {
+      const analysis = analyzePayload(new Uint8Array(entry.bytes).buffer)
+      expect(analysis.contentType).toBe(entry.expected)
+    }
+  })
+
+  it('detects unknown and text branches correctly', () => {
+    const empty = analyzePayload(new Uint8Array([]).buffer)
+    expect(empty.contentType).toBe('unknown')
+    expect(empty.entropy).toBe(0)
+
+    const text = analyzePayload(new TextEncoder().encode('hello world').buffer)
+    expect(text.contentType).toBe('text')
+  })
+
+  it('detects json with leading whitespace', () => {
+    const payload = new TextEncoder().encode(' \n\t {"k":1}').buffer
+    const analysis = analyzePayload(payload)
+    expect(analysis.contentType).toBe('json')
+  })
+
   it('encodes/decodes analysis IPC message round-trip', () => {
     const analysis: HoundMessage = {
       type: 'analysis',

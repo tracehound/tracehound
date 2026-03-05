@@ -258,4 +258,140 @@ describe('system snapshot freshness', () => {
     if (result.ok) return
     expect(result.code).toBe('NO_INSTANCE')
   })
+
+  it('should reject envelope with invalid signature metadata', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: createFixtureSnapshot(now.getTime()),
+        signature: '',
+      }),
+      'utf8',
+    )
+
+    const result = loadSystemSnapshot()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
+  it('should reject envelope when version or algorithm is invalid', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 2,
+        algorithm: 'HMAC-SHA256',
+        payload: createFixtureSnapshot(now.getTime()),
+        signature: 'x',
+      }),
+      'utf8',
+    )
+    let result = loadSystemSnapshot()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-MD5',
+        payload: createFixtureSnapshot(now.getTime()),
+        signature: 'x',
+      }),
+      'utf8',
+    )
+    result = loadSystemSnapshot()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
+  it('should reject payload with invalid generatedAt or health values', () => {
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: { generatedAt: Number.NaN, systemHealth: 'healthy' },
+        signature: 'x',
+      }),
+      'utf8',
+    )
+
+    let result = loadSystemSnapshot()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: 'unknown',
+          agent: {},
+          quarantine: {},
+          quarantineMaxBytes: 1,
+          watcher: {},
+          houndPool: {},
+          rateLimiter: {},
+        },
+        signature: 'x',
+      }),
+      'utf8',
+    )
+
+    result = loadSystemSnapshot()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
+  it('should reject signed payload when nested counters are structurally invalid', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    const invalidPayload: unknown = {
+      ...createFixtureSnapshot(now.getTime()),
+      watcher: {
+        ...createFixtureSnapshot(now.getTime()).watcher,
+        threats: {
+          total: 8,
+          byCategory: { injection: 3, ddos: '2' },
+          bySeverity: { critical: 1, high: 2, medium: 3, low: 2 },
+        },
+      },
+      quarantine: {
+        ...createFixtureSnapshot(now.getTime()).quarantine,
+        bySeverity: { critical: 1, high: 1, medium: 1, low: '1' },
+      },
+    }
+    const payloadText = JSON.stringify(invalidPayload)
+    const signature = createHmac('sha256', SNAPSHOT_SECRET).update(payloadText).digest('hex')
+
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: invalidPayload,
+        signature,
+      }),
+      'utf8',
+    )
+
+    const result = loadSystemSnapshot()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
 })

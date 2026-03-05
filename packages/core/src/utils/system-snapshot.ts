@@ -301,41 +301,295 @@ function isSignedSnapshot(value: unknown): value is SignedSystemSnapshot {
 }
 
 function isSystemSnapshot(value: unknown): value is SystemSnapshot {
-  if (typeof value !== "object" || value === null) {
+  if (!isRecord(value)) {
     return false;
   }
 
-  const snapshot = value as Partial<SystemSnapshot>;
-  if (
-    typeof snapshot.generatedAt !== "number" ||
-    !Number.isFinite(snapshot.generatedAt)
-  ) {
+  const snapshot = value as {
+    generatedAt?: unknown;
+    systemHealth?: unknown;
+    quarantineMaxBytes?: unknown;
+    agent?: unknown;
+    quarantine?: unknown;
+    watcher?: unknown;
+    houndPool?: unknown;
+    rateLimiter?: unknown;
+  };
+
+  if (!isNonNegativeFiniteNumber(snapshot.generatedAt)) {
     return false;
   }
-  if (
-    snapshot.systemHealth !== "healthy" &&
-    snapshot.systemHealth !== "degraded" &&
-    snapshot.systemHealth !== "critical"
-  ) {
+  if (!isSystemHealth(snapshot.systemHealth)) {
     return false;
   }
-  if (
-    typeof snapshot.quarantineMaxBytes !== "number" ||
-    snapshot.quarantineMaxBytes < 0
-  ) {
+  if (!isNonNegativeInteger(snapshot.quarantineMaxBytes)) {
     return false;
   }
-  if (
-    !snapshot.agent ||
-    !snapshot.quarantine ||
-    !snapshot.watcher ||
-    !snapshot.houndPool
-  ) {
+
+  if (!isAgentStats(snapshot.agent)) {
     return false;
   }
-  if (!snapshot.rateLimiter) {
+  if (!isQuarantineStats(snapshot.quarantine)) {
+    return false;
+  }
+  if (!isWatcherSnapshot(snapshot.watcher)) {
+    return false;
+  }
+  if (!isHoundPoolStats(snapshot.houndPool)) {
+    return false;
+  }
+  if (!isRateLimiterStats(snapshot.rateLimiter)) {
     return false;
   }
 
   return true;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isSystemHealth(value: unknown): value is SystemHealth {
+  return value === "healthy" || value === "degraded" || value === "critical";
+}
+
+function isAgentStats(value: unknown): value is AgentStats {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const stats = value as {
+    totalIntercepts?: unknown;
+    cleanCount?: unknown;
+    rateLimitedCount?: unknown;
+    validationFailures?: unknown;
+    ignoredCount?: unknown;
+    quarantinedCount?: unknown;
+    errorCount?: unknown;
+    coordinationFallbackCount?: unknown;
+    coordinationWarningCount?: unknown;
+    membraneRejectionCount?: unknown;
+  };
+
+  return (
+    isNonNegativeInteger(stats.totalIntercepts) &&
+    isNonNegativeInteger(stats.cleanCount) &&
+    isNonNegativeInteger(stats.rateLimitedCount) &&
+    isNonNegativeInteger(stats.validationFailures) &&
+    isNonNegativeInteger(stats.ignoredCount) &&
+    isNonNegativeInteger(stats.quarantinedCount) &&
+    isNonNegativeInteger(stats.errorCount) &&
+    isNonNegativeInteger(stats.coordinationFallbackCount) &&
+    isNonNegativeInteger(stats.coordinationWarningCount) &&
+    isNonNegativeInteger(stats.membraneRejectionCount)
+  );
+}
+
+function isQuarantineStats(value: unknown): value is QuarantineStats {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const stats = value as {
+    count?: unknown;
+    bytes?: unknown;
+    droppedCount?: unknown;
+    droppedBytes?: unknown;
+    bySeverity?: unknown;
+  };
+
+  return (
+    isNonNegativeInteger(stats.count) &&
+    isNonNegativeInteger(stats.bytes) &&
+    isNonNegativeInteger(stats.droppedCount) &&
+    isNonNegativeInteger(stats.droppedBytes) &&
+    isSeverityCounters(stats.bySeverity)
+  );
+}
+
+function isWatcherSnapshot(value: unknown): value is WatcherSnapshot {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const snapshot = value as {
+    uptimeMs?: unknown;
+    threats?: unknown;
+    quarantine?: unknown;
+    totalAlerts?: unknown;
+    alertsInWindow?: unknown;
+    lastAlert?: unknown;
+    overloaded?: unknown;
+    snapshotTime?: unknown;
+  };
+
+  if (!isRecord(snapshot.threats) || !isRecord(snapshot.quarantine)) {
+    return false;
+  }
+
+  const threats = snapshot.threats as {
+    total?: unknown;
+    byCategory?: unknown;
+    bySeverity?: unknown;
+  };
+  const quarantine = snapshot.quarantine as {
+    count?: unknown;
+    bytes?: unknown;
+    capacityPercent?: unknown;
+  };
+
+  return (
+    isNonNegativeInteger(snapshot.uptimeMs) &&
+    isNonNegativeInteger(threats.total) &&
+    isNumericRecord(threats.byCategory) &&
+    isSeverityCounters(threats.bySeverity) &&
+    isNonNegativeInteger(quarantine.count) &&
+    isNonNegativeInteger(quarantine.bytes) &&
+    isNonNegativeFiniteNumber(quarantine.capacityPercent) &&
+    isNonNegativeInteger(snapshot.totalAlerts) &&
+    isNonNegativeInteger(snapshot.alertsInWindow) &&
+    isAlertOrNull(snapshot.lastAlert) &&
+    typeof snapshot.overloaded === "boolean" &&
+    isNonNegativeFiniteNumber(snapshot.snapshotTime)
+  );
+}
+
+function isAlertOrNull(value: unknown): boolean {
+  if (value === null) {
+    return true;
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const alert = value as {
+    id?: unknown;
+    type?: unknown;
+    severity?: unknown;
+    message?: unknown;
+    timestamp?: unknown;
+    context?: unknown;
+  };
+
+  if (
+    typeof alert.id !== "string" ||
+    alert.id.length === 0 ||
+    !isAlertType(alert.type) ||
+    !isAlertSeverity(alert.severity) ||
+    typeof alert.message !== "string" ||
+    alert.message.length === 0 ||
+    !isNonNegativeFiniteNumber(alert.timestamp)
+  ) {
+    return false;
+  }
+
+  if (alert.context !== undefined && !isRecord(alert.context)) {
+    return false;
+  }
+
+  return true;
+}
+
+function isAlertType(value: unknown): boolean {
+  return (
+    value === "threat_detected" ||
+    value === "evidence_neutralized" ||
+    value === "quarantine_full" ||
+    value === "quarantine_high" ||
+    value === "rate_limit_exceeded" ||
+    value === "hound_timeout" ||
+    value === "system_overload"
+  );
+}
+
+function isAlertSeverity(value: unknown): boolean {
+  return value === "info" || value === "warning" || value === "critical";
+}
+
+function isHoundPoolStats(value: unknown): value is HoundPoolStats {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const stats = value as {
+    activeProcesses?: unknown;
+    totalProcesses?: unknown;
+    totalActivations?: unknown;
+    totalTimeouts?: unknown;
+    totalErrors?: unknown;
+    avgProcessingMs?: unknown;
+  };
+
+  return (
+    isNonNegativeInteger(stats.activeProcesses) &&
+    isNonNegativeInteger(stats.totalProcesses) &&
+    isNonNegativeInteger(stats.totalActivations) &&
+    isNonNegativeInteger(stats.totalTimeouts) &&
+    isNonNegativeInteger(stats.totalErrors) &&
+    isNonNegativeFiniteNumber(stats.avgProcessingMs)
+  );
+}
+
+function isRateLimiterStats(value: unknown): value is RateLimiterStats {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const stats = value as {
+    sources?: unknown;
+    blocked?: unknown;
+    totalChecks?: unknown;
+    totalRejections?: unknown;
+    totalEvictions?: unknown;
+  };
+
+  return (
+    isNonNegativeInteger(stats.sources) &&
+    isNonNegativeInteger(stats.blocked) &&
+    isNonNegativeInteger(stats.totalChecks) &&
+    isNonNegativeInteger(stats.totalRejections) &&
+    isNonNegativeInteger(stats.totalEvictions)
+  );
+}
+
+function isSeverityCounters(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const counters = value as {
+    low?: unknown;
+    medium?: unknown;
+    high?: unknown;
+    critical?: unknown;
+  };
+
+  return (
+    isNonNegativeInteger(counters.low) &&
+    isNonNegativeInteger(counters.medium) &&
+    isNonNegativeInteger(counters.high) &&
+    isNonNegativeInteger(counters.critical)
+  );
+}
+
+function isNumericRecord(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  for (const entryValue of Object.values(value)) {
+    if (!isNonNegativeInteger(entryValue)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNonNegativeFiniteNumber(value) && Number.isInteger(value);
 }

@@ -437,6 +437,7 @@ export class HoundPool implements IHoundPool {
     errorMessage?: string,
   ): void {
     const signature = processState.currentSignature;
+    const analysis = processState.currentAnalysis;
     const startTime = processState.startTime;
 
     // Clear timeout
@@ -469,6 +470,9 @@ export class HoundPool implements IHoundPool {
         processId: processState.id,
         error: errorMessage ?? reason,
       };
+      if (analysis) {
+        result.analysis = analysis;
+      }
 
       this.emitResult(result);
     }

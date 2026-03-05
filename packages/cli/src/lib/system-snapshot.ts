@@ -189,28 +189,240 @@ function isSignedSnapshot(value: unknown): value is SignedSnapshot {
 }
 
 function isSnapshotPayload(value: unknown): value is CliSystemSnapshot {
-  if (typeof value !== 'object' || value === null) {
+  if (!isRecord(value)) {
     return false
   }
 
-  const snapshot = value as Partial<CliSystemSnapshot>
-  if (typeof snapshot.generatedAt !== 'number' || !Number.isFinite(snapshot.generatedAt)) {
+  const snapshot = value as {
+    generatedAt?: unknown
+    systemHealth?: unknown
+    quarantineMaxBytes?: unknown
+    agent?: unknown
+    quarantine?: unknown
+    watcher?: unknown
+    houndPool?: unknown
+    rateLimiter?: unknown
+  }
+
+  if (!isNonNegativeFiniteNumber(snapshot.generatedAt)) {
     return false
   }
-  if (
-    snapshot.systemHealth !== 'healthy' &&
-    snapshot.systemHealth !== 'degraded' &&
-    snapshot.systemHealth !== 'critical'
-  ) {
+  if (!isSystemHealth(snapshot.systemHealth)) {
+    return false
+  }
+  if (!isNonNegativeInteger(snapshot.quarantineMaxBytes)) {
+    return false
+  }
+  if (!isAgentStats(snapshot.agent)) {
+    return false
+  }
+  if (!isQuarantineStats(snapshot.quarantine)) {
+    return false
+  }
+  if (!isWatcherSnapshot(snapshot.watcher)) {
+    return false
+  }
+  if (!isHoundPoolStats(snapshot.houndPool)) {
+    return false
+  }
+  if (!isRateLimiterStats(snapshot.rateLimiter)) {
     return false
   }
 
-  return Boolean(
-    snapshot.agent &&
-      snapshot.quarantine &&
-      typeof snapshot.quarantineMaxBytes === 'number' &&
-      snapshot.watcher &&
-      snapshot.houndPool &&
-      snapshot.rateLimiter,
+  return true
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isSystemHealth(value: unknown): value is CliSystemSnapshot['systemHealth'] {
+  return value === 'healthy' || value === 'degraded' || value === 'critical'
+}
+
+function isAgentStats(value: unknown): value is CliSystemSnapshot['agent'] {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const stats = value as {
+    totalIntercepts?: unknown
+    cleanCount?: unknown
+    rateLimitedCount?: unknown
+    validationFailures?: unknown
+    ignoredCount?: unknown
+    quarantinedCount?: unknown
+    errorCount?: unknown
+    coordinationFallbackCount?: unknown
+    coordinationWarningCount?: unknown
+    membraneRejectionCount?: unknown
+  }
+
+  return (
+    isNonNegativeInteger(stats.totalIntercepts) &&
+    isNonNegativeInteger(stats.cleanCount) &&
+    isNonNegativeInteger(stats.rateLimitedCount) &&
+    isNonNegativeInteger(stats.validationFailures) &&
+    isNonNegativeInteger(stats.ignoredCount) &&
+    isNonNegativeInteger(stats.quarantinedCount) &&
+    isNonNegativeInteger(stats.errorCount) &&
+    isNonNegativeInteger(stats.coordinationFallbackCount) &&
+    isNonNegativeInteger(stats.coordinationWarningCount) &&
+    isNonNegativeInteger(stats.membraneRejectionCount)
   )
+}
+
+function isQuarantineStats(value: unknown): value is CliSystemSnapshot['quarantine'] {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const stats = value as {
+    count?: unknown
+    bytes?: unknown
+    droppedCount?: unknown
+    droppedBytes?: unknown
+    bySeverity?: unknown
+  }
+
+  return (
+    isNonNegativeInteger(stats.count) &&
+    isNonNegativeInteger(stats.bytes) &&
+    isNonNegativeInteger(stats.droppedCount) &&
+    isNonNegativeInteger(stats.droppedBytes) &&
+    isSeverityCounters(stats.bySeverity)
+  )
+}
+
+function isWatcherSnapshot(value: unknown): value is CliSystemSnapshot['watcher'] {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const snapshot = value as {
+    uptimeMs?: unknown
+    threats?: unknown
+    totalAlerts?: unknown
+    alertsInWindow?: unknown
+    overloaded?: unknown
+    snapshotTime?: unknown
+    quarantine?: unknown
+  }
+
+  if (!isRecord(snapshot.threats) || !isRecord(snapshot.quarantine)) {
+    return false
+  }
+
+  const threats = snapshot.threats as {
+    total?: unknown
+    byCategory?: unknown
+    bySeverity?: unknown
+  }
+  const quarantine = snapshot.quarantine as {
+    count?: unknown
+    bytes?: unknown
+    capacityPercent?: unknown
+  }
+
+  return (
+    isNonNegativeInteger(snapshot.uptimeMs) &&
+    isNonNegativeInteger(threats.total) &&
+    isNumericRecord(threats.byCategory) &&
+    isSeverityCounters(threats.bySeverity) &&
+    isNonNegativeInteger(snapshot.totalAlerts) &&
+    isNonNegativeInteger(snapshot.alertsInWindow) &&
+    typeof snapshot.overloaded === 'boolean' &&
+    isNonNegativeFiniteNumber(snapshot.snapshotTime) &&
+    isNonNegativeInteger(quarantine.count) &&
+    isNonNegativeInteger(quarantine.bytes) &&
+    isNonNegativeFiniteNumber(quarantine.capacityPercent)
+  )
+}
+
+function isHoundPoolStats(value: unknown): value is CliSystemSnapshot['houndPool'] {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const stats = value as {
+    activeProcesses?: unknown
+    totalProcesses?: unknown
+    totalActivations?: unknown
+    totalTimeouts?: unknown
+    totalErrors?: unknown
+    avgProcessingMs?: unknown
+  }
+
+  return (
+    isNonNegativeInteger(stats.activeProcesses) &&
+    isNonNegativeInteger(stats.totalProcesses) &&
+    isNonNegativeInteger(stats.totalActivations) &&
+    isNonNegativeInteger(stats.totalTimeouts) &&
+    isNonNegativeInteger(stats.totalErrors) &&
+    isNonNegativeFiniteNumber(stats.avgProcessingMs)
+  )
+}
+
+function isRateLimiterStats(value: unknown): value is CliSystemSnapshot['rateLimiter'] {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const stats = value as {
+    sources?: unknown
+    blocked?: unknown
+    totalChecks?: unknown
+    totalRejections?: unknown
+    totalEvictions?: unknown
+  }
+
+  return (
+    isNonNegativeInteger(stats.sources) &&
+    isNonNegativeInteger(stats.blocked) &&
+    isNonNegativeInteger(stats.totalChecks) &&
+    isNonNegativeInteger(stats.totalRejections) &&
+    isNonNegativeInteger(stats.totalEvictions)
+  )
+}
+
+function isSeverityCounters(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const counters = value as {
+    critical?: unknown
+    high?: unknown
+    medium?: unknown
+    low?: unknown
+  }
+
+  return (
+    isNonNegativeInteger(counters.critical) &&
+    isNonNegativeInteger(counters.high) &&
+    isNonNegativeInteger(counters.medium) &&
+    isNonNegativeInteger(counters.low)
+  )
+}
+
+function isNumericRecord(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  for (const entryValue of Object.values(value)) {
+    if (!isNonNegativeInteger(entryValue)) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function isNonNegativeFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNonNegativeFiniteNumber(value) && Number.isInteger(value)
 }

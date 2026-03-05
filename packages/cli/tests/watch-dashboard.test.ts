@@ -8,7 +8,7 @@ import { renderDashboard, watchCommand } from '../src/commands/watch.js'
 
 const SNAPSHOT_SECRET = 'tracehound-cli-watch-dashboard-secret'
 
-function createFixtureSnapshot(): SystemSnapshot {
+function createFixtureSnapshot(partial?: Partial<SystemSnapshot['houndPool']>): SystemSnapshot {
   const now = Date.now()
   return {
     generatedAt: now,
@@ -72,6 +72,7 @@ function createFixtureSnapshot(): SystemSnapshot {
       totalTimeouts: 0,
       totalErrors: 0,
       avgProcessingMs: 12.4,
+      ...partial,
     },
     rateLimiter: {
       sources: 7,
@@ -196,6 +197,24 @@ describe('watch dashboard rendering', () => {
 
     const outputAfterSigint = logSpy.mock.calls.map((call) => String(call[0])).join('\n')
     expect(outputAfterSigint).toContain('Dashboard closed')
+  })
+
+  it('should render exhausted pool status from live snapshot mapping', () => {
+    const snapshotPath = join(fixtureDir, 'system-snapshot.json')
+    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
+    process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+
+    writeFixtureSnapshotToDisk(
+      createFixtureSnapshot({ activeProcesses: 2, totalProcesses: 2 }),
+      snapshotPath,
+      SNAPSHOT_SECRET,
+    )
+
+    watchCommand.exitOverride()
+    watchCommand.parse(['watch', '--refresh', '250'], { from: 'user' })
+
+    const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n')
+    expect(output).toContain('EXHAUSTED')
   })
 
   it('should render explicit exhausted state with non-empty threat list', () => {

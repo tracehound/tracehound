@@ -119,12 +119,9 @@ export function getProcessIsolationTelemetry(
     ...DEFAULT_CONSTRAINTS,
     ...constraints,
   };
-  const memoryLimit =
-    typeof mergedConstraints.maxMemoryMB === "number" &&
-    Number.isFinite(mergedConstraints.maxMemoryMB) &&
-    mergedConstraints.maxMemoryMB > 0
-      ? "enforced"
-      : "declarative";
+  const memoryLimit = isValidEnforcedMemoryLimitMB(mergedConstraints.maxMemoryMB)
+    ? "enforced"
+    : "declarative";
   const normalizedPlatform = normalizePlatform(platform);
 
   return Object.freeze({
@@ -215,7 +212,7 @@ export function createProcessAdapter(): IHoundProcessAdapter {
       const execArgv: string[] = [];
 
       // Memory limit (V8 heap)
-      if (mergedConstraints.maxMemoryMB) {
+      if (isValidEnforcedMemoryLimitMB(mergedConstraints.maxMemoryMB)) {
         execArgv.push(`--max-old-space-size=${mergedConstraints.maxMemoryMB}`);
       }
 
@@ -433,4 +430,13 @@ function normalizePlatform(platform: string): NodeJS.Platform | "unknown" {
     default:
       return "unknown";
   }
+}
+
+function isValidEnforcedMemoryLimitMB(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value > 0
+  );
 }

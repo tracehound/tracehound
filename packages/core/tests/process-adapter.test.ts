@@ -29,6 +29,37 @@ describe('process-adapter', () => {
     expect(Object.isFrozen(telemetry.capabilities)).toBe(true)
   })
 
+  it('treats fractional maxMemoryMB as declarative and omits memory arg', async () => {
+    let capturedArgs: string[] | undefined
+
+    vi.resetModules()
+    vi.doMock('node:child_process', () => ({
+      spawn: (_command: string, args: string[]) => {
+        capturedArgs = args
+        return ({
+          pid: 7777,
+          stdin: null,
+          stdout: null,
+          on: () => {},
+          kill: () => true,
+        }) as unknown
+      },
+    }))
+
+    const { createProcessAdapter, getProcessIsolationTelemetry } = await import(
+      '../src/core/process-adapter.js'
+    )
+
+    const telemetry = getProcessIsolationTelemetry({ maxMemoryMB: 64.5 }, 'linux')
+    expect(telemetry.capabilities.memoryLimit).toBe('declarative')
+
+    const adapter = createProcessAdapter()
+    adapter.spawn('noop.js', { maxMemoryMB: 64.5 })
+
+    expect(capturedArgs?.some((arg) => arg.startsWith('--max-old-space-size='))).toBe(false)
+    vi.doUnmock('node:child_process')
+  })
+
   it('throws when spawned child has no pid', async () => {
     vi.resetModules()
     vi.doMock('node:child_process', () => ({

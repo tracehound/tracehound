@@ -85,6 +85,15 @@ describe('HoundIPC', () => {
       expect(payload.subarray(2).toString('utf8')).toBe('test_error')
     })
 
+    it('should throw when status state is invalid at runtime', () => {
+      const invalid = {
+        type: 'status',
+        state: 'invalid',
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/status/i)
+    })
+
     it('should encode metrics message', () => {
       const message: HoundMessage = { type: 'metrics', processingTime: 123.45, memoryUsed: 678.9 }
       const encoded = encodeHoundMessage(message)
@@ -132,6 +141,18 @@ describe('HoundIPC', () => {
           expect(decoded.contentType).toBe(contentType)
         }
       }
+    })
+
+    it('should throw when analysis contentType is invalid at runtime', () => {
+      const invalid = {
+        type: 'analysis',
+        hash: 'abc',
+        entropy: 1.23,
+        contentType: 'exe',
+        sizeBytes: 12,
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/analysis/i)
     })
 
     it('should throw when analysis hash length exceeds uint16', () => {

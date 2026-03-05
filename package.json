@@ -10,6 +10,7 @@
     "test": "pnpm -r test",
     "test:coverage": "vitest run --coverage",
     "test:chaos": "tsx scripts/chaos/run-chaos-suite.ts",
+    "review:branch": "node scripts/review/pr-branch-review.mjs",
     "prelint": "pnpm --filter @tracehound/core build",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean",

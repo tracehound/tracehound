@@ -172,7 +172,7 @@ function encodeStatusState(state: HoundStatus): number {
     case 'error':
       return 0x03
     default:
-      return 0x00
+      throw Errors.processIpcInvalidStatusMessage()
   }
 }
 
@@ -199,7 +199,7 @@ function encodeContentType(contentType: HoundContentType): number {
     case 'gif':
       return 0x09
     default:
-      return 0x00
+      throw Errors.processIpcInvalidAnalysisMessage()
   }
 }
 

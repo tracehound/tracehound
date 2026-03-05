@@ -410,22 +410,23 @@ describe("system-snapshot utilities", () => {
   });
 
   it("should execute non-win32 hardening path without warning", () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
     const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
     const path = join(dir, "snapshot.json");
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
     );
-    const previousPlatform = process.platform;
     const warningSpy = vi
       .spyOn(process, "emitWarning")
       .mockImplementation(() => {});
 
     try {
-      Object.defineProperty(process, "platform", { value: "linux" });
       expect(() => writeSystemSnapshotToDisk(snapshot, path, "secret")).not.toThrow();
       expect(warningSpy).not.toHaveBeenCalled();
     } finally {
-      Object.defineProperty(process, "platform", { value: previousPlatform });
       warningSpy.mockRestore();
       rmSync(dir, { recursive: true, force: true });
     }

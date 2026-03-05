@@ -2,6 +2,33 @@ import { describe, expect, it, vi } from 'vitest'
 import { encodeMessage } from '../src/core/hound-ipc.js'
 
 describe('process-adapter', () => {
+  it('reports isolation telemetry with defaults', async () => {
+    const { getProcessIsolationTelemetry } = await import('../src/core/process-adapter.js')
+    const telemetry = getProcessIsolationTelemetry(undefined, 'linux')
+
+    expect(telemetry.constraints.maxMemoryMB).toBe(128)
+    expect(telemetry.capabilities.platform).toBe('linux')
+    expect(telemetry.capabilities.memoryLimit).toBe('enforced')
+    expect(telemetry.capabilities.environmentIsolation).toBe('allowlist')
+    expect(telemetry.environmentAllowlistSize).toBeGreaterThan(0)
+  })
+
+  it('normalizes unknown platform and declarative memory limit in telemetry', async () => {
+    const { getProcessIsolationTelemetry } = await import('../src/core/process-adapter.js')
+    const telemetry = getProcessIsolationTelemetry(
+      {
+        maxMemoryMB: 0,
+      },
+      'plan9' as NodeJS.Platform,
+    )
+
+    expect(telemetry.constraints.maxMemoryMB).toBe(0)
+    expect(telemetry.capabilities.platform).toBe('unknown')
+    expect(telemetry.capabilities.memoryLimit).toBe('declarative')
+    expect(Object.isFrozen(telemetry.constraints)).toBe(true)
+    expect(Object.isFrozen(telemetry.capabilities)).toBe(true)
+  })
+
   it('throws when spawned child has no pid', async () => {
     vi.resetModules()
     vi.doMock('node:child_process', () => ({

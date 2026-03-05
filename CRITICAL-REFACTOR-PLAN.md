@@ -185,9 +185,12 @@ IPC/Pool genisletmeleri:
    - planned shutdown no lifecycle error emission
    - agent typed error regression
    - snapshot cleanup on shutdown
+7. Process isolation capability/telemetry raporlamasi eklendi:
+   - `HoundPool.stats.isolationTelemetry` ile merged constraint + capability gorunurlugu
+   - Spawn path'i merged/default constraint setiyle deterministic hale getirildi
+   - Snapshot schema validator'i telemetry alanini strict dogrular, legacy telemetry'siz payload'i backward-compatible kabul eder
 
 ### Kalanlar (Wave 2 backlog)
 
-1. Process capability/telemetry raporlamasi (declarative kisit gozlemi) henuz yok.
-2. RFC-0011 pressure containment 2.2'nin tam metrik/watcher wiring audit'i tamamlanmadi.
-3. Core genelinde `throw new Error` temizligi runtime path disinda (ornek: codec class hierarchy) ayri review dalinda tamamlanacak.
+1. RFC-0011 pressure containment 2.2'nin tam metrik/watcher wiring audit'i tamamlanmadi.
+2. Core genelinde `throw new Error` temizligi runtime path disinda (ornek: codec class hierarchy) ayri review dalinda tamamlanacak.

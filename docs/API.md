@@ -207,6 +207,7 @@ Operational snapshot API for signed disk export / CLI consumption:
 ```ts
 const runtime = th.snapshot()
 console.log(runtime.systemHealth)
+console.log(runtime.houndPool.isolationTelemetry?.capabilities)
 ```
 
 For disk transport:

@@ -538,6 +538,45 @@ describe('HoundPool', () => {
       // Should be frozen
       expect(Object.isFrozen(constraints)).toBe(true)
     })
+
+    it('exposes process isolation telemetry in stats', () => {
+      const telemetry = pool.stats.isolationTelemetry
+
+      expect(telemetry).toBeDefined()
+      expect(telemetry?.constraints.networkAccess).toBe(false)
+      expect(telemetry?.constraints.fileSystemWrite).toBe(false)
+      expect(telemetry?.constraints.childSpawn).toBe(false)
+      expect(telemetry?.capabilities.environmentIsolation).toBe('allowlist')
+      expect(telemetry?.environmentAllowlistSize).toBeGreaterThan(0)
+    })
+
+    it('uses merged process constraints for spawn and telemetry', () => {
+      pool.shutdown()
+      mockAdapter = createMockAdapter()
+
+      let capturedConstraints: unknown
+      const originalSpawn = mockAdapter.spawn
+      mockAdapter.spawn = ((scriptPath, constraints) => {
+        capturedConstraints = constraints
+        return originalSpawn(scriptPath, constraints)
+      }) as typeof originalSpawn
+
+      pool = createHoundPool({
+        poolSize: 1,
+        timeout: 1000,
+        rotationJitterMs: 10,
+        adapter: mockAdapter,
+        processConstraints: { maxMemoryMB: 64 },
+      })
+
+      pool.activate(createEvidence('constraint-merge'))
+
+      expect(capturedConstraints).toEqual({
+        ...HoundPool.DEFAULT_CONSTRAINTS,
+        maxMemoryMB: 64,
+      })
+      expect(pool.stats.isolationTelemetry?.constraints.maxMemoryMB).toBe(64)
+    })
   })
 
   describe('shutdown()', () => {

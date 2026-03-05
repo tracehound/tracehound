@@ -210,6 +210,81 @@ describe('Tracehound Factory', () => {
       expect(panics.some((panic) => panic.reason.includes('hound_error'))).toBe(true)
       tracehound.shutdown()
     })
+
+    it('sets watcher overload when pool is exhausted and clears it after recovery', () => {
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 1000,
+          rotationJitterMs: 10,
+          onPoolExhausted: 'drop',
+          adapter,
+        },
+      })
+
+      tracehound.agent.intercept({
+        id: '5',
+        timestamp: Date.now(),
+        source: '1.2.3.6',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { first: true },
+      })
+      tracehound.agent.intercept({
+        id: '6',
+        timestamp: Date.now(),
+        source: '1.2.3.7',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { second: true },
+      })
+
+      expect(tracehound.watcher.snapshot().overloaded).toBe(true)
+
+      const pid = [...adapter.getMockProcesses().keys()][0]
+      const analysisMessage = encodeHoundMessage({
+        type: 'analysis',
+        hash: 'a1b2c3',
+        entropy: 7.1,
+        contentType: 'json',
+        sizeBytes: 128,
+      })
+      adapter.simulateMessage(pid, new Uint8Array(analysisMessage.subarray(4)).buffer)
+
+      const completeMessage = encodeHoundMessage({ type: 'status', state: 'complete' })
+      adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
+
+      expect(tracehound.watcher.snapshot().overloaded).toBe(false)
+      tracehound.shutdown()
+    })
+
+    it('does not mark watcher overloaded on forced terminate lifecycle', () => {
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 1000,
+          rotationJitterMs: 10,
+          adapter,
+        },
+      })
+
+      const result = tracehound.agent.intercept({
+        id: '7',
+        timestamp: Date.now(),
+        source: '1.2.3.8',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { terminate: true },
+      })
+      expect(result.status).toBe('quarantined')
+      if (result.status !== 'quarantined') {
+        tracehound.shutdown()
+        return
+      }
+
+      tracehound.houndPool.terminate(result.handle.signature)
+      expect(tracehound.watcher.snapshot().overloaded).toBe(false)
+      tracehound.shutdown()
+    })
   })
 
   describe('Snapshot API', () => {

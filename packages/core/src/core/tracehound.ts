@@ -8,6 +8,7 @@ import { createAgent, type IAgent } from './agent.js'
 import { AuditChain } from './audit-chain.js'
 import { EvidenceFactory, type IEvidenceFactory } from './evidence-factory.js'
 import { createHoundPool, type HoundPoolConfig, type IHoundPool } from './hound-pool.js'
+import type { HoundResult } from './hound-pool.js'
 import { createNotificationEmitter, type INotificationEmitter } from './notification-emitter.js'
 import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
@@ -194,6 +195,8 @@ class Tracehound implements ITracehound {
     // Wire HoundPool results back into Watcher and NotificationEmitter.
     // timeout/error outcomes are security-relevant events that SecOps must see.
     this.houndPool.onResult((result) => {
+      this.syncOverloadState(result)
+
       if (result.status === 'timeout') {
         this.watcher.alert({
           type: 'hound_timeout',
@@ -306,6 +309,36 @@ class Tracehound implements ITracehound {
         context: { error: error instanceof Error ? error.message : 'unknown' },
       })
     }
+  }
+
+  private syncOverloadState(result: HoundResult): void {
+    if (this.isOverloadSignal(result)) {
+      this.watcher.setOverloaded(true)
+      return
+    }
+
+    if (result.status !== 'processed') {
+      return
+    }
+
+    const stats = this.houndPool.stats
+    const hasHeadroom =
+      stats.totalProcesses === 0 || stats.activeProcesses < stats.totalProcesses
+    if (hasHeadroom) {
+      this.watcher.setOverloaded(false)
+    }
+  }
+
+  private isOverloadSignal(result: HoundResult): boolean {
+    if (result.status === 'timeout') {
+      return true
+    }
+
+    if (result.status !== 'error') {
+      return false
+    }
+
+    return result.error !== 'forced_terminate'
   }
 }
 

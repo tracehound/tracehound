@@ -189,8 +189,12 @@ IPC/Pool genisletmeleri:
    - `HoundPool.stats.isolationTelemetry` ile merged constraint + capability gorunurlugu
    - Spawn path'i merged/default constraint setiyle deterministic hale getirildi
    - Snapshot schema validator'i telemetry alanini strict dogrular, legacy telemetry'siz payload'i backward-compatible kabul eder
+8. RFC-0011 pressure containment watcher wiring audit'i tamamlandi:
+   - `Tracehound` hound-result geri beslemesinde deterministic overload state senkronizasyonu eklendi.
+   - Pool exhaustion/timeouts/error sinyallerinde `Watcher.setOverloaded(true)` tetikleniyor.
+   - Islenen sonuclarla headroom geri geldiginde overload durumu deterministik olarak temizleniyor.
+   - Forced terminate lifecycle'i overload sinyali uretmiyor (false positive engellendi).
 
 ### Kalanlar (Wave 2 backlog)
 
-1. RFC-0011 pressure containment 2.2'nin tam metrik/watcher wiring audit'i tamamlanmadi.
-2. Core genelinde `throw new Error` temizligi runtime path disinda (ornek: codec class hierarchy) ayri review dalinda tamamlanacak.
+1. Core genelinde `throw new Error` temizligi runtime path disinda (ornek: codec class hierarchy) ayri review dalinda tamamlanacak.

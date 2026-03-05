@@ -248,12 +248,30 @@ th.shutdown()
 Subscribe to internal system events (e.g., panic, thread detection, quarantine).
 
 ```ts
+import {
+  formatHoundErrorReason,
+  formatHoundTimeoutReason,
+  SYSTEM_PANIC_REASONS,
+} from '@tracehound/core'
+
 th.notifications.on('threat.detected', (payload) => {
   console.log(`[ALERT] Threat detected: ${payload.category}`)
 })
 
+const timeoutReasonExample = formatHoundTimeoutReason('sig-123')
+
 th.notifications.on('system.panic', (payload) => {
   console.error(`[PANIC] System level ${payload.level}: ${payload.reason}`)
+
+  if (payload.reason === formatHoundErrorReason('pool_exhausted')) {
+    // capacity pressure handling
+  }
+  if (payload.reason.startsWith(SYSTEM_PANIC_REASONS.HOUND_TIMEOUT_SIGNATURE_PREFIX)) {
+    // timeout handling
+  }
+  if (payload.reason === timeoutReasonExample) {
+    // exact timeout match for known signature
+  }
 })
 ```
 
@@ -267,7 +285,7 @@ th.notifications.on('system.panic', (payload) => {
 6. `coordination.health_failure`
 7. `membrane.payload_egress_blocked`
 
-These reason values are intended for deterministic telemetry parsing.
+These reason values are stable string patterns that you can match directly in telemetry pipelines.
 
 ---
 

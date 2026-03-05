@@ -302,6 +302,11 @@ export type {
 
 export { createTracehound } from './core/tracehound.js'
 export type { ITracehound, TracehoundOptions } from './core/tracehound.js'
+export {
+  formatHoundErrorReason,
+  formatHoundTimeoutReason,
+  SYSTEM_PANIC_REASONS,
+} from './core/operational-events.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Notification Emitter
@@ -339,7 +344,6 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
-
 
 
 

@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { encodeHoundMessage } from '../src/core/hound-ipc.js'
 import { createMockAdapter, HOUND_PRESSURE_ERRORS } from '../src/core/hound-pool.js'
-import { SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
+import { formatHoundErrorReason, SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk } from '../src/utils/system-snapshot.js'
 
@@ -269,7 +269,7 @@ describe('Tracehound Factory', () => {
       expect(second.status).toBe('quarantined')
       expect(
         panics.some(
-          (panic) => panic.reason === `hound_error: ${HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED}`,
+          (panic) => panic.reason === formatHoundErrorReason(HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED),
         ),
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
@@ -363,7 +363,8 @@ describe('Tracehound Factory', () => {
 
       expect(
         panics.some(
-          (panic) => panic.reason === `hound_error: ${HOUND_PRESSURE_ERRORS.DEFER_QUEUE_FULL}`,
+          (panic) =>
+            panic.reason === formatHoundErrorReason(HOUND_PRESSURE_ERRORS.DEFER_QUEUE_FULL),
         ),
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
@@ -456,6 +457,65 @@ describe('Tracehound Factory', () => {
       })
 
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
+      tracehound.shutdown()
+    })
+
+    it('sets overload on escalate pressure and clears after capacity recovers', async () => {
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 1000,
+          rotationJitterMs: 10,
+          onPoolExhausted: 'escalate',
+          adapter,
+        },
+      })
+
+      const panics: Array<{ reason: string }> = []
+      tracehound.notifications.on('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
+      })
+
+      const first = tracehound.agent.intercept({
+        id: '14',
+        timestamp: Date.now(),
+        source: '1.2.3.15',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { first: true },
+      })
+      const second = tracehound.agent.intercept({
+        id: '15',
+        timestamp: Date.now(),
+        source: '1.2.3.16',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { second: true },
+      })
+
+      expect(first.status).toBe('quarantined')
+      expect(second.status).toBe('quarantined')
+      expect(
+        panics.some(
+          (panic) =>
+            panic.reason === formatHoundErrorReason(HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED_ESCALATED),
+        ),
+      ).toBe(true)
+      expect(tracehound.watcher.snapshot().overloaded).toBe(true)
+
+      const pid = [...adapter.getMockProcesses().keys()][0]
+      const analysisMessage = encodeHoundMessage({
+        type: 'analysis',
+        hash: 'a1b2c3',
+        entropy: 7.1,
+        contentType: 'json',
+        sizeBytes: 128,
+      })
+      const completeMessage = encodeHoundMessage({ type: 'status', state: 'complete' })
+      adapter.simulateMessage(pid, new Uint8Array(analysisMessage.subarray(4)).buffer)
+      adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
+
+      await flushMicrotasks()
+      expect(tracehound.watcher.snapshot().overloaded).toBe(false)
       tracehound.shutdown()
     })
   })

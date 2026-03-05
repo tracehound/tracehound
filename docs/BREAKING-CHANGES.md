@@ -67,7 +67,11 @@ Snapshot file permission hardening is strict on POSIX (`0600` best-effort), but 
 
 Use host-level ACL policy for strict production controls on Windows.
 
-## 6) Operational env key constants (non-breaking, recommended)
+## Appendix A) Non-breaking additions (informational)
+
+### Operational env key constants (recommended)
+
+This is additive and does not require migration work.
 
 `@tracehound/core` exposes `SYSTEM_SNAPSHOT_ENV` for snapshot env key access:
 

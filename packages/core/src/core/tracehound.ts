@@ -356,7 +356,7 @@ class Tracehound implements ITracehound {
       return true
     }
 
-    return !this.isCapacityPressureError(result.error)
+    return !isHoundPressureError(result.error)
   }
 
   private isOverloadSignal(result: HoundResult): boolean {
@@ -372,11 +372,7 @@ class Tracehound implements ITracehound {
       return false
     }
 
-    return this.isCapacityPressureError(result.error)
-  }
-
-  private isCapacityPressureError(errorCode: string): boolean {
-    return isHoundPressureError(errorCode)
+    return isHoundPressureError(result.error)
   }
 }
 

@@ -21,6 +21,11 @@ import { createWatcher, type IWatcher } from './watcher.js'
 import { Errors } from '../types/errors.js'
 import { existsSync, unlinkSync } from 'node:fs'
 import {
+  formatHoundErrorReason,
+  formatHoundTimeoutReason,
+  SYSTEM_PANIC_REASONS,
+} from './operational-events.js'
+import {
   exportSystemSnapshot,
   resolveSystemSnapshotPath,
   resolveSystemSnapshotSecret,
@@ -211,7 +216,7 @@ class Tracehound implements ITracehound {
         })
         this.notifications.emit('system.panic', {
           level: 'warning',
-          reason: `hound_timeout: signature=${result.signature}`,
+          reason: formatHoundTimeoutReason(result.signature),
         })
       } else if (result.status === 'error') {
         this.watcher.alert({
@@ -222,7 +227,7 @@ class Tracehound implements ITracehound {
         })
         this.notifications.emit('system.panic', {
           level: 'critical',
-          reason: `hound_error: ${result.error ?? 'unknown'}`,
+          reason: formatHoundErrorReason(result.error ?? 'unknown'),
         })
       }
     })
@@ -276,7 +281,7 @@ class Tracehound implements ITracehound {
       } catch (error: unknown) {
         this.notifications.emit('system.panic', {
           level: 'warning',
-          reason: 'snapshot_write_failed',
+          reason: SYSTEM_PANIC_REASONS.SNAPSHOT_WRITE_FAILED,
           context: { error: error instanceof Error ? error.message : 'unknown' },
         })
       }
@@ -310,7 +315,7 @@ class Tracehound implements ITracehound {
     } catch (error: unknown) {
       this.notifications.emit('system.panic', {
         level: 'warning',
-        reason: 'snapshot_cleanup_failed',
+        reason: SYSTEM_PANIC_REASONS.SNAPSHOT_CLEANUP_FAILED,
         context: { error: error instanceof Error ? error.message : 'unknown' },
       })
     }

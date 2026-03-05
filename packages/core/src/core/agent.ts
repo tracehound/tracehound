@@ -17,6 +17,7 @@ import type { Scent } from '../types/scent.js'
 import type { IEvidenceFactory } from './evidence-factory.js'
 import type { IHoundPool } from './hound-pool.js'
 import type { INotificationEmitter } from './notification-emitter.js'
+import { SYSTEM_PANIC_REASONS } from './operational-events.js'
 import type { Quarantine } from './quarantine.js'
 import type { IRateLimiter, RateLimitResult } from './rate-limiter.js'
 import type { IWatcher } from './watcher.js'
@@ -388,7 +389,7 @@ export class Agent implements IAgent {
 
     this.notifications?.emit('system.panic', {
       level: 'warning',
-      reason: 'membrane.payload_egress_blocked',
+      reason: SYSTEM_PANIC_REASONS.MEMBRANE_PAYLOAD_EGRESS_BLOCKED,
       context: {
         operation,
         signature,
@@ -430,7 +431,10 @@ export class Agent implements IAgent {
 
     this.notifications?.emit('system.panic', {
       level: 'warning',
-      reason: `coordination.${reason}`,
+      reason:
+        reason === 'invalid_contract'
+          ? SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT
+          : SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
       context: {
         providerId,
         error: error instanceof Error ? error.message : undefined,
@@ -500,4 +504,3 @@ export function createAgent(
     notifications,
   )
 }
-

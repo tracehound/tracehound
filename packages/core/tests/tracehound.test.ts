@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { encodeHoundMessage } from '../src/core/hound-ipc.js'
 import { createMockAdapter, HOUND_PRESSURE_ERRORS } from '../src/core/hound-pool.js'
+import { SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk } from '../src/utils/system-snapshot.js'
 
@@ -19,8 +20,11 @@ async function flushMicrotasks(): Promise<void> {
   if (typeof vitestTimers.isFakeTimers === 'function' && vitestTimers.isFakeTimers()) {
     if (typeof vitestTimers.runAllTicks === 'function') {
       vitestTimers.runAllTicks()
-      return
     }
+
+    // Always await an async boundary so queued microtasks are observed before assertions.
+    await Promise.resolve()
+    return
   }
 
   await new Promise<void>((resolve) => queueMicrotask(resolve))
@@ -223,7 +227,9 @@ describe('Tracehound Factory', () => {
       const snapshot = tracehound.watcher.snapshot()
       expect(snapshot.lastAlert?.type).toBe('system_overload')
       expect(snapshot.overloaded).toBe(false)
-      expect(panics.some((panic) => panic.reason.includes('hound_error'))).toBe(true)
+      expect(
+        panics.some((panic) => panic.reason.startsWith(SYSTEM_PANIC_REASONS.HOUND_ERROR_PREFIX)),
+      ).toBe(true)
       tracehound.shutdown()
     })
 
@@ -612,7 +618,11 @@ describe('Tracehound Factory', () => {
         })
 
         tracehound.shutdown()
-        expect(panics.some((panic) => panic.reason === 'snapshot_cleanup_failed')).toBe(true)
+        expect(
+          panics.some(
+            (panic) => panic.reason === SYSTEM_PANIC_REASONS.SNAPSHOT_CLEANUP_FAILED,
+          ),
+        ).toBe(true)
       } finally {
         rmSync(dir, { recursive: true, force: true })
       }
@@ -670,7 +680,9 @@ describe('Tracehound Factory', () => {
         })
 
         await vi.advanceTimersByTimeAsync(100)
-        expect(panics.some((panic) => panic.reason === 'snapshot_write_failed')).toBe(true)
+        expect(
+          panics.some((panic) => panic.reason === SYSTEM_PANIC_REASONS.SNAPSHOT_WRITE_FAILED),
+        ).toBe(true)
 
         tracehound.shutdown()
       } finally {

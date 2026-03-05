@@ -7,6 +7,7 @@ import { Agent, createAgent } from '../src/core/agent.js'
 import { AuditChain } from '../src/core/audit-chain.js'
 import { createEvidenceFactory } from '../src/core/evidence-factory.js'
 import type { INotificationEmitter } from '../src/core/notification-emitter.js'
+import { SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
 import type { IWatcher } from '../src/core/watcher.js'
@@ -186,7 +187,7 @@ describe('Agent', () => {
         'system.panic',
         expect.objectContaining({
           level: 'warning',
-          reason: 'coordination.health_failure',
+          reason: SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
           context: expect.objectContaining({
             providerId: 'throwing-provider',
           }),
@@ -223,7 +224,7 @@ describe('Agent', () => {
         'system.panic',
         expect.objectContaining({
           level: 'warning',
-          reason: 'coordination.invalid_contract',
+          reason: SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT,
           context: expect.objectContaining({
             providerId: 'invalid-provider',
           }),
@@ -267,7 +268,7 @@ describe('Agent', () => {
         'system.panic',
         expect.objectContaining({
           level: 'warning',
-          reason: 'coordination.invalid_contract',
+          reason: SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT,
           context: expect.objectContaining({
             providerId: 'malformed-provider',
           }),
@@ -424,7 +425,7 @@ describe('Agent', () => {
           'system.panic',
           expect.objectContaining({
             level: 'warning',
-            reason: 'membrane.payload_egress_blocked',
+            reason: SYSTEM_PANIC_REASONS.MEMBRANE_PAYLOAD_EGRESS_BLOCKED,
             context: expect.objectContaining({
               signature: result.handle.signature,
             }),
@@ -469,7 +470,8 @@ describe('Agent', () => {
             typeof payload === 'object' &&
             payload !== null &&
             'reason' in (payload as Record<string, unknown>) &&
-            (payload as { reason?: string }).reason === 'membrane.payload_egress_blocked',
+            (payload as { reason?: string }).reason ===
+              SYSTEM_PANIC_REASONS.MEMBRANE_PAYLOAD_EGRESS_BLOCKED,
         )
         expect(membraneWarnings).toHaveLength(0)
       }
@@ -645,4 +647,3 @@ describe('Agent', () => {
     })
   })
 })
-

@@ -1,11 +1,5 @@
-import {
-  readSystemSnapshotFromDisk,
-  resolveSystemSnapshotPath,
-  resolveSystemSnapshotSecret,
-  SYSTEM_SNAPSHOT_ENV,
-  type SnapshotReadResult,
-  type SystemSnapshot,
-} from '@tracehound/core'
+import * as tracehoundCore from '@tracehound/core'
+import type { SnapshotReadResult, SystemSnapshot } from '@tracehound/core'
 
 const DEFAULT_MAX_SNAPSHOT_AGE_MS = 5_000
 const DEFAULT_MAX_FUTURE_SKEW_MS = 5_000
@@ -15,7 +9,7 @@ const FALLBACK_SNAPSHOT_ENV = Object.freeze({
   MAX_AGE_MS: 'TRACEHOUND_SNAPSHOT_MAX_AGE_MS',
   MAX_FUTURE_SKEW_MS: 'TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS',
 } as const)
-const SNAPSHOT_ENV = SYSTEM_SNAPSHOT_ENV ?? FALLBACK_SNAPSHOT_ENV
+const SNAPSHOT_ENV = tracehoundCore.SYSTEM_SNAPSHOT_ENV ?? FALLBACK_SNAPSHOT_ENV
 
 export type CliSystemSnapshot = SystemSnapshot
 
@@ -34,11 +28,11 @@ export type CliSnapshotLoadResult =
     }
 
 export function loadSystemSnapshot(): CliSnapshotLoadResult {
-  const path = resolveSystemSnapshotPath()
-  const secret = resolveSystemSnapshotSecret() ?? ''
+  const path = tracehoundCore.resolveSystemSnapshotPath()
+  const secret = tracehoundCore.resolveSystemSnapshotSecret() ?? ''
   const maxSnapshotAgeMs = resolveSnapshotMaxAgeMs()
   const maxFutureSkewMs = resolveSnapshotMaxFutureSkewMs()
-  const readResult = readSystemSnapshotFromDisk(path, secret)
+  const readResult = tracehoundCore.readSystemSnapshotFromDisk(path, secret)
 
   if (!readResult.ok) {
     return {

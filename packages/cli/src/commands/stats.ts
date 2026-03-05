@@ -8,6 +8,7 @@ import { Command } from 'commander'
 import { formatBytes, formatDurationMs } from '../lib/format.js'
 import {
   loadSystemSnapshot,
+  type CliSnapshotErrorCode,
   type CliSnapshotLoadResult,
   type CliSystemSnapshot,
 } from '../lib/system-snapshot.js'
@@ -23,116 +24,124 @@ export const statsCommand = new Command('stats')
     if (options.json) {
       console.log(JSON.stringify(stats, null, 2))
     } else {
-      printStats(snapshotResult, stats)
+      printStats(stats)
     }
   })
 
-interface ThreatStats {
-  connected: boolean
-  window: string
-  total: number
-  bySeverity: {
-    critical: number
-    high: number
-    medium: number
-    low: number
-  }
-  byCategory: {
-    injection: number
-    ddos: number
-    other: number
-  }
-  outcomes: {
-    quarantined: number
-    rateLimited: number
-    clean: number
-    ignored: number
-  }
-  traceRegistry: {
-    path: string
-    fileExists: boolean
-    retainedEntries: number
-    uniqueTraceIds: number
-    fileBytes: number
-    maxFileBytes: number
-    fileUsagePct: number
-    queueDepth: number
-    maxQueueEntries: number
-    droppedCount: number
-    blocked: boolean
-    ttlMs: number
-    maxEntries: number
-  }
+interface ThreatSeverityStats {
+  critical: number
+  high: number
+  medium: number
+  low: number
 }
 
-function getStats(snapshotResult: CliSnapshotLoadResult, since: string): ThreatStats {
+interface ThreatCategoryStats {
+  injection: number
+  ddos: number
+  other: number
+}
+
+interface ThreatOutcomeStats {
+  quarantined: number
+  rateLimited: number
+  clean: number
+  ignored: number
+}
+
+interface TraceRegistrySnapshot {
+  path: string
+  fileExists: boolean
+  retainedEntries: number
+  uniqueTraceIds: number
+  fileBytes: number
+  maxFileBytes: number
+  fileUsagePct: number
+  queueDepth: number
+  maxQueueEntries: number
+  droppedCount: number
+  blocked: boolean
+  ttlMs: number
+  maxEntries: number
+}
+
+interface ConnectedThreatStats {
+  connected: true
+  window: string
+  total: number
+  bySeverity: ThreatSeverityStats
+  byCategory: ThreatCategoryStats
+  outcomes: ThreatOutcomeStats
+  traceRegistry: TraceRegistrySnapshot
+}
+
+interface DisconnectedThreatStats {
+  connected: false
+  window: string
+  error: CliSnapshotErrorCode
+  path: string
+  traceRegistry: TraceRegistrySnapshot
+}
+
+type ThreatStats = ConnectedThreatStats | DisconnectedThreatStats
+
+function getTraceRegistrySnapshot(): TraceRegistrySnapshot {
   const registry = getTraceRegistryStats()
   const fileUsagePct =
     registry.maxFileBytes > 0 ? Number(((registry.fileBytes / registry.maxFileBytes) * 100).toFixed(2)) : 0
 
-  const base: ThreatStats = {
-    connected: snapshotResult.ok,
-    window: since,
-    total: 0,
-    bySeverity: {
-      critical: 0,
-      high: 0,
-      medium: 0,
-      low: 0,
-    },
-    byCategory: {
-      injection: 0,
-      ddos: 0,
-      other: 0,
-    },
-    outcomes: {
-      quarantined: 0,
-      rateLimited: 0,
-      clean: 0,
-      ignored: 0,
-    },
-    traceRegistry: {
-      path: registry.path,
-      fileExists: registry.fileExists,
-      retainedEntries: registry.retainedEntries,
-      uniqueTraceIds: registry.uniqueTraceIds,
-      fileBytes: registry.fileBytes,
-      maxFileBytes: registry.maxFileBytes,
-      fileUsagePct,
-      queueDepth: registry.queueDepth,
-      maxQueueEntries: registry.maxQueueEntries,
-      droppedCount: registry.droppedCount,
-      blocked: registry.blocked,
-      ttlMs: registry.ttlMs,
-      maxEntries: registry.maxEntries,
-    },
+  return {
+    path: registry.path,
+    fileExists: registry.fileExists,
+    retainedEntries: registry.retainedEntries,
+    uniqueTraceIds: registry.uniqueTraceIds,
+    fileBytes: registry.fileBytes,
+    maxFileBytes: registry.maxFileBytes,
+    fileUsagePct,
+    queueDepth: registry.queueDepth,
+    maxQueueEntries: registry.maxQueueEntries,
+    droppedCount: registry.droppedCount,
+    blocked: registry.blocked,
+    ttlMs: registry.ttlMs,
+    maxEntries: registry.maxEntries,
   }
+}
+
+function getStats(snapshotResult: CliSnapshotLoadResult, since: string): ThreatStats {
+  const traceRegistry = getTraceRegistrySnapshot()
 
   if (!snapshotResult.ok) {
-    return base
+    return {
+      connected: false,
+      error: snapshotResult.code,
+      path: snapshotResult.path,
+      window: since,
+      traceRegistry,
+    }
   }
 
   const runtime = mapRuntimeThreatStats(snapshotResult.snapshot)
 
   return {
-    ...base,
+    connected: true,
+    window: since,
     total: runtime.total,
     bySeverity: runtime.bySeverity,
     byCategory: runtime.byCategory,
     outcomes: runtime.outcomes,
+    traceRegistry,
   }
 }
 
-function printStats(snapshotResult: CliSnapshotLoadResult, stats: ThreatStats): void {
+function printStats(stats: ThreatStats): void {
   // Header
   console.log('\n  ╔══════════════════════════════════════════════════════════════╗')
   console.log(`  ║              THREAT STATISTICS (${stats.window.padEnd(24)})  ║`)
   console.log('  ╚══════════════════════════════════════════════════════════════╝\n')
 
-  if (!snapshotResult.ok) {
-    console.log(`  ❌ Snapshot unavailable: ${snapshotResult.code}`)
-    console.log(`  Path: ${snapshotResult.path}\n`)
-    printTraceRegistry(stats)
+  if (!stats.connected) {
+    console.log(`  ❌ Snapshot unavailable: ${stats.error}`)
+    console.log(`  Path: ${stats.path}\n`)
+    printTraceRegistry(stats.traceRegistry)
     return
   }
 
@@ -186,32 +195,32 @@ function printStats(snapshotResult: CliSnapshotLoadResult, stats: ThreatStats): 
   console.log(outcomesTable.toString())
   console.log()
 
-  printTraceRegistry(stats)
+  printTraceRegistry(stats.traceRegistry)
 }
 
-function printTraceRegistry(stats: ThreatStats): void {
+function printTraceRegistry(traceRegistry: TraceRegistrySnapshot): void {
   // Trace registry visibility (explicit data lifecycle controls)
   const registryTable = new Table({
     head: ['TRACE REGISTRY', 'Value'],
     style: { head: ['magenta'], border: ['gray'] },
   })
   registryTable.push(
-    ['Path', stats.traceRegistry.path],
-    ['File Exists', stats.traceRegistry.fileExists ? 'yes' : 'no'],
-    ['Retained Entries', String(stats.traceRegistry.retainedEntries)],
-    ['Unique Trace IDs', String(stats.traceRegistry.uniqueTraceIds)],
+    ['Path', traceRegistry.path],
+    ['File Exists', traceRegistry.fileExists ? 'yes' : 'no'],
+    ['Retained Entries', String(traceRegistry.retainedEntries)],
+    ['Unique Trace IDs', String(traceRegistry.uniqueTraceIds)],
     [
       'Disk Usage',
-      `${formatBytes(stats.traceRegistry.fileBytes)} / ${formatBytes(stats.traceRegistry.maxFileBytes)} (${stats.traceRegistry.fileUsagePct.toFixed(2)}%)`,
+      `${formatBytes(traceRegistry.fileBytes)} / ${formatBytes(traceRegistry.maxFileBytes)} (${traceRegistry.fileUsagePct.toFixed(2)}%)`,
     ],
     [
       'Queue Depth',
-      `${stats.traceRegistry.queueDepth} / ${stats.traceRegistry.maxQueueEntries}`,
+      `${traceRegistry.queueDepth} / ${traceRegistry.maxQueueEntries}`,
     ],
-    ['Dropped (in-memory)', String(stats.traceRegistry.droppedCount)],
-    ['Writes Blocked', stats.traceRegistry.blocked ? 'yes' : 'no'],
-    ['Retention TTL', formatDurationMs(stats.traceRegistry.ttlMs)],
-    ['Read Max Entries', String(stats.traceRegistry.maxEntries)],
+    ['Dropped (in-memory)', String(traceRegistry.droppedCount)],
+    ['Writes Blocked', traceRegistry.blocked ? 'yes' : 'no'],
+    ['Retention TTL', formatDurationMs(traceRegistry.ttlMs)],
+    ['Read Max Entries', String(traceRegistry.maxEntries)],
   )
   console.log(registryTable.toString())
   console.log()
@@ -219,9 +228,9 @@ function printTraceRegistry(stats: ThreatStats): void {
 
 function mapRuntimeThreatStats(snapshot: CliSystemSnapshot): {
   total: number
-  bySeverity: ThreatStats['bySeverity']
-  byCategory: ThreatStats['byCategory']
-  outcomes: ThreatStats['outcomes']
+  bySeverity: ThreatSeverityStats
+  byCategory: ThreatCategoryStats
+  outcomes: ThreatOutcomeStats
 } {
   const byCategory = snapshot.watcher.threats.byCategory
   const injection = byCategory['injection'] ?? 0

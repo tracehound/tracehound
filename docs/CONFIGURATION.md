@@ -57,8 +57,9 @@ CLI commands (`status`, `stats`, `watch`) read:
 1. `TRACEHOUND_SYSTEM_SNAPSHOT_PATH` (snapshot file path)
 2. `TRACEHOUND_SNAPSHOT_SECRET` (verification secret)
 3. `TRACEHOUND_SNAPSHOT_MAX_AGE_MS` (optional freshness window override, default `5000`)
+4. `TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS` (optional future timestamp skew tolerance, default `5000`)
 
 If snapshot cannot be trusted:
 
 1. `NO_INSTANCE` when file is absent or stale.
-2. `INTEGRITY_VIOLATION` when signature/format/secret validation fails.
+2. `INTEGRITY_VIOLATION` when signature/format/secret validation fails or snapshot timestamp is implausibly in the future.

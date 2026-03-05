@@ -253,6 +253,23 @@ describe('Tracehound Factory', () => {
       rmSync(dir, { recursive: true, force: true })
     })
 
+    it('removes snapshot file on shutdown to prevent stale operational truth', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-cleanup-'))
+      const path = join(dir, 'snapshot.json')
+      const tracehound = createTracehound({
+        snapshot: {
+          path,
+          secret: 'test-secret',
+          intervalMs: 1000,
+        },
+      })
+
+      expect(existsSync(path)).toBe(true)
+      tracehound.shutdown()
+      expect(existsSync(path)).toBe(false)
+      rmSync(dir, { recursive: true, force: true })
+    })
+
     it('stops snapshot writes after shutdown', async () => {
       vi.useFakeTimers()
       const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-stop-'))

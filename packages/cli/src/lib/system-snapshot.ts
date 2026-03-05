@@ -7,6 +7,7 @@ import {
 } from '@tracehound/core'
 
 const DEFAULT_MAX_SNAPSHOT_AGE_MS = 5_000
+const DEFAULT_MAX_FUTURE_SKEW_MS = 5_000
 
 export type CliSystemSnapshot = SystemSnapshot
 
@@ -28,6 +29,7 @@ export function loadSystemSnapshot(): CliSnapshotLoadResult {
   const path = resolveSystemSnapshotPath()
   const secret = resolveSystemSnapshotSecret() ?? ''
   const maxSnapshotAgeMs = resolveSnapshotMaxAgeMs()
+  const maxFutureSkewMs = resolveSnapshotMaxFutureSkewMs()
   const readResult = readSystemSnapshotFromDisk(path, secret)
 
   if (!readResult.ok) {
@@ -36,6 +38,10 @@ export function loadSystemSnapshot(): CliSnapshotLoadResult {
       code: mapReadFailureToCliCode(readResult),
       path,
     }
+  }
+
+  if (isSnapshotFromFuture(readResult.snapshot.generatedAt, maxFutureSkewMs)) {
+    return { ok: false, code: 'INTEGRITY_VIOLATION', path }
   }
 
   if (isSnapshotStale(readResult.snapshot.generatedAt, maxSnapshotAgeMs)) {
@@ -63,8 +69,26 @@ function resolveSnapshotMaxAgeMs(): number {
   return Math.floor(parsed)
 }
 
+function resolveSnapshotMaxFutureSkewMs(): number {
+  const raw = process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
+  if (typeof raw !== 'string' || raw.length === 0) {
+    return DEFAULT_MAX_FUTURE_SKEW_MS
+  }
+
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return DEFAULT_MAX_FUTURE_SKEW_MS
+  }
+
+  return Math.floor(parsed)
+}
+
 function isSnapshotStale(generatedAt: number, maxAgeMs: number): boolean {
   return Date.now() - generatedAt > maxAgeMs
+}
+
+function isSnapshotFromFuture(generatedAt: number, maxFutureSkewMs: number): boolean {
+  return generatedAt - Date.now() > maxFutureSkewMs
 }
 
 function mapReadFailureToCliCode(

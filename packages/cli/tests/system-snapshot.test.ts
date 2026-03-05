@@ -102,6 +102,7 @@ describe('system snapshot freshness', () => {
   let previousSnapshotPath: string | undefined
   let previousSnapshotSecret: string | undefined
   let previousSnapshotMaxAgeMs: string | undefined
+  let previousSnapshotMaxFutureSkewMs: string | undefined
   let fixtureDir = ''
   let snapshotPath = ''
 
@@ -113,6 +114,7 @@ describe('system snapshot freshness', () => {
     previousSnapshotPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
     previousSnapshotSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET
     previousSnapshotMaxAgeMs = process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS
+    previousSnapshotMaxFutureSkewMs = process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
 
     process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
     process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
@@ -138,6 +140,12 @@ describe('system snapshot freshness', () => {
       delete process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS
     } else {
       process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS = previousSnapshotMaxAgeMs
+    }
+
+    if (previousSnapshotMaxFutureSkewMs === undefined) {
+      delete process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
+    } else {
+      process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS = previousSnapshotMaxFutureSkewMs
     }
   })
 
@@ -165,6 +173,36 @@ describe('system snapshot freshness', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('NO_INSTANCE')
+  })
+
+  it('should reject future-dated snapshot as INTEGRITY_VIOLATION by default', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    writeFixtureSnapshotToDisk(
+      createFixtureSnapshot(now.getTime() + 5_001),
+      snapshotPath,
+      SNAPSHOT_SECRET,
+    )
+
+    const result = loadSystemSnapshot()
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
+  it('should honor TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS override', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS = '10000'
+    writeFixtureSnapshotToDisk(
+      createFixtureSnapshot(now.getTime() + 6_000),
+      snapshotPath,
+      SNAPSHOT_SECRET,
+    )
+
+    const result = loadSystemSnapshot()
+    expect(result.ok).toBe(true)
   })
 
   it('should honor TRACEHOUND_SNAPSHOT_MAX_AGE_MS override', () => {

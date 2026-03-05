@@ -53,7 +53,11 @@ describe('HoundPool', () => {
   }
 
   // Helper to simulate process completion
-  function simulateProcessComplete(pid: number): void {
+  function simulateProcessComplete(pid: number, includeAnalysis = true): void {
+    if (includeAnalysis) {
+      simulateProcessAnalysis(pid)
+    }
+
     const message = encodeHoundMessage({ type: 'status', state: 'complete' })
     // Extract payload from length-prefixed message
     const payloadSlice = message.subarray(4)
@@ -178,7 +182,6 @@ describe('HoundPool', () => {
 
       const processes = mockAdapter.getMockProcesses()
       const pid = [...processes.keys()][0]
-      simulateProcessAnalysis(pid)
       simulateProcessComplete(pid)
 
       expect(results.length).toBe(1)
@@ -474,6 +477,21 @@ describe('HoundPool', () => {
       })
     })
 
+    it('treats complete status without analysis as IPC error', () => {
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      pool.activate(createEvidence('missing-analysis'))
+
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+      simulateProcessComplete(pid, false)
+
+      const errorResult = results.find((result) => result.status === 'error')
+      expect(errorResult).toBeDefined()
+      expect(errorResult?.error).toBe('process_ipc_missing_analysis')
+    })
+
     it('handles unexpected process exit', () => {
       const results: HoundResult[] = []
       pool.onResult((result) => results.push(result))
@@ -530,6 +548,16 @@ describe('HoundPool', () => {
       pool.shutdown()
 
       expect(pool.stats.totalProcesses).toBe(0)
+    })
+
+    it('does not emit lifecycle error results during planned shutdown', () => {
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      pool.activate(createEvidence('shutdown-active'))
+      pool.shutdown()
+
+      expect(results.length).toBe(0)
     })
   })
 

@@ -329,6 +329,19 @@ describe('CLI Commands', () => {
       expect(output).toContain('Snapshot unavailable: NO_INSTANCE')
     })
 
+    it('stats command JSON should return explicit disconnected error payload when snapshot is missing', () => {
+      rmSync(snapshotPath, { force: true })
+
+      statsCommand.exitOverride()
+      statsCommand.parse(['stats', '--json'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('"connected": false')
+      expect(output).toContain('"error": "NO_INSTANCE"')
+      expect(output).toContain('"path"')
+      expect(output).not.toContain('"total":')
+    })
+
     it('inspect command action should print quarantine list', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse(['--limit', '5'], { from: 'user' })

@@ -6,6 +6,7 @@
  */
 
 import type { RateLimitConfig } from '../types/config.js'
+import { Errors } from '../types/errors.js'
 
 /**
  * Result of a rate limit check.
@@ -104,16 +105,16 @@ export class RateLimiter implements IRateLimiter {
   constructor(config: RateLimitConfig) {
     // Validate config
     if (config.windowMs <= 0) {
-      throw new Error('windowMs must be positive')
+      throw Errors.invalidConfigRateLimit('windowMs must be positive')
     }
     if (config.maxRequests <= 0) {
-      throw new Error('maxRequests must be positive')
+      throw Errors.invalidConfigRateLimit('maxRequests must be positive')
     }
     if (config.blockDurationMs < 0) {
-      throw new Error('blockDurationMs cannot be negative')
+      throw Errors.invalidConfigRateLimit('blockDurationMs cannot be negative')
     }
     if (config.maxSources !== undefined && config.maxSources <= 0) {
-      throw new Error('maxSources must be positive')
+      throw Errors.invalidConfigRateLimit('maxSources must be positive')
     }
 
     this.config = {

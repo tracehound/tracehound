@@ -61,6 +61,19 @@ describe('HoundPool', () => {
     mockAdapter.simulateMessage(pid, payload)
   }
 
+  function simulateProcessAnalysis(pid: number): void {
+    const message = encodeHoundMessage({
+      type: 'analysis',
+      hash: 'a1b2c3',
+      entropy: 7.1,
+      contentType: 'json',
+      sizeBytes: 128,
+    })
+    const payloadSlice = message.subarray(4)
+    const payload = new Uint8Array(payloadSlice).buffer
+    mockAdapter.simulateMessage(pid, payload)
+  }
+
   describe('Construction', () => {
     it('pre-spawns configured number of process slots', () => {
       const stats = pool.stats
@@ -155,6 +168,26 @@ describe('HoundPool', () => {
 
       expect(results[0].processId).toMatch(/^hound-\d+$/)
       expect(results[0].durationMs).toBeGreaterThanOrEqual(0)
+    })
+
+    it('includes analysis metadata when process sends analysis message', () => {
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+
+      pool.activate(createEvidence('analysis'))
+
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+      simulateProcessAnalysis(pid)
+      simulateProcessComplete(pid)
+
+      expect(results.length).toBe(1)
+      expect(results[0].analysis).toEqual({
+        hash: 'a1b2c3',
+        entropy: 7.1,
+        contentType: 'json',
+        sizeBytes: 128,
+      })
     })
 
     it('process becomes available after completion', () => {

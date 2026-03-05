@@ -9,6 +9,7 @@ import {
   recordTraceInspectionEntry,
   type IAgent,
   type InterceptResult,
+  type JsonSerializable,
   type Scent,
 } from '@tracehound/core'
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from 'fastify'
@@ -52,10 +53,10 @@ export interface TracehoundPluginOptions {
  * Defensive clone for safely copying deeply nested or cyclical external payloads
  * without crashing the process.
  */
-function safeClone(obj: any): any {
-  if (obj === undefined) return undefined
+function safeClone(value: unknown): JsonSerializable | undefined {
+  if (value === undefined) return undefined
   try {
-    return JSON.parse(JSON.stringify(obj))
+    return JSON.parse(JSON.stringify(value)) as JsonSerializable
   } catch {
     return undefined // Unsafe to clone or cyclical, omit silently
   }
@@ -66,21 +67,27 @@ function safeClone(obj: any): any {
  */
 function defaultExtractScent(req: FastifyRequest): Scent {
   const ip = req.ip || 'unknown'
+  const query = safeClone(req.query) ?? {}
+  const body = safeClone(req.body)
+  const payload: Record<string, JsonSerializable> = {
+    method: req.method,
+    path: req.url,
+    query,
+    headers: {
+      'user-agent': req.headers['user-agent'] || '',
+      'content-type': req.headers['content-type'] || '',
+    },
+  }
+
+  if (body !== undefined) {
+    payload['body'] = body
+  }
 
   return {
     id: generateSecureId(),
     timestamp: Date.now(),
     source: ip,
-    payload: {
-      method: req.method,
-      path: req.url,
-      query: safeClone(req.query) ?? {},
-      headers: {
-        'user-agent': req.headers['user-agent'] || '',
-        'content-type': req.headers['content-type'] || '',
-      },
-      body: safeClone(req.body),
-    },
+    payload,
   }
 }
 
@@ -214,9 +221,6 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
  * Create Tracehound plugin (alias).
  */
 export const createPlugin = tracehoundPlugin
-
-// Default export for Fastify auto-loading
-export default tracehoundPlugin
 
 // Re-export types for convenience
 export type { InterceptResult, Scent } from '@tracehound/core'

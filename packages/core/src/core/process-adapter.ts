@@ -34,6 +34,7 @@ import {
   encodeMessage,
   type MessageParser,
 } from "./hound-ipc.js";
+import { Errors } from "../types/errors.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -176,10 +177,11 @@ export function createProcessAdapter(): IHoundProcessAdapter {
         stdio: ["pipe", "pipe", "pipe"],
         detached: false,
         windowsHide: true,
+        env: buildChildEnv(),
       });
 
       if (!child.pid) {
-        throw new Error("Failed to spawn Hound process");
+        throw Errors.processSpawnFailed("missing pid");
       }
 
       const parser = createMessageParser();
@@ -332,4 +334,31 @@ export function createMockAdapter(): IHoundProcessAdapter & {
   };
 
   return mockAdapter;
+}
+
+const CHILD_ENV_ALLOWLIST = [
+  "PATH",
+  "SystemRoot",
+  "WINDIR",
+  "ComSpec",
+  "TMP",
+  "TEMP",
+  "HOME",
+  "USERPROFILE",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+] as const;
+
+function buildChildEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+
+  for (const key of CHILD_ENV_ALLOWLIST) {
+    const value = process.env[key];
+    if (typeof value === "string" && value.length > 0) {
+      env[key] = value;
+    }
+  }
+
+  return env;
 }

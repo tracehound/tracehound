@@ -1,8 +1,11 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
-import { createRequire } from 'node:module'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, renameSync, writeFileSync } from 'node:fs'
+import { createHmac } from 'node:crypto'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { recordTraceInspectionEntry } from '@tracehound/core'
+import { dirname, join } from 'node:path'
+import {
+  recordTraceInspectionEntry,
+  type SystemSnapshot,
+} from '@tracehound/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { diskCommand } from '../src/commands/disk.js'
 import { historyCommand } from '../src/commands/history.js'
@@ -11,11 +14,101 @@ import { statsCommand } from '../src/commands/stats.js'
 import { statusCommand } from '../src/commands/status.js'
 import { watchCommand } from '../src/commands/watch.js'
 
-const require = createRequire(import.meta.url)
-const { version: cliVersion } = require('../package.json')
-
 const SEEDED_TRACE_ID = 'trace-seeded-0001'
 const SEEDED_SIGNATURE = 'injection:seeded-signature'
+const SNAPSHOT_SECRET = 'tracehound-cli-test-snapshot-secret'
+
+function createFixtureSnapshot(): SystemSnapshot {
+  const now = Date.now()
+
+  return {
+    generatedAt: now,
+    systemHealth: 'degraded',
+    agent: {
+      totalIntercepts: 12,
+      cleanCount: 3,
+      rateLimitedCount: 2,
+      validationFailures: 1,
+      ignoredCount: 1,
+      quarantinedCount: 5,
+      errorCount: 0,
+      coordinationFallbackCount: 0,
+      coordinationWarningCount: 0,
+      membraneRejectionCount: 0,
+    },
+    quarantine: {
+      count: 4,
+      bytes: 4096,
+      droppedCount: 1,
+      droppedBytes: 512,
+      bySeverity: {
+        critical: 1,
+        high: 1,
+        medium: 1,
+        low: 1,
+      },
+    },
+    quarantineMaxBytes: 8192,
+    watcher: {
+      uptimeMs: 65_000,
+      threats: {
+        total: 8,
+        byCategory: {
+          injection: 3,
+          ddos: 2,
+          malware: 3,
+        },
+        bySeverity: {
+          critical: 1,
+          high: 2,
+          medium: 3,
+          low: 2,
+        },
+      },
+      totalAlerts: 2,
+      alertsInWindow: 1,
+      lastAlert: null,
+      overloaded: false,
+      snapshotTime: now,
+      quarantine: {
+        count: 4,
+        bytes: 4096,
+        capacityPercent: 50,
+      },
+    },
+    houndPool: {
+      activeProcesses: 1,
+      totalProcesses: 2,
+      totalActivations: 10,
+      totalTimeouts: 0,
+      totalErrors: 0,
+      avgProcessingMs: 12.4,
+    },
+    rateLimiter: {
+      sources: 7,
+      blocked: 2,
+      totalChecks: 100,
+      totalRejections: 2,
+      totalEvictions: 0,
+    },
+  }
+}
+
+function writeFixtureSnapshotToDisk(snapshot: SystemSnapshot, path: string, secret: string): void {
+  const payloadText = JSON.stringify(snapshot)
+  const signature = createHmac('sha256', secret).update(payloadText).digest('hex')
+  const signed = JSON.stringify({
+    version: 1,
+    algorithm: 'HMAC-SHA256',
+    payload: snapshot,
+    signature,
+  })
+  const tmpPath = `${path}.tmp`
+
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(tmpPath, signed, 'utf8')
+  renameSync(tmpPath, path)
+}
 
 describe('CLI Commands', () => {
   describe('Smoke tests', () => {
@@ -100,14 +193,23 @@ describe('CLI Commands', () => {
   describe('Command execution', () => {
     let logSpy: any
     let previousRegistryPath: string | undefined
+    let previousSnapshotPath: string | undefined
+    let previousSnapshotSecret: string | undefined
     let registryDir = ''
+    let snapshotPath = ''
 
     beforeEach(() => {
       logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
       previousRegistryPath = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+      previousSnapshotPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+      previousSnapshotSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET
       registryDir = mkdtempSync(join(tmpdir(), 'tracehound-cli-registry-'))
       process.env.TRACEHOUND_TRACE_REGISTRY_PATH = join(registryDir, 'trace-registry.ndjson')
+      snapshotPath = join(registryDir, 'system-snapshot.json')
+      process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
+      process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+      writeFixtureSnapshotToDisk(createFixtureSnapshot(), snapshotPath, SNAPSHOT_SECRET)
 
       recordTraceInspectionEntry({
         traceId: SEEDED_TRACE_ID,
@@ -137,6 +239,17 @@ describe('CLI Commands', () => {
         process.env.TRACEHOUND_TRACE_REGISTRY_PATH = previousRegistryPath
       }
 
+      if (previousSnapshotPath === undefined) {
+        delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+      } else {
+        process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = previousSnapshotPath
+      }
+      if (previousSnapshotSecret === undefined) {
+        delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+      } else {
+        process.env.TRACEHOUND_SNAPSHOT_SECRET = previousSnapshotSecret
+      }
+
       // Reset commander options to avoid state leakage
       inspectCommand.setOptionValue('signature', undefined)
       inspectCommand.setOptionValue('traceId', undefined)
@@ -161,7 +274,8 @@ describe('CLI Commands', () => {
       statusCommand.parse(['status', '--json'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
-      expect(output).toContain(`"version": "${cliVersion}"`)
+      expect(output).toContain('"connected": true')
+      expect(output).toContain('"health": "degraded"')
     })
 
     it('stats command action should print stats', () => {
@@ -178,9 +292,21 @@ describe('CLI Commands', () => {
       statsCommand.parse(['stats', '--json'], { from: 'user' })
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('"connected": true')
       expect(output).toContain('"traceRegistry"')
       expect(output).toContain('"retainedEntries"')
       expect(output).toContain('"path"')
+    })
+
+    it('status command should report NO_INSTANCE when snapshot is missing', () => {
+      rmSync(snapshotPath, { force: true })
+
+      statusCommand.exitOverride()
+      statusCommand.parse(['status', '--json'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('"connected": false')
+      expect(output).toContain('"error": "NO_INSTANCE"')
     })
 
     it('inspect command action should print quarantine list', () => {
@@ -315,27 +441,80 @@ describe('CLI Commands', () => {
 
   describe('Watch command logic', () => {
     let logSpy: any
+    let previousSnapshotPath: string | undefined
+    let previousSnapshotSecret: string | undefined
+    let snapshotDir = ''
 
     beforeEach(() => {
       logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      previousSnapshotPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+      previousSnapshotSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET
+      snapshotDir = mkdtempSync(join(tmpdir(), 'tracehound-cli-watch-'))
+      process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = join(snapshotDir, 'system-snapshot.json')
+      process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+      writeFixtureSnapshotToDisk(
+        createFixtureSnapshot(),
+        process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH,
+        SNAPSHOT_SECRET,
+      )
     })
 
     afterEach(() => {
       logSpy.mockRestore()
+      rmSync(snapshotDir, { recursive: true, force: true })
+      if (previousSnapshotPath === undefined) {
+        delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+      } else {
+        process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = previousSnapshotPath
+      }
+      if (previousSnapshotSecret === undefined) {
+        delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+      } else {
+        process.env.TRACEHOUND_SNAPSHOT_SECRET = previousSnapshotSecret
+      }
     })
 
     it('should get system snapshot', async () => {
       const { getSnapshot } = await import('../src/commands/watch.js')
       const snapshot = getSnapshot()
-      expect(snapshot.system.version).toBe(cliVersion)
-      expect(snapshot.timestamp).toBeDefined()
+      expect(snapshot.ok).toBe(true)
+      if (snapshot.ok) {
+        expect(snapshot.snapshot.systemHealth).toBe('degraded')
+      }
     })
 
     it('should render dashboard without errors', async () => {
       const { renderDashboard, getSnapshot } = await import('../src/commands/watch.js')
       const snapshot = getSnapshot()
+      expect(snapshot.ok).toBe(true)
+      if (!snapshot.ok) return
 
-      renderDashboard(snapshot, 1000)
+      renderDashboard(
+        {
+          timestamp: new Date(snapshot.snapshot.generatedAt).toISOString(),
+          system: {
+            version: 'test',
+            uptime: '0h 1m 5s',
+            health: snapshot.snapshot.systemHealth,
+          },
+          quarantine: {
+            count: snapshot.snapshot.quarantine.count,
+            bytes: snapshot.snapshot.quarantine.bytes,
+            maxBytes: snapshot.snapshot.quarantineMaxBytes,
+            bySeverity: snapshot.snapshot.quarantine.bySeverity,
+          },
+          houndPool: {
+            active: snapshot.snapshot.houndPool.activeProcesses,
+            dormant:
+              snapshot.snapshot.houndPool.totalProcesses -
+              snapshot.snapshot.houndPool.activeProcesses,
+            total: snapshot.snapshot.houndPool.totalProcesses,
+            status: 'ok',
+          },
+          recentThreats: [],
+        },
+        1000,
+      )
 
       const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
       expect(output).toContain('TRACEHOUND LIVE DASHBOARD')

@@ -9,6 +9,7 @@ import {
   recordTraceInspectionEntry,
   type IAgent,
   type InterceptResult,
+  type JsonSerializable,
   type Scent,
 } from "@tracehound/core";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
@@ -52,10 +53,10 @@ export interface TracehoundMiddlewareOptions {
  * Defensive clone for safely copying deeply nested or cyclical external payloads
  * without crashing the process.
  */
-function safeClone(obj: any): any {
+function safeClone(obj: unknown): JsonSerializable | undefined {
   if (obj === undefined) return undefined;
   try {
-    return JSON.parse(JSON.stringify(obj));
+    return JSON.parse(JSON.stringify(obj)) as JsonSerializable;
   } catch {
     return undefined; // Unsafe to clone or cyclical, omit silently
   }
@@ -66,21 +67,27 @@ function safeClone(obj: any): any {
  */
 function defaultExtractScent(req: Request): Scent {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const query = safeClone(req.query) ?? {};
+  const body = safeClone(req.body);
+  const payload: Record<string, JsonSerializable> = {
+    method: req.method,
+    path: req.path,
+    query,
+    headers: {
+      "user-agent": req.get("user-agent") || "",
+      "content-type": req.get("content-type") || "",
+    },
+  };
+
+  if (body !== undefined) {
+    payload["body"] = body;
+  }
 
   return {
     id: generateSecureId(),
     timestamp: Date.now(),
     source: ip,
-    payload: {
-      method: req.method,
-      path: req.path,
-      query: safeClone(req.query) ?? {},
-      headers: {
-        "user-agent": req.get("user-agent") || "",
-        "content-type": req.get("content-type") || "",
-      },
-      body: safeClone(req.body),
-    },
+    payload,
   };
 }
 

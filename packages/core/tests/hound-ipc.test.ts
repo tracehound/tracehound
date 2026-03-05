@@ -95,6 +95,22 @@ describe('HoundIPC', () => {
       expect(payload[0]).toBe(0x02) // type: metrics
       expect(payload.length).toBe(17) // 1 + 8 + 8
     })
+
+    it('should encode analysis message', () => {
+      const message: HoundMessage = {
+        type: 'analysis',
+        hash: 'abc123',
+        entropy: 7.42,
+        contentType: 'json',
+        sizeBytes: 256,
+      }
+      const encoded = encodeHoundMessage(message)
+      const length = encoded.readUInt32BE(0)
+      const payload = encoded.subarray(4, 4 + length)
+
+      expect(payload[0]).toBe(0x03) // type: analysis
+      expect(payload.length).toBeGreaterThan(16)
+    })
   })
 
   describe('tryParseMessage', () => {
@@ -194,6 +210,28 @@ describe('HoundIPC', () => {
       if (decoded.type === 'metrics') {
         expect(decoded.processingTime).toBeCloseTo(42.5)
         expect(decoded.memoryUsed).toBeCloseTo(1024)
+      }
+    })
+
+    it('should decode analysis message', () => {
+      const encoded = encodeHoundMessage({
+        type: 'analysis',
+        hash: 'ff00aa',
+        entropy: 5.5,
+        contentType: 'text',
+        sizeBytes: 77,
+      })
+      const length = encoded.readUInt32BE(0)
+      const payload = encoded.subarray(4, 4 + length)
+
+      const decoded = decodeHoundMessage(new Uint8Array(payload).buffer)
+
+      expect(decoded.type).toBe('analysis')
+      if (decoded.type === 'analysis') {
+        expect(decoded.hash).toBe('ff00aa')
+        expect(decoded.entropy).toBeCloseTo(5.5)
+        expect(decoded.contentType).toBe('text')
+        expect(decoded.sizeBytes).toBe(77)
       }
     })
 
@@ -311,6 +349,22 @@ describe('HoundIPC', () => {
         expect(decoded.processingTime).toBeCloseTo(original.processingTime)
         expect(decoded.memoryUsed).toBeCloseTo(original.memoryUsed)
       }
+    })
+
+    it('should preserve analysis messages', () => {
+      const original: HoundMessage = {
+        type: 'analysis',
+        hash: 'feedbeef',
+        entropy: 7.91,
+        contentType: 'binary',
+        sizeBytes: 512,
+      }
+      const encoded = encodeHoundMessage(original)
+      const length = encoded.readUInt32BE(0)
+      const payload = encoded.subarray(4, 4 + length)
+      const decoded = decodeHoundMessage(new Uint8Array(payload).buffer)
+
+      expect(decoded).toEqual(original)
     })
   })
 })

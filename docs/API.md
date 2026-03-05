@@ -96,6 +96,16 @@ interface TracehoundOptions {
     /** Jitter for rotation in ms. Default: 1000 */
     rotationJitterMs?: number
   }
+
+  /** Signed runtime snapshot export configuration. */
+  snapshot?: {
+    /** Output file path (required when enabled) */
+    path: string
+    /** HMAC secret (fallback: TRACEHOUND_SNAPSHOT_SECRET) */
+    secret?: string
+    /** Flush interval in ms. Default: 1000 */
+    intervalMs?: number
+  }
 }
 ```
 
@@ -135,6 +145,12 @@ If no coordination provider is configured, `mode` is `local`.
 If provider health retrieval fails, Agent returns `degraded` without interrupting intercept flow.
 If provider contract is invalid or health lookup throws, Agent emits `system.panic` with warning level (`coordination.invalid_contract` or `coordination.health_failure`).
 
+Agent stats are available via:
+
+```ts
+const stats = th.agent.getStats()
+```
+
 ### Adapter Runtime Guarantees (Express/Fastify)
 
 1. `payload_too_large` outcomes map to graceful HTTP `413`.
@@ -172,8 +188,28 @@ if (!check.allowed) {
 Pull-based observability for threat statistics and alerts.
 
 ```ts
-const snapshot = th.watcher.getSnapshot()
-console.log(snapshot.stats)
+const snapshot = th.watcher.snapshot()
+console.log(snapshot.threats)
+```
+
+### Runtime Snapshot (`th.snapshot()`)
+
+Operational snapshot API for signed disk export / CLI consumption:
+
+```ts
+const runtime = th.snapshot()
+console.log(runtime.systemHealth)
+```
+
+For disk transport:
+
+```ts
+import { readSystemSnapshotFromDisk } from '@tracehound/core'
+
+const verified = readSystemSnapshotFromDisk('/tmp/tracehound/system-snapshot.json', process.env.TRACEHOUND_SNAPSHOT_SECRET!)
+if (verified.ok) {
+  console.log(verified.snapshot.generatedAt)
+}
 ```
 
 ### Notifications (`th.notifications`)

@@ -58,6 +58,11 @@ export interface IAgent {
    * - Provider contract/health error => degraded mode (fail-open)
    */
   getCoordinationHealth(): CoordinationHealth
+
+  /**
+   * Get current agent statistics.
+   */
+  getStats(): Readonly<AgentStats>
 }
 
 /**
@@ -116,7 +121,7 @@ export class Agent implements IAgent {
   ) {
     // Validate config
     if (config.maxPayloadSize <= 0) {
-      throw new Error('maxPayloadSize must be positive')
+      throw Errors.invalidConfigAgent('maxPayloadSize must be positive')
     }
   }
 

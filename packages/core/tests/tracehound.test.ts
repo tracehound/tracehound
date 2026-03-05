@@ -2,8 +2,13 @@
  * Tests for tracehound.ts - Main API factory
  */
 
-import { describe, expect, it } from 'vitest'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it, vi } from 'vitest'
+import { createMockAdapter } from '../src/core/hound-pool.js'
 import { createTracehound } from '../src/core/tracehound.js'
+import { readSystemSnapshotFromDisk } from '../src/utils/system-snapshot.js'
 
 describe('Tracehound Factory', () => {
   describe('createTracehound', () => {
@@ -137,27 +142,76 @@ describe('Tracehound Factory', () => {
       expect(tracehound.notifications.stats.totalEmitted).toBeGreaterThanOrEqual(2)
     })
 
-    it('houndPool.onResult handler fires and alerts watcher on timeout', () => {
+    it('houndPool timeout flow alerts watcher without private access', async () => {
+      vi.useFakeTimers()
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 5,
+          rotationJitterMs: 10,
+          adapter,
+        },
+      })
+
+      tracehound.agent.intercept({
+        id: '3',
+        timestamp: Date.now(),
+        source: '1.2.3.4',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { a: 1 },
+      })
+
+      await vi.advanceTimersByTimeAsync(6)
+
+      const snapshot = tracehound.watcher.snapshot()
+      expect(snapshot.totalAlerts).toBeGreaterThanOrEqual(1)
+      expect(snapshot.lastAlert?.type).toBe('hound_timeout')
+      tracehound.houndPool.shutdown()
+      vi.useRealTimers()
+    })
+  })
+
+  describe('Snapshot API', () => {
+    it('exposes runtime snapshot via tracehound.snapshot()', () => {
       const tracehound = createTracehound()
+      const snapshot = tracehound.snapshot()
 
-      // Bypassing private access to simulate a timeout result
-      const mockPool = tracehound.houndPool as any
-      const handlers = mockPool.resultHandlers
+      expect(snapshot.generatedAt).toBeGreaterThan(0)
+      expect(snapshot.agent.totalIntercepts).toBe(0)
+      expect(snapshot.houndPool.totalProcesses).toBeGreaterThan(0)
+    })
 
-      if (handlers && handlers.length > 0) {
-        handlers[0]({
-          signature: 'test-sig',
-          status: 'timeout',
-          durationMs: 5000,
-          processId: 'p1',
-        })
+    it('throws when snapshot export is enabled without secret', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-config-'))
+      const path = join(dir, 'snapshot.json')
+      delete process.env['TRACEHOUND_SNAPSHOT_SECRET']
 
-        const snapshot = tracehound.watcher.snapshot()
-        expect(snapshot.totalAlerts).toBe(1)
-        expect(snapshot.lastAlert?.type).toBe('hound_timeout')
-      } else {
-        throw new Error('No result handlers registered on HoundPool')
-      }
+      expect(() =>
+        createTracehound({
+          snapshot: { path },
+        }),
+      ).toThrow()
+
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('writes signed snapshot file when snapshot export is enabled', () => {
+      const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-'))
+      const path = join(dir, 'snapshot.json')
+      const tracehound = createTracehound({
+        snapshot: {
+          path,
+          secret: 'test-secret',
+          intervalMs: 1000,
+        },
+      })
+
+      expect(existsSync(path)).toBe(true)
+      const read = readSystemSnapshotFromDisk(path, 'test-secret')
+      expect(read.ok).toBe(true)
+      tracehound.houndPool.shutdown()
+      rmSync(dir, { recursive: true, force: true })
     })
   })
 })

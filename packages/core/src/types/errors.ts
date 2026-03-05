@@ -101,6 +101,44 @@ export const Errors = {
       recoverable: false,
     }),
 
+  invalidConfigSnapshot: (issue: string) =>
+    createError('config', 'CONFIG_SNAPSHOT_INVALID', `Invalid snapshot config: ${issue}`, {
+      context: { issue },
+      recoverable: false,
+    }),
+
+  snapshotSecretMissing: () =>
+    createError(
+      'config',
+      'CONFIG_SNAPSHOT_SECRET_MISSING',
+      'Snapshot secret is required when snapshot export is enabled',
+      {
+        recoverable: false,
+      },
+    ),
+
+  invalidConfigWebhookUrl: (url: string) =>
+    createError(
+      'config',
+      'CONFIG_WEBHOOK_URL_INVALID',
+      'Webhook URL rejected: private/internal targets are not allowed',
+      {
+        context: { url },
+        recoverable: false,
+      },
+    ),
+
+  invalidConfigWebhookSecret: (minLength: number) =>
+    createError(
+      'config',
+      'CONFIG_WEBHOOK_SECRET_INVALID',
+      `Webhook secret must be at least ${minLength} characters`,
+      {
+        context: { minLength },
+        recoverable: false,
+      },
+    ),
+
   // ─────────────────────────────────────────────────────────────────────────
   // Scent Errors
   // ─────────────────────────────────────────────────────────────────────────
@@ -278,6 +316,77 @@ export const Errors = {
       recoverable: true,
     }),
 
+  processIpcMessageTooLarge: (length: number, maxLength: number) =>
+    createError(
+      'process',
+      'PROCESS_IPC_MESSAGE_TOO_LARGE',
+      `Message too large: ${length} > ${maxLength}`,
+      {
+        context: { length, maxLength },
+        recoverable: false,
+      },
+    ),
+
+  processIpcInvalidLength: (length: number) =>
+    createError('process', 'PROCESS_IPC_INVALID_LENGTH', `Invalid message length: ${length}`, {
+      context: { length },
+      recoverable: false,
+    }),
+
+  processIpcEmptyPayload: () =>
+    createError('process', 'PROCESS_IPC_EMPTY_PAYLOAD', 'Empty IPC payload', {
+      recoverable: false,
+    }),
+
+  processIpcInvalidStatusMessage: () =>
+    createError('process', 'PROCESS_IPC_INVALID_STATUS_MESSAGE', 'Invalid IPC status message', {
+      recoverable: false,
+    }),
+
+  processIpcInvalidMetricsMessage: () =>
+    createError('process', 'PROCESS_IPC_INVALID_METRICS_MESSAGE', 'Invalid IPC metrics message', {
+      recoverable: false,
+    }),
+
+  processIpcInvalidAnalysisMessage: () =>
+    createError('process', 'PROCESS_IPC_INVALID_ANALYSIS_MESSAGE', 'Invalid IPC analysis message', {
+      recoverable: false,
+    }),
+
+  processIpcUnknownMessageType: (type: number) =>
+    createError('process', 'PROCESS_IPC_UNKNOWN_MESSAGE_TYPE', `Unknown IPC message type: ${type}`, {
+      context: { type },
+      recoverable: false,
+    }),
+
+  processIpcUnknownStatusState: (stateCode: number) =>
+    createError(
+      'process',
+      'PROCESS_IPC_UNKNOWN_STATUS_STATE',
+      `Unknown IPC status state: ${stateCode}`,
+      {
+        context: { stateCode },
+        recoverable: false,
+      },
+    ),
+
+  processIpcUnknownContentType: (contentTypeCode: number) =>
+    createError(
+      'process',
+      'PROCESS_IPC_UNKNOWN_CONTENT_TYPE',
+      `Unknown IPC content type code: ${contentTypeCode}`,
+      {
+        context: { contentTypeCode },
+        recoverable: false,
+      },
+    ),
+
+  processIpcDecodeFailed: (reason: string) =>
+    createError('process', 'PROCESS_IPC_DECODE_FAILED', `Failed to decode IPC payload: ${reason}`, {
+      context: { reason },
+      recoverable: false,
+    }),
+
   // ─────────────────────────────────────────────────────────────────────────
   // Rate Limit Errors
   // ─────────────────────────────────────────────────────────────────────────
@@ -316,6 +425,28 @@ export const Errors = {
       `Runtime membrane blocked payload egress via ${operation}`,
       {
         context: { operation },
+        recoverable: false,
+      },
+    ),
+
+  snapshotWriteFailed: (reason: string) =>
+    createError('runtime', 'RUNTIME_SNAPSHOT_WRITE_FAILED', `Snapshot write failed: ${reason}`, {
+      context: { reason },
+      recoverable: true,
+    }),
+
+  snapshotReadFailed: (reason: string) =>
+    createError('runtime', 'RUNTIME_SNAPSHOT_READ_FAILED', `Snapshot read failed: ${reason}`, {
+      context: { reason },
+      recoverable: true,
+    }),
+
+  snapshotIntegrityViolation: () =>
+    createError(
+      'runtime',
+      'RUNTIME_SNAPSHOT_INTEGRITY_VIOLATION',
+      'Snapshot integrity verification failed',
+      {
         recoverable: false,
       },
     ),
@@ -380,6 +511,10 @@ export const ErrorCodes = {
   CONFIG_RATELIMIT_INVALID: 'CONFIG_RATELIMIT_INVALID',
   CONFIG_AGENT_INVALID: 'CONFIG_AGENT_INVALID',
   CONFIG_SCHEDULER_INVALID: 'CONFIG_SCHEDULER_INVALID',
+  CONFIG_SNAPSHOT_INVALID: 'CONFIG_SNAPSHOT_INVALID',
+  CONFIG_SNAPSHOT_SECRET_MISSING: 'CONFIG_SNAPSHOT_SECRET_MISSING',
+  CONFIG_WEBHOOK_URL_INVALID: 'CONFIG_WEBHOOK_URL_INVALID',
+  CONFIG_WEBHOOK_SECRET_INVALID: 'CONFIG_WEBHOOK_SECRET_INVALID',
 
   // Scent
   SCENT_PAYLOAD_INVALID: 'SCENT_PAYLOAD_INVALID',
@@ -418,6 +553,16 @@ export const ErrorCodes = {
   PROCESS_TIMEOUT: 'PROCESS_TIMEOUT',
   PROCESS_CRASHED: 'PROCESS_CRASHED',
   PROCESS_POOL_EXHAUSTED: 'PROCESS_POOL_EXHAUSTED',
+  PROCESS_IPC_MESSAGE_TOO_LARGE: 'PROCESS_IPC_MESSAGE_TOO_LARGE',
+  PROCESS_IPC_INVALID_LENGTH: 'PROCESS_IPC_INVALID_LENGTH',
+  PROCESS_IPC_EMPTY_PAYLOAD: 'PROCESS_IPC_EMPTY_PAYLOAD',
+  PROCESS_IPC_INVALID_STATUS_MESSAGE: 'PROCESS_IPC_INVALID_STATUS_MESSAGE',
+  PROCESS_IPC_INVALID_METRICS_MESSAGE: 'PROCESS_IPC_INVALID_METRICS_MESSAGE',
+  PROCESS_IPC_INVALID_ANALYSIS_MESSAGE: 'PROCESS_IPC_INVALID_ANALYSIS_MESSAGE',
+  PROCESS_IPC_UNKNOWN_MESSAGE_TYPE: 'PROCESS_IPC_UNKNOWN_MESSAGE_TYPE',
+  PROCESS_IPC_UNKNOWN_STATUS_STATE: 'PROCESS_IPC_UNKNOWN_STATUS_STATE',
+  PROCESS_IPC_UNKNOWN_CONTENT_TYPE: 'PROCESS_IPC_UNKNOWN_CONTENT_TYPE',
+  PROCESS_IPC_DECODE_FAILED: 'PROCESS_IPC_DECODE_FAILED',
 
   // Rate Limit
   RATE_LIMITED: 'RATE_LIMITED',
@@ -427,6 +572,9 @@ export const ErrorCodes = {
   RUNTIME_FLAG_MISSING: 'RUNTIME_FLAG_MISSING',
   RUNTIME_INTRINSICS_NOT_FROZEN: 'RUNTIME_INTRINSICS_NOT_FROZEN',
   RUNTIME_MEMBRANE_VIOLATION: 'RUNTIME_MEMBRANE_VIOLATION',
+  RUNTIME_SNAPSHOT_WRITE_FAILED: 'RUNTIME_SNAPSHOT_WRITE_FAILED',
+  RUNTIME_SNAPSHOT_READ_FAILED: 'RUNTIME_SNAPSHOT_READ_FAILED',
+  RUNTIME_SNAPSHOT_INTEGRITY_VIOLATION: 'RUNTIME_SNAPSHOT_INTEGRITY_VIOLATION',
 
   // Scheduler
   SCHEDULER_TASK_FAILED: 'SCHEDULER_TASK_FAILED',

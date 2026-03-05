@@ -14,7 +14,9 @@
 
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Errors } from '../types/errors.js'
 import type { Evidence } from './evidence.js'
+import type { HoundAnalysisMessage } from './hound-ipc.js'
 import { decodeHoundMessage } from './hound-ipc.js'
 import {
   createMockAdapter,
@@ -44,6 +46,8 @@ export interface HoundResult {
   processId: string
   /** Error message if status is 'error' */
   error?: string
+  /** Optional deterministic analysis metadata from child process */
+  analysis?: Omit<HoundAnalysisMessage, 'type'>
 }
 
 /**
@@ -145,6 +149,7 @@ interface ProcessState {
   handle: HoundHandle | null
   busy: boolean
   currentSignature: string | null
+  currentAnalysis: Omit<HoundAnalysisMessage, 'type'> | null
   startTime: number | null
   timeoutId: ReturnType<typeof setTimeout> | null
 }
@@ -307,6 +312,7 @@ export class HoundPool implements IHoundPool {
       handle: null,
       busy: false,
       currentSignature: null,
+      currentAnalysis: null,
       startTime: null,
       timeoutId: null,
     }
@@ -324,6 +330,7 @@ export class HoundPool implements IHoundPool {
   private assignToProcess(processState: ProcessState, evidence: Evidence): void {
     processState.busy = true
     processState.currentSignature = evidence.signature
+    processState.currentAnalysis = null
     processState.startTime = Date.now()
 
     // Lazy spawn if needed
@@ -352,7 +359,7 @@ export class HoundPool implements IHoundPool {
           status: 'error',
           durationMs: 0,
           processId: processState.id,
-          error: err instanceof Error ? err.message : 'spawn_failed',
+          error: toErrorMessage(err),
         })
         processState.busy = false
         processState.currentSignature = null
@@ -379,12 +386,23 @@ export class HoundPool implements IHoundPool {
       } else if (message.type === 'status' && message.state === 'error') {
         this._totalErrors++
         this.terminateProcess(processState, 'error', message.error)
+      } else if (message.type === 'analysis') {
+        processState.currentAnalysis = {
+          hash: message.hash,
+          entropy: message.entropy,
+          contentType: message.contentType,
+          sizeBytes: message.sizeBytes,
+        }
       }
       // Ignore 'processing' status - just acknowledgment
     } catch {
       // Decode error - terminate
       this._totalErrors++
-      this.terminateProcess(processState, 'error', 'ipc_decode_error')
+      this.terminateProcess(
+        processState,
+        'error',
+        Errors.processIpcDecodeFailed('malformed frame').code,
+      )
     }
   }
 
@@ -428,6 +446,7 @@ export class HoundPool implements IHoundPool {
     // Reset state
     processState.busy = false
     processState.currentSignature = null
+    processState.currentAnalysis = null
     processState.startTime = null
 
     // Emit result
@@ -451,6 +470,7 @@ export class HoundPool implements IHoundPool {
 
   private completeProcessing(processState: ProcessState, status: 'processed'): void {
     const signature = processState.currentSignature
+    const analysis = processState.currentAnalysis
     const startTime = processState.startTime
 
     // Clear timeout
@@ -462,6 +482,7 @@ export class HoundPool implements IHoundPool {
     // Reset state (keep handle alive for reuse)
     processState.busy = false
     processState.currentSignature = null
+    processState.currentAnalysis = null
     processState.startTime = null
 
     // Emit result
@@ -479,6 +500,9 @@ export class HoundPool implements IHoundPool {
         status,
         durationMs,
         processId: processState.id,
+      }
+      if (analysis) {
+        result.analysis = analysis
       }
 
       this.emitResult(result)
@@ -524,3 +548,18 @@ export function createHoundPool(config: HoundPoolConfig): IHoundPool {
 
 // Re-export for testing
 export { createMockAdapter }
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = error['message']
+    if (typeof message === 'string' && message.length > 0) {
+      return message
+    }
+  }
+
+  return 'spawn_failed'
+}

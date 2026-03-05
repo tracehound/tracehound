@@ -1,4 +1,4 @@
-name: security-paranoid
+name: Security Paranoid
 
 on:
   schedule:

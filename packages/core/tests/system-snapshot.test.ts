@@ -77,6 +77,27 @@ function createWatcherSnapshot(
   };
 }
 
+function createIsolationTelemetry() {
+  return {
+    constraints: {
+      maxMemoryMB: 128,
+      networkAccess: false,
+      fileSystemWrite: false,
+      childSpawn: false,
+    },
+    capabilities: {
+      platform: "linux",
+      memoryLimit: "enforced",
+      processTermination: "enforced",
+      environmentIsolation: "allowlist",
+      networkAccess: "declarative",
+      fileSystemWrite: "declarative",
+      childSpawn: "declarative",
+    },
+    environmentAllowlistSize: 10,
+  } as const;
+}
+
 function createHoundPoolStats(
   partial: Partial<HoundPoolStats> = {},
 ): HoundPoolStats {
@@ -87,6 +108,7 @@ function createHoundPoolStats(
     totalTimeouts: 0,
     totalErrors: 0,
     avgProcessingMs: 5,
+    isolationTelemetry: createIsolationTelemetry(),
     ...partial,
   };
 }
@@ -211,6 +233,89 @@ describe("system-snapshot utilities", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("should accept decimal maxMemoryMB in isolation telemetry", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
+    const path = join(dir, "snapshot.json");
+    const telemetry = createIsolationTelemetry();
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot(),
+        createHoundPoolStats({
+          isolationTelemetry: {
+            ...telemetry,
+            constraints: {
+              ...telemetry.constraints,
+              maxMemoryMB: 64.5,
+            },
+          },
+        }),
+      ),
+    );
+
+    writeSystemSnapshotToDisk(snapshot, path, "secret");
+    const result = readSystemSnapshotFromDisk(path, "secret");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.houndPool.isolationTelemetry?.constraints.maxMemoryMB).toBe(64.5);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should accept unknown platform and best_effort telemetry capabilities", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
+    const path = join(dir, "snapshot.json");
+    const telemetry = createIsolationTelemetry();
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot(),
+        createHoundPoolStats({
+          isolationTelemetry: {
+            ...telemetry,
+            capabilities: {
+              ...telemetry.capabilities,
+              platform: "unknown",
+              memoryLimit: "best_effort",
+              processTermination: "best_effort",
+              networkAccess: "best_effort",
+              fileSystemWrite: "best_effort",
+              childSpawn: "best_effort",
+            },
+          },
+        }),
+      ),
+    );
+
+    writeSystemSnapshotToDisk(snapshot, path, "secret");
+    const result = readSystemSnapshotFromDisk(path, "secret");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.houndPool.isolationTelemetry?.capabilities.platform).toBe(
+      "unknown",
+    );
+    expect(
+      result.snapshot.houndPool.isolationTelemetry?.capabilities.memoryLimit,
+    ).toBe("best_effort");
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("should accept legacy hound pool stats without isolation telemetry", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
+    const path = join(dir, "snapshot.json");
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot(),
+        createHoundPoolStats({ isolationTelemetry: undefined }),
+      ),
+    );
+
+    writeSystemSnapshotToDisk(snapshot, path, "secret");
+    const result = readSystemSnapshotFromDisk(path, "secret");
+    expect(result.ok).toBe(true);
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("should return NO_INSTANCE when file does not exist", () => {
     const path = join(tmpdir(), "tracehound-missing", "snapshot.json");
     const result = readSystemSnapshotFromDisk(path, "secret");
@@ -307,6 +412,179 @@ describe("system-snapshot utilities", () => {
             },
           },
           houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: null,
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: {
+            ...createHoundPoolStats(),
+            isolationTelemetry: null,
+          },
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: {
+            ...createHoundPoolStats(),
+            isolationTelemetry: {
+              ...createIsolationTelemetry(),
+              constraints: null,
+            },
+          },
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: {
+            ...createHoundPoolStats(),
+            isolationTelemetry: {
+              ...createIsolationTelemetry(),
+              capabilities: null,
+            },
+          },
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: {
+            ...createQuarantineStats(),
+            bySeverity: null,
+          },
+          watcher: createWatcherSnapshot(),
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: {
+            ...createWatcherSnapshot(),
+            threats: {
+              total: 3,
+              byCategory: null,
+              bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+            },
+          },
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: {
+            ...createWatcherSnapshot(),
+            threats: {
+              total: 3,
+              byCategory: { injection: "2" },
+              bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+            },
+          },
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: createHoundPoolStats(),
+          rateLimiter: null,
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: {
+            ...createHoundPoolStats(),
+            isolationTelemetry: {
+              ...createIsolationTelemetry(),
+              environmentAllowlistSize: -1,
+            },
+          },
           rateLimiter: createRateLimiterStats(),
         },
         signature: "x",

@@ -524,6 +524,7 @@ function isHoundPoolStats(value: unknown): value is HoundPoolStats {
     totalTimeouts?: unknown;
     totalErrors?: unknown;
     avgProcessingMs?: unknown;
+    isolationTelemetry?: unknown;
   };
 
   return (
@@ -532,7 +533,100 @@ function isHoundPoolStats(value: unknown): value is HoundPoolStats {
     isNonNegativeInteger(stats.totalActivations) &&
     isNonNegativeInteger(stats.totalTimeouts) &&
     isNonNegativeInteger(stats.totalErrors) &&
-    isNonNegativeFiniteNumber(stats.avgProcessingMs)
+    isNonNegativeFiniteNumber(stats.avgProcessingMs) &&
+    (stats.isolationTelemetry === undefined ||
+      isProcessIsolationTelemetry(stats.isolationTelemetry))
+  );
+}
+
+function isProcessIsolationTelemetry(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const telemetry = value as {
+    constraints?: unknown;
+    capabilities?: unknown;
+    environmentAllowlistSize?: unknown;
+  };
+
+  return (
+    isProcessConstraints(telemetry.constraints) &&
+    isProcessIsolationCapabilities(telemetry.capabilities) &&
+    isNonNegativeInteger(telemetry.environmentAllowlistSize)
+  );
+}
+
+function isProcessConstraints(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const constraints = value as {
+    maxMemoryMB?: unknown;
+    networkAccess?: unknown;
+    fileSystemWrite?: unknown;
+    childSpawn?: unknown;
+  };
+
+  const hasValidMemory =
+    constraints.maxMemoryMB === undefined ||
+    isNonNegativeFiniteNumber(constraints.maxMemoryMB);
+
+  return (
+    hasValidMemory &&
+    constraints.networkAccess === false &&
+    constraints.fileSystemWrite === false &&
+    constraints.childSpawn === false
+  );
+}
+
+function isProcessIsolationCapabilities(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const capabilities = value as {
+    platform?: unknown;
+    memoryLimit?: unknown;
+    processTermination?: unknown;
+    environmentIsolation?: unknown;
+    networkAccess?: unknown;
+    fileSystemWrite?: unknown;
+    childSpawn?: unknown;
+  };
+
+  return (
+    isProcessPlatform(capabilities.platform) &&
+    isIsolationEnforcementLevel(capabilities.memoryLimit) &&
+    isIsolationEnforcementLevel(capabilities.processTermination) &&
+    capabilities.environmentIsolation === "allowlist" &&
+    isIsolationEnforcementLevel(capabilities.networkAccess) &&
+    isIsolationEnforcementLevel(capabilities.fileSystemWrite) &&
+    isIsolationEnforcementLevel(capabilities.childSpawn)
+  );
+}
+
+function isProcessPlatform(value: unknown): boolean {
+  return (
+    value === "aix" ||
+    value === "darwin" ||
+    value === "freebsd" ||
+    value === "linux" ||
+    value === "openbsd" ||
+    value === "sunos" ||
+    value === "win32" ||
+    value === "android" ||
+    value === "haiku" ||
+    value === "cygwin" ||
+    value === "netbsd" ||
+    value === "unknown"
+  );
+}
+
+function isIsolationEnforcementLevel(value: unknown): boolean {
+  return (
+    value === "enforced" || value === "best_effort" || value === "declarative"
   );
 }
 

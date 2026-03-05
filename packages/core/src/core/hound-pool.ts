@@ -22,7 +22,9 @@ import {
   createMockAdapter,
   createProcessAdapter,
   DEFAULT_CONSTRAINTS,
+  getProcessIsolationTelemetry,
   type HoundHandle,
+  type HoundProcessIsolationTelemetry,
   type HoundProcessConstraints,
   type IHoundProcessAdapter,
 } from "./process-adapter.js";
@@ -68,6 +70,8 @@ export interface HoundPoolStats {
   totalErrors: number;
   /** Average processing time in ms */
   avgProcessingMs: number;
+  /** Process isolation constraints/capabilities telemetry */
+  isolationTelemetry?: Readonly<HoundProcessIsolationTelemetry>;
 }
 
 /**
@@ -168,6 +172,8 @@ export class HoundPool implements IHoundPool {
   private readonly processScriptPath: string;
   private readonly onPoolExhausted: PoolExhaustedAction;
   private readonly deferQueueLimit: number;
+  private readonly mergedProcessConstraints: HoundProcessConstraints;
+  private readonly isolationTelemetry: Readonly<HoundProcessIsolationTelemetry>;
 
   // Statistics
   private _totalActivations = 0;
@@ -186,6 +192,13 @@ export class HoundPool implements IHoundPool {
     this.processScriptPath = config.processScriptPath ?? defaultScript;
     this.onPoolExhausted = config.onPoolExhausted ?? "drop";
     this.deferQueueLimit = config.deferQueueLimit ?? 100;
+    this.mergedProcessConstraints = Object.freeze({
+      ...DEFAULT_CONSTRAINTS,
+      ...config.processConstraints,
+    });
+    this.isolationTelemetry = getProcessIsolationTelemetry(
+      this.mergedProcessConstraints,
+    );
 
     // Pre-spawn process slots (lazy spawn)
     for (let i = 0; i < config.poolSize; i++) {
@@ -289,6 +302,7 @@ export class HoundPool implements IHoundPool {
       totalTimeouts: this._totalTimeouts,
       totalErrors: this._totalErrors,
       avgProcessingMs,
+      isolationTelemetry: this.isolationTelemetry,
     });
   }
 
@@ -359,7 +373,7 @@ export class HoundPool implements IHoundPool {
       try {
         processState.handle = this.adapter.spawn(
           this.processScriptPath,
-          this.config.processConstraints,
+          this.mergedProcessConstraints,
         );
         processState.pid = processState.handle.pid;
 

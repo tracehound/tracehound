@@ -79,6 +79,27 @@ export interface HoundProcessConstraints {
   childSpawn: false;
 }
 
+export type IsolationEnforcementLevel =
+  | "enforced"
+  | "best_effort"
+  | "declarative";
+
+export interface HoundProcessIsolationCapabilities {
+  platform: NodeJS.Platform | "unknown";
+  memoryLimit: IsolationEnforcementLevel;
+  processTermination: IsolationEnforcementLevel;
+  environmentIsolation: "allowlist";
+  networkAccess: IsolationEnforcementLevel;
+  fileSystemWrite: IsolationEnforcementLevel;
+  childSpawn: IsolationEnforcementLevel;
+}
+
+export interface HoundProcessIsolationTelemetry {
+  constraints: Readonly<HoundProcessConstraints>;
+  capabilities: Readonly<HoundProcessIsolationCapabilities>;
+  environmentAllowlistSize: number;
+}
+
 /**
  * Default constraints (read-only).
  */
@@ -89,6 +110,34 @@ export const DEFAULT_CONSTRAINTS: Readonly<HoundProcessConstraints> =
     fileSystemWrite: false,
     childSpawn: false,
   });
+
+export function getProcessIsolationTelemetry(
+  constraints?: Partial<HoundProcessConstraints>,
+  platform: NodeJS.Platform = process.platform,
+): HoundProcessIsolationTelemetry {
+  const mergedConstraints: HoundProcessConstraints = {
+    ...DEFAULT_CONSTRAINTS,
+    ...constraints,
+  };
+  const memoryLimit = isValidEnforcedMemoryLimitMB(mergedConstraints.maxMemoryMB)
+    ? "enforced"
+    : "declarative";
+  const normalizedPlatform = normalizePlatform(platform);
+
+  return Object.freeze({
+    constraints: Object.freeze({ ...mergedConstraints }),
+    capabilities: Object.freeze({
+      platform: normalizedPlatform,
+      memoryLimit,
+      processTermination: "enforced",
+      environmentIsolation: "allowlist",
+      networkAccess: "declarative",
+      fileSystemWrite: "declarative",
+      childSpawn: "declarative",
+    }),
+    environmentAllowlistSize: CHILD_ENV_ALLOWLIST.length,
+  });
+}
 
 /**
  * Hound Process Adapter interface.
@@ -163,7 +212,7 @@ export function createProcessAdapter(): IHoundProcessAdapter {
       const execArgv: string[] = [];
 
       // Memory limit (V8 heap)
-      if (mergedConstraints.maxMemoryMB) {
+      if (isValidEnforcedMemoryLimitMB(mergedConstraints.maxMemoryMB)) {
         execArgv.push(`--max-old-space-size=${mergedConstraints.maxMemoryMB}`);
       }
 
@@ -362,4 +411,32 @@ function buildChildEnv(): NodeJS.ProcessEnv {
   }
 
   return env;
+}
+
+function normalizePlatform(platform: string): NodeJS.Platform | "unknown" {
+  switch (platform) {
+    case "aix":
+    case "darwin":
+    case "freebsd":
+    case "linux":
+    case "openbsd":
+    case "sunos":
+    case "win32":
+    case "android":
+    case "haiku":
+    case "cygwin":
+    case "netbsd":
+      return platform;
+    default:
+      return "unknown";
+  }
+}
+
+function isValidEnforcedMemoryLimitMB(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    Number.isInteger(value) &&
+    value > 0
+  );
 }

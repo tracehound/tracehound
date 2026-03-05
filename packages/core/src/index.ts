@@ -191,6 +191,7 @@ export {
   readSystemSnapshotFromDisk,
   resolveSystemSnapshotPath,
   resolveSystemSnapshotSecret,
+  SYSTEM_SNAPSHOT_ENV,
   writeSystemSnapshotToDisk,
 } from './utils/system-snapshot.js'
 export type { SnapshotReadResult, SystemHealth, SystemSnapshot } from './utils/system-snapshot.js'
@@ -338,7 +339,6 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
-
 
 
 

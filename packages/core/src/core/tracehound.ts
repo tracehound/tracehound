@@ -9,6 +9,7 @@ import { AuditChain } from './audit-chain.js'
 import { EvidenceFactory, type IEvidenceFactory } from './evidence-factory.js'
 import {
   createHoundPool,
+  isHoundPressureError,
   type HoundPoolConfig,
   type HoundResult,
   type IHoundPool,
@@ -129,20 +130,6 @@ const DEFAULT_POOL_CONFIG: HoundPoolConfig = {
   onPoolExhausted: 'defer',
   deferQueueLimit: 100,
 }
-
-const PRESSURE_ERROR_CODES: ReadonlySet<string> = new Set([
-  'pool_exhausted',
-  'pool_exhausted_escalated',
-  'defer_queue_full',
-  'spawn_failed',
-  'ipc_timeout',
-])
-
-const SPAWN_PRESSURE_PATTERNS: ReadonlyArray<RegExp> = [
-  /^spawn_failed(?:\b|:)/i,
-  /\bfailed to spawn process\b/i,
-  /\bprocess spawn failed\b/i,
-]
 
 /**
  * Tracehound runtime implementation.
@@ -384,17 +371,7 @@ class Tracehound implements ITracehound {
   }
 
   private isCapacityPressureError(errorCode: string): boolean {
-    if (PRESSURE_ERROR_CODES.has(errorCode)) {
-      return true
-    }
-
-    for (const pattern of SPAWN_PRESSURE_PATTERNS) {
-      if (pattern.test(errorCode)) {
-        return true
-      }
-    }
-
-    return false
+    return isHoundPressureError(errorCode)
   }
 }
 

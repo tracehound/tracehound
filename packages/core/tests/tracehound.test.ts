@@ -7,11 +7,22 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { encodeHoundMessage } from '../src/core/hound-ipc.js'
-import { createMockAdapter } from '../src/core/hound-pool.js'
+import { createMockAdapter, HOUND_PRESSURE_ERRORS } from '../src/core/hound-pool.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk } from '../src/utils/system-snapshot.js'
 
 async function flushMicrotasks(): Promise<void> {
+  const vitestTimers = vi as unknown as {
+    isFakeTimers?: () => boolean
+    runAllTicks?: () => void
+  }
+  if (typeof vitestTimers.isFakeTimers === 'function' && vitestTimers.isFakeTimers()) {
+    if (typeof vitestTimers.runAllTicks === 'function') {
+      vitestTimers.runAllTicks()
+      return
+    }
+  }
+
   await new Promise<void>((resolve) => queueMicrotask(resolve))
 }
 
@@ -250,7 +261,11 @@ describe('Tracehound Factory', () => {
 
       expect(first.status).toBe('quarantined')
       expect(second.status).toBe('quarantined')
-      expect(panics.some((panic) => panic.reason === 'hound_error: pool_exhausted')).toBe(true)
+      expect(
+        panics.some(
+          (panic) => panic.reason === `hound_error: ${HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED}`,
+        ),
+      ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
       const pid = [...adapter.getMockProcesses().keys()][0]
@@ -340,7 +355,11 @@ describe('Tracehound Factory', () => {
         payload: { third: true },
       })
 
-      expect(panics.some((panic) => panic.reason === 'hound_error: defer_queue_full')).toBe(true)
+      expect(
+        panics.some(
+          (panic) => panic.reason === `hound_error: ${HOUND_PRESSURE_ERRORS.DEFER_QUEUE_FULL}`,
+        ),
+      ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
       const pid = [...adapter.getMockProcesses().keys()][0]

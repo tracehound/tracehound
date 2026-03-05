@@ -10,6 +10,7 @@ import { encodeHoundMessage } from '../src/core/hound-ipc.js'
 import {
   createHoundPool,
   createMockAdapter,
+  HOUND_PRESSURE_ERRORS,
   HoundPool,
   type HoundResult,
   type IHoundPool,
@@ -136,7 +137,9 @@ describe('HoundPool', () => {
       expect(pool.stats.activeProcesses).toBe(3)
       expect(pool.stats.totalActivations).toBe(5)
       // 2 dropped = 2 error results
-      expect(results.filter((r) => r.error === 'pool_exhausted').length).toBe(2)
+      expect(results.filter((r) => r.error === HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED).length).toBe(
+        2,
+      )
     })
   })
 
@@ -342,7 +345,9 @@ describe('HoundPool', () => {
 
       expect(pool.stats.activeProcesses).toBe(1)
       // 1 dropped (queue full)
-      expect(results.filter((r) => r.error === 'defer_queue_full').length).toBe(1)
+      expect(results.filter((r) => r.error === HOUND_PRESSURE_ERRORS.DEFER_QUEUE_FULL).length).toBe(
+        1,
+      )
     })
 
     it('escalate emits error but continues', () => {
@@ -364,7 +369,9 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('test-2'))
 
       expect(pool.stats.activeProcesses).toBe(1)
-      expect(results.filter((r) => r.error === 'pool_exhausted_escalated').length).toBe(1)
+      expect(
+        results.filter((r) => r.error === HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED_ESCALATED).length,
+      ).toBe(1)
       expect(pool.stats.totalErrors).toBeGreaterThan(0)
     })
 
@@ -443,7 +450,7 @@ describe('HoundPool', () => {
 
       const errorResult = results.find((result) => result.status === 'error')
       expect(errorResult).toBeDefined()
-      expect(errorResult?.error).toBe('spawn_failed')
+      expect(errorResult?.error).toBe(HOUND_PRESSURE_ERRORS.SPAWN_FAILED)
     })
 
     it('handles process status error messages', () => {

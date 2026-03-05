@@ -65,6 +65,14 @@ const DEFAULT_SNAPSHOT_PATH = join(
   "tracehound",
   "system-snapshot.json",
 );
+
+export const SYSTEM_SNAPSHOT_ENV = Object.freeze({
+  PATH: "TRACEHOUND_SYSTEM_SNAPSHOT_PATH",
+  SECRET: "TRACEHOUND_SNAPSHOT_SECRET",
+  MAX_AGE_MS: "TRACEHOUND_SNAPSHOT_MAX_AGE_MS",
+  MAX_FUTURE_SKEW_MS: "TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS",
+} as const);
+
 let windowsAclWarningEmitted = false;
 
 /**
@@ -75,7 +83,7 @@ export function resolveSystemSnapshotPath(pathOverride?: string): string {
     return pathOverride;
   }
 
-  const fromEnv = process.env["TRACEHOUND_SYSTEM_SNAPSHOT_PATH"];
+  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.PATH];
   if (typeof fromEnv === "string" && fromEnv.length > 0) {
     return fromEnv;
   }
@@ -93,7 +101,7 @@ export function resolveSystemSnapshotSecret(
     return secretOverride;
   }
 
-  const fromEnv = process.env["TRACEHOUND_SNAPSHOT_SECRET"];
+  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
   if (typeof fromEnv === "string" && fromEnv.length > 0) {
     return fromEnv;
   }

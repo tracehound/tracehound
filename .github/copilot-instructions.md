@@ -4,8 +4,8 @@
 - Monorepo managed with **pnpm workspaces** (`/pnpm-workspace.yaml`).
 - Main packages:
   - `packages/core` → core deterministic runtime security buffer (`@tracehound/core`)
-  - `packages/express` → Express adapter
-  - `packages/fastify` → Fastify adapter
+  - `packages/express` → Express adapter (`@tracehound/express`)
+  - `packages/fastify` → Fastify adapter (`@tracehound/fastify`)
   - `packages/cli` → CLI tooling
 - Shared TypeScript config is in `/tsconfig.base.json` (strict mode + exact optional properties + noUncheckedIndexedAccess).
 
@@ -26,7 +26,7 @@
   ```
 
 ## Commands that match CI
-Run from repo root (`/home/runner/work/tracehound/tracehound`):
+Run from the repository root:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -63,8 +63,8 @@ Additional CI/security checks used by workflows:
 - Update docs when public behavior/configuration changes.
 - Do not weaken fail-open guarantees, evidence integrity behavior, or quarantine/audit invariants without explicit tests and spec updates.
 
-## Error encountered during onboarding
-- **Issue:** `pnpm: command not found` in this environment.
-- **Workaround:** Enabled Corepack and activated pinned pnpm version:
+## Troubleshooting
+- **Potential issue:** `pnpm: command not found`.
+- **Workaround used during onboarding:** Enable Corepack and activate the pinned pnpm version:
   - `corepack enable`
   - `corepack prepare pnpm@9.1.4 --activate`

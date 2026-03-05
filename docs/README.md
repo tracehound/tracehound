@@ -1,7 +1,7 @@
 # Documentation Index
 
-> **Last Updated:** 2026-03-05
-> **Version:** v1.5.0
+> **Last Updated:** 2026-03-06
+> **Version:** v1.6.0
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
 ---

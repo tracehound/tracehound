@@ -5,7 +5,7 @@
 For configuration defaults and adapter behavior flags, see [CONFIGURATION.md](./CONFIGURATION.md).
 For upgrade-impacting changes, see [BREAKING-CHANGES.md](./BREAKING-CHANGES.md).
 
-## Migration Note (Post v1.5.0)
+## Migration Note (v1.6.0)
 
 1. `@tracehound/fastify` now uses named export only (`tracehoundPlugin`).
 2. Custom `IAgent` implementations must expose `getStats(): Readonly<AgentStats>`.

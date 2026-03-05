@@ -1,9 +1,9 @@
 # Breaking Changes and Migration Guide
 
 > Last Updated: 2026-03-06
-> Target: next release after `v1.5.0`
+> Target: `v1.6.0`
 
-This page tracks behavior and contract changes that require migration work.
+This page tracks behavior and contract changes included in `v1.6.0`.
 
 ## 1) `@tracehound/fastify` default export removed
 

@@ -261,6 +261,44 @@ describe("system-snapshot utilities", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("should accept unknown platform and best_effort telemetry capabilities", () => {
+    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
+    const path = join(dir, "snapshot.json");
+    const telemetry = createIsolationTelemetry();
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot(),
+        createHoundPoolStats({
+          isolationTelemetry: {
+            ...telemetry,
+            capabilities: {
+              ...telemetry.capabilities,
+              platform: "unknown",
+              memoryLimit: "best_effort",
+              processTermination: "best_effort",
+              networkAccess: "best_effort",
+              fileSystemWrite: "best_effort",
+              childSpawn: "best_effort",
+            },
+          },
+        }),
+      ),
+    );
+
+    writeSystemSnapshotToDisk(snapshot, path, "secret");
+    const result = readSystemSnapshotFromDisk(path, "secret");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.houndPool.isolationTelemetry?.capabilities.platform).toBe(
+      "unknown",
+    );
+    expect(
+      result.snapshot.houndPool.isolationTelemetry?.capabilities.memoryLimit,
+    ).toBe("best_effort");
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("should accept legacy hound pool stats without isolation telemetry", () => {
     const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
     const path = join(dir, "snapshot.json");
@@ -375,6 +413,158 @@ describe("system-snapshot utilities", () => {
           },
           houndPool: createHoundPoolStats(),
           rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: null,
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: {
+            ...createHoundPoolStats(),
+            isolationTelemetry: null,
+          },
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: {
+            ...createHoundPoolStats(),
+            isolationTelemetry: {
+              ...createIsolationTelemetry(),
+              constraints: null,
+            },
+          },
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: {
+            ...createHoundPoolStats(),
+            isolationTelemetry: {
+              ...createIsolationTelemetry(),
+              capabilities: null,
+            },
+          },
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: {
+            ...createQuarantineStats(),
+            bySeverity: null,
+          },
+          watcher: createWatcherSnapshot(),
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: {
+            ...createWatcherSnapshot(),
+            threats: {
+              total: 3,
+              byCategory: null,
+              bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+            },
+          },
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: {
+            ...createWatcherSnapshot(),
+            threats: {
+              total: 3,
+              byCategory: { injection: "2" },
+              bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+            },
+          },
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: "x",
+      },
+      {
+        version: 1,
+        algorithm: "HMAC-SHA256",
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: "healthy",
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot(),
+          houndPool: createHoundPoolStats(),
+          rateLimiter: null,
         },
         signature: "x",
       },

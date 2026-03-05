@@ -275,7 +275,11 @@ export class Agent implements IAgent {
 
     if (typeof provider.health !== 'function') {
       this.stats.coordinationFallbackCount++
-      this.emitCoordinationWarning('invalid_contract', providerId)
+      this.emitCoordinationWarning(
+        'invalid_contract',
+        providerId,
+        Errors.coordinationContractInvalid(providerId, 'health() is required'),
+      )
       return this.toDegradedHealth(providerId)
     }
 
@@ -286,7 +290,7 @@ export class Agent implements IAgent {
         this.emitCoordinationWarning(
           'invalid_contract',
           providerId,
-          new Error('Provider health payload is invalid'),
+          Errors.coordinationContractInvalid(providerId, 'health() returned invalid payload'),
         )
         return this.toDegradedHealth(providerId)
       }
@@ -437,9 +441,26 @@ export class Agent implements IAgent {
           : SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
       context: {
         providerId,
-        error: error instanceof Error ? error.message : undefined,
+        error: this.getErrorMessage(error),
       },
     })
+  }
+
+  private getErrorMessage(error: unknown): string | undefined {
+    if (error instanceof Error) {
+      return error.message
+    }
+
+    if (typeof error !== 'object' || error === null || !('message' in error)) {
+      return undefined
+    }
+
+    const { message } = error as { message?: unknown }
+    if (typeof message !== 'string' || message.length === 0) {
+      return undefined
+    }
+
+    return message
   }
 
   private isValidCoordinationHealth(value: unknown): value is CoordinationHealth {

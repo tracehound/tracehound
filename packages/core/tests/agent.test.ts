@@ -14,6 +14,7 @@ import type { IWatcher } from '../src/core/watcher.js'
 import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
 import type { JsonSerializable, QuarantineConfig, RateLimitConfig } from '../src/types/index.js'
 import type { Scent } from '../src/types/scent.js'
+import { Errors } from '../src/types/errors.js'
 
 describe('Agent', () => {
   let agent: Agent
@@ -190,6 +191,7 @@ describe('Agent', () => {
           reason: SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
           context: expect.objectContaining({
             providerId: 'throwing-provider',
+            error: 'provider unavailable',
           }),
         }),
       )
@@ -227,6 +229,10 @@ describe('Agent', () => {
           reason: SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT,
           context: expect.objectContaining({
             providerId: 'invalid-provider',
+            error: Errors.coordinationContractInvalid(
+              'invalid-provider',
+              'health() is required',
+            ).message,
           }),
         }),
       )
@@ -271,6 +277,10 @@ describe('Agent', () => {
           reason: SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT,
           context: expect.objectContaining({
             providerId: 'malformed-provider',
+            error: Errors.coordinationContractInvalid(
+              'malformed-provider',
+              'health() returned invalid payload',
+            ).message,
           }),
         }),
       )

@@ -182,6 +182,17 @@ export const Errors = {
       recoverable: true,
     }),
 
+  coordinationContractInvalid: (providerId: string, issue: string) =>
+    createError(
+      'agent',
+      'AGENT_COORDINATION_CONTRACT_INVALID',
+      `Coordination provider ${providerId} contract invalid: ${issue}`,
+      {
+        context: { providerId, issue },
+        recoverable: true,
+      },
+    ),
+
   // ─────────────────────────────────────────────────────────────────────────
   // Quarantine Errors
   // ─────────────────────────────────────────────────────────────────────────
@@ -525,6 +536,7 @@ export const ErrorCodes = {
   AGENT_PAYLOAD_TOO_LARGE: 'AGENT_PAYLOAD_TOO_LARGE',
   AGENT_SERIALIZATION_FAILED: 'AGENT_SERIALIZATION_FAILED',
   AGENT_INTERCEPT_FAILED: 'AGENT_INTERCEPT_FAILED',
+  AGENT_COORDINATION_CONTRACT_INVALID: 'AGENT_COORDINATION_CONTRACT_INVALID',
 
   // Quarantine
   QUARANTINE_FULL: 'QUARANTINE_FULL',

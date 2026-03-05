@@ -1,6 +1,6 @@
 # Breaking Changes and Migration Guide
 
-> Last Updated: 2026-03-05
+> Last Updated: 2026-03-06
 > Target: next release after `v1.5.0`
 
 This page tracks behavior and contract changes that require migration work.
@@ -44,7 +44,7 @@ Commands `tracehound status`, `tracehound stats`, and `tracehound watch` now req
 ### New failure modes
 
 1. `NO_INSTANCE`: snapshot file not found or stale.
-2. `INTEGRITY_VIOLATION`: missing/invalid secret, invalid format, or signature mismatch.
+2. `INTEGRITY_VIOLATION`: missing/invalid secret, invalid format, signature mismatch, or implausibly future-dated snapshot timestamp.
 
 ### Required runtime configuration
 
@@ -54,6 +54,7 @@ Commands `tracehound status`, `tracehound stats`, and `tracehound watch` now req
    - `TRACEHOUND_SYSTEM_SNAPSHOT_PATH`
    - `TRACEHOUND_SNAPSHOT_SECRET`
    - Optional: `TRACEHOUND_SNAPSHOT_MAX_AGE_MS` (default 5000)
+   - Optional: `TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS` (default 5000)
 
 ## 4) Snapshot export now enforces secret presence
 

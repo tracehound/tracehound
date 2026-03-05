@@ -1,8 +1,8 @@
 # CRITICAL-REFACTOR-PLAN
 
-> Status: ACTIVE (Wave 1 implemented, Wave 2 in-progress)
+> Status: ACTIVE (Wave 1 implemented, Wave 2 release-readiness hardening validated; non-runtime hygiene follow-up remains)
 > Priority: P0/P1
-> Updated: 2026-03-05
+> Updated: 2026-03-06
 
 ## 1) Critical Findings (Gercek Kod Durumu)
 
@@ -194,7 +194,15 @@ IPC/Pool genisletmeleri:
    - Pool exhaustion/timeouts/error sinyallerinde `Watcher.setOverloaded(true)` tetikleniyor.
    - Islenen sonuclarla headroom geri geldiginde overload durumu deterministik olarak temizleniyor.
    - Forced terminate lifecycle'i overload sinyali uretmiyor (false positive engellendi).
+9. Release-readiness drift temizligi:
+   - `Agent.getCoordinationHealth()` invalid contract yolu typed `Errors` factory ile merkezilestirildi; runtime `new Error(...)` kalmadi.
+   - Snapshot env-key kullanan core/CLI testleri `SYSTEM_SNAPSHOT_ENV` sabitine tasindi; hard-coded drift riski azaltildi.
+   - `API.md` ve `BREAKING-CHANGES.md`, future-dated snapshot -> `INTEGRITY_VIOLATION` davranisiyla hizalandi.
+10. Verification gate rerun tamamlandi:
+   - `pnpm --filter @tracehound/core test` gecti.
+   - `pnpm --filter @tracehound/cli test` gecti.
+   - `pnpm lint` gecti.
 
 ### Kalanlar (Wave 2 backlog)
 
-1. Core genelinde `throw new Error` temizligi runtime path disinda (ornek: codec class hierarchy) ayri review dalinda tamamlanacak.
+1. Core genelinde runtime disi / test-yardimci `throw new Error` temizligi (ornek: codec class hierarchy, test fixture stub'lari) ayri hygiene dalinda tamamlanacak.

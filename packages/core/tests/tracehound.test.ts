@@ -10,7 +10,7 @@ import { encodeHoundMessage } from '../src/core/hound-ipc.js'
 import { createMockAdapter, HOUND_PRESSURE_ERRORS } from '../src/core/hound-pool.js'
 import { formatHoundErrorReason, SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
-import { readSystemSnapshotFromDisk } from '../src/utils/system-snapshot.js'
+import { readSystemSnapshotFromDisk, SYSTEM_SNAPSHOT_ENV } from '../src/utils/system-snapshot.js'
 
 async function flushMicrotasks(): Promise<void> {
   const vitestTimers = vi as unknown as {
@@ -533,10 +533,10 @@ describe('Tracehound Factory', () => {
     it('throws when snapshot export is enabled without secret', () => {
       const dir = mkdtempSync(join(tmpdir(), 'tracehound-snapshot-config-'))
       const path = join(dir, 'snapshot.json')
-      const previousSnapshotSecret = process.env['TRACEHOUND_SNAPSHOT_SECRET']
+      const previousSnapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
 
       try {
-        delete process.env['TRACEHOUND_SNAPSHOT_SECRET']
+        delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
 
         expect(() =>
           createTracehound({
@@ -545,9 +545,9 @@ describe('Tracehound Factory', () => {
         ).toThrow()
       } finally {
         if (previousSnapshotSecret === undefined) {
-          delete process.env['TRACEHOUND_SNAPSHOT_SECRET']
+          delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
         } else {
-          process.env['TRACEHOUND_SNAPSHOT_SECRET'] = previousSnapshotSecret
+          process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSnapshotSecret
         }
         rmSync(dir, { recursive: true, force: true })
       }

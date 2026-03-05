@@ -235,6 +235,11 @@ console.log(SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS) // TRACEHOUND_SNAPSHOT_MAX_AGE_MS
 console.log(SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS) // TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
 ```
 
+CLI freshness/integrity rules use the same keys:
+
+1. Stale snapshots beyond `SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS` are treated as `NO_INSTANCE`.
+2. Future-dated snapshots beyond `SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS` are treated as `INTEGRITY_VIOLATION`.
+
 ### Runtime Teardown (`th.shutdown()`)
 
 Stop runtime background resources (snapshot interval and hound processes):
@@ -249,6 +254,7 @@ Subscribe to internal system events (e.g., panic, thread detection, quarantine).
 
 ```ts
 import {
+  HOUND_PRESSURE_ERRORS,
   formatHoundErrorReason,
   formatHoundTimeoutReason,
   SYSTEM_PANIC_REASONS,
@@ -263,7 +269,7 @@ const timeoutReasonExample = formatHoundTimeoutReason('sig-123')
 th.notifications.on('system.panic', (payload) => {
   console.error(`[PANIC] System level ${payload.level}: ${payload.reason}`)
 
-  if (payload.reason === formatHoundErrorReason('pool_exhausted')) {
+  if (payload.reason === formatHoundErrorReason(HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED)) {
     // capacity pressure handling
   }
   if (payload.reason.startsWith(SYSTEM_PANIC_REASONS.HOUND_TIMEOUT_SIGNATURE_PREFIX)) {

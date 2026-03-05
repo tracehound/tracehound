@@ -13,6 +13,7 @@ import {
   readSystemSnapshotFromDisk,
   resolveSystemSnapshotPath,
   resolveSystemSnapshotSecret,
+  SYSTEM_SNAPSHOT_ENV,
   writeSystemSnapshotToDisk,
   type SystemSnapshot,
 } from "../src/utils/system-snapshot.js";
@@ -135,19 +136,19 @@ function createMockTracehound(
 }
 
 describe("system-snapshot utilities", () => {
-  const previousPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH;
-  const previousSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET;
+  const previousPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH];
+  const previousSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
 
   afterEach(() => {
     if (previousPath === undefined) {
-      delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH;
+      delete process.env[SYSTEM_SNAPSHOT_ENV.PATH];
     } else {
-      process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = previousPath;
+      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousPath;
     }
     if (previousSecret === undefined) {
-      delete process.env.TRACEHOUND_SNAPSHOT_SECRET;
+      delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
     } else {
-      process.env.TRACEHOUND_SNAPSHOT_SECRET = previousSecret;
+      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSecret;
     }
     vi.restoreAllMocks();
   });
@@ -156,11 +157,11 @@ describe("system-snapshot utilities", () => {
     const override = resolveSystemSnapshotPath("/tmp/custom.json");
     expect(override).toBe("/tmp/custom.json");
 
-    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = "/tmp/from-env.json";
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = "/tmp/from-env.json";
     const fromEnv = resolveSystemSnapshotPath();
     expect(fromEnv).toBe("/tmp/from-env.json");
 
-    delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH;
+    delete process.env[SYSTEM_SNAPSHOT_ENV.PATH];
     const fallback = resolveSystemSnapshotPath();
     expect(fallback).toContain("tracehound");
     expect(fallback).toContain("system-snapshot.json");
@@ -170,10 +171,10 @@ describe("system-snapshot utilities", () => {
     const override = resolveSystemSnapshotSecret("abc");
     expect(override).toBe("abc");
 
-    process.env.TRACEHOUND_SNAPSHOT_SECRET = "env-secret";
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = "env-secret";
     expect(resolveSystemSnapshotSecret()).toBe("env-secret");
 
-    delete process.env.TRACEHOUND_SNAPSHOT_SECRET;
+    delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
     expect(resolveSystemSnapshotSecret()).toBeNull();
   });
 

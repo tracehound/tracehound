@@ -7,8 +7,12 @@
 import { createAgent, type IAgent } from './agent.js'
 import { AuditChain } from './audit-chain.js'
 import { EvidenceFactory, type IEvidenceFactory } from './evidence-factory.js'
-import { createHoundPool, type HoundPoolConfig, type IHoundPool } from './hound-pool.js'
-import type { HoundResult } from './hound-pool.js'
+import {
+  createHoundPool,
+  type HoundPoolConfig,
+  type HoundResult,
+  type IHoundPool,
+} from './hound-pool.js'
 import { createNotificationEmitter, type INotificationEmitter } from './notification-emitter.js'
 import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
@@ -321,12 +325,17 @@ class Tracehound implements ITracehound {
       return
     }
 
-    const stats = this.houndPool.stats
-    const hasHeadroom =
-      stats.totalProcesses === 0 || stats.activeProcesses < stats.totalProcesses
-    if (hasHeadroom) {
-      this.watcher.setOverloaded(false)
-    }
+    // HoundPool emits processed before deferred queue reassignment, so the
+    // immediate snapshot can transiently show idle headroom. Defer clear check
+    // to microtask to observe post-reassignment state.
+    queueMicrotask(() => {
+      const stats = this.houndPool.stats
+      const hasHeadroom =
+        stats.totalProcesses === 0 || stats.activeProcesses < stats.totalProcesses
+      if (hasHeadroom) {
+        this.watcher.setOverloaded(false)
+      }
+    })
   }
 
   private isOverloadSignal(result: HoundResult): boolean {
@@ -338,7 +347,23 @@ class Tracehound implements ITracehound {
       return false
     }
 
-    return result.error !== 'forced_terminate'
+    if (!result.error) {
+      return false
+    }
+
+    return this.isCapacityPressureError(result.error)
+  }
+
+  private isCapacityPressureError(errorCode: string): boolean {
+    const pressureErrorCodes: ReadonlySet<string> = new Set([
+      'pool_exhausted',
+      'pool_exhausted_escalated',
+      'defer_queue_full',
+      'spawn_failed',
+      'ipc_timeout',
+    ])
+
+    return pressureErrorCodes.has(errorCode)
   }
 }
 

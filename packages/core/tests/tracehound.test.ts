@@ -207,11 +207,12 @@ describe('Tracehound Factory', () => {
 
       const snapshot = tracehound.watcher.snapshot()
       expect(snapshot.lastAlert?.type).toBe('system_overload')
+      expect(snapshot.overloaded).toBe(false)
       expect(panics.some((panic) => panic.reason.includes('hound_error'))).toBe(true)
       tracehound.shutdown()
     })
 
-    it('sets watcher overload when pool is exhausted and clears it after recovery', () => {
+    it('sets watcher overload when pool is exhausted and clears it after recovery', async () => {
       const adapter = createMockAdapter()
       const tracehound = createTracehound({
         houndPool: {
@@ -223,14 +224,19 @@ describe('Tracehound Factory', () => {
         },
       })
 
-      tracehound.agent.intercept({
+      const first = tracehound.agent.intercept({
         id: '5',
         timestamp: Date.now(),
         source: '1.2.3.6',
         threat: { category: 'injection', severity: 'high' },
         payload: { first: true },
       })
-      tracehound.agent.intercept({
+      const panics: Array<{ reason: string }> = []
+      tracehound.notifications.on('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
+      })
+
+      const second = tracehound.agent.intercept({
         id: '6',
         timestamp: Date.now(),
         source: '1.2.3.7',
@@ -238,6 +244,9 @@ describe('Tracehound Factory', () => {
         payload: { second: true },
       })
 
+      expect(first.status).toBe('quarantined')
+      expect(second.status).toBe('quarantined')
+      expect(panics.some((panic) => panic.reason === 'hound_error: pool_exhausted')).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
       const pid = [...adapter.getMockProcesses().keys()][0]
@@ -253,6 +262,7 @@ describe('Tracehound Factory', () => {
       const completeMessage = encodeHoundMessage({ type: 'status', state: 'complete' })
       adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
 
+      await Promise.resolve()
       expect(tracehound.watcher.snapshot().overloaded).toBe(false)
       tracehound.shutdown()
     })
@@ -283,6 +293,72 @@ describe('Tracehound Factory', () => {
 
       tracehound.houndPool.terminate(result.handle.signature)
       expect(tracehound.watcher.snapshot().overloaded).toBe(false)
+      tracehound.shutdown()
+    })
+
+    it('keeps overload until deferred queue drains under defer pressure', async () => {
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 1000,
+          rotationJitterMs: 10,
+          onPoolExhausted: 'defer',
+          deferQueueLimit: 1,
+          adapter,
+        },
+      })
+
+      const panics: Array<{ reason: string }> = []
+      tracehound.notifications.on('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
+      })
+
+      tracehound.agent.intercept({
+        id: '8',
+        timestamp: Date.now(),
+        source: '1.2.3.9',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { first: true },
+      })
+      tracehound.agent.intercept({
+        id: '9',
+        timestamp: Date.now(),
+        source: '1.2.3.10',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { second: true },
+      })
+      tracehound.agent.intercept({
+        id: '10',
+        timestamp: Date.now(),
+        source: '1.2.3.11',
+        threat: { category: 'injection', severity: 'high' },
+        payload: { third: true },
+      })
+
+      expect(panics.some((panic) => panic.reason === 'hound_error: defer_queue_full')).toBe(true)
+      expect(tracehound.watcher.snapshot().overloaded).toBe(true)
+
+      const pid = [...adapter.getMockProcesses().keys()][0]
+      const analysisMessage = encodeHoundMessage({
+        type: 'analysis',
+        hash: 'a1b2c3',
+        entropy: 7.1,
+        contentType: 'json',
+        sizeBytes: 128,
+      })
+      const completeMessage = encodeHoundMessage({ type: 'status', state: 'complete' })
+
+      adapter.simulateMessage(pid, new Uint8Array(analysisMessage.subarray(4)).buffer)
+      adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
+      await Promise.resolve()
+      expect(tracehound.watcher.snapshot().overloaded).toBe(true)
+
+      adapter.simulateMessage(pid, new Uint8Array(analysisMessage.subarray(4)).buffer)
+      adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
+      await Promise.resolve()
+      expect(tracehound.watcher.snapshot().overloaded).toBe(false)
+
       tracehound.shutdown()
     })
   })

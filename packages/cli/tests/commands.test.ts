@@ -309,6 +309,26 @@ describe('CLI Commands', () => {
       expect(output).toContain('"error": "NO_INSTANCE"')
     })
 
+    it('status command should print snapshot unavailable banner when snapshot is missing', () => {
+      rmSync(snapshotPath, { force: true })
+
+      statusCommand.exitOverride()
+      statusCommand.parse(['status'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('Snapshot unavailable: NO_INSTANCE')
+    })
+
+    it('stats command should print snapshot unavailable when snapshot is missing', () => {
+      rmSync(snapshotPath, { force: true })
+
+      statsCommand.exitOverride()
+      statsCommand.parse(['stats'], { from: 'user' })
+
+      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      expect(output).toContain('Snapshot unavailable: NO_INSTANCE')
+    })
+
     it('inspect command action should print quarantine list', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse(['--limit', '5'], { from: 'user' })

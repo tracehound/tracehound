@@ -353,7 +353,34 @@ describe('HoundPool', () => {
 
       const errorResults = results.filter((r) => r.status === 'error')
       expect(errorResults.length).toBeGreaterThan(0)
+      expect(errorResults.some((result) => result.error?.includes('spawn_failed') ?? false)).toBe(
+        false,
+      )
       expect(pool.stats.totalErrors).toBeGreaterThan(0)
+    })
+
+    it('uses spawn_failed fallback when spawn throws non-error value', () => {
+      pool.shutdown()
+      const throwingAdapter = createMockAdapter()
+      const originalSpawn = throwingAdapter.spawn
+      throwingAdapter.spawn = ((..._args) => {
+        throw 42
+      }) as typeof originalSpawn
+
+      pool = createHoundPool({
+        poolSize: 1,
+        timeout: 1000,
+        rotationJitterMs: 10,
+        adapter: throwingAdapter,
+      })
+
+      const results: HoundResult[] = []
+      pool.onResult((result) => results.push(result))
+      pool.activate(createEvidence('spawn-error-fallback'))
+
+      const errorResult = results.find((result) => result.status === 'error')
+      expect(errorResult).toBeDefined()
+      expect(errorResult?.error).toBe('spawn_failed')
     })
 
     it('handles process status error messages', () => {

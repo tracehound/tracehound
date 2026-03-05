@@ -10,6 +10,7 @@ import {
   getTraceRegistryStats,
   listTraceInspectionEntries,
   recordTraceInspectionEntry,
+  resolveTraceRegistryPath,
 } from '../src/utils/trace-registry.js'
 
 describe('trace inspection registry', () => {
@@ -185,6 +186,232 @@ describe('trace inspection registry', () => {
       const statsAfter = getTraceRegistryStats({ path })
       expect(statsAfter.fileExists).toBe(false)
       expect(statsAfter.fileBytes).toBe(0)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('resolves registry path by option, env, then default', () => {
+    const previous = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+    const envPath = join(tmpdir(), 'tracehound-env-registry.ndjson')
+    const optionPath = join(tmpdir(), 'tracehound-option-registry.ndjson')
+
+    try {
+      process.env.TRACEHOUND_TRACE_REGISTRY_PATH = envPath
+      expect(resolveTraceRegistryPath({ path: optionPath })).toBe(optionPath)
+      expect(resolveTraceRegistryPath()).toBe(envPath)
+
+      delete process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+      expect(resolveTraceRegistryPath()).toContain(join('tracehound', 'trace-registry.ndjson'))
+    } finally {
+      if (previous === undefined) {
+        delete process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+      } else {
+        process.env.TRACEHOUND_TRACE_REGISTRY_PATH = previous
+      }
+    }
+  })
+
+  it('returns null for invalid write/read inputs', () => {
+    const invalidRecord = recordTraceInspectionEntry({
+      traceId: '',
+      signature: 'sig',
+      severity: 'high',
+      size: 1,
+      captured: Date.now(),
+      source: 'src',
+    })
+    expect(invalidRecord).toBeNull()
+
+    expect(getTraceInspectionEntry('', {})).toBeNull()
+    expect(findTraceInspectionEntryBySignature('', {})).toBeNull()
+  })
+
+  it('normalizes invalid list limit and deduplicates by latest trace id', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-registry-test-'))
+    const path = join(dir, 'trace-registry.ndjson')
+    const now = Date.now()
+    const lines = [
+      {
+        traceId: 'trace-dup',
+        signature: 'sig-old',
+        severity: 'low',
+        size: 1,
+        captured: now - 200,
+        source: 'src-old',
+        recordedAt: now - 200,
+      },
+      {
+        traceId: 'trace-unique',
+        signature: 'sig-unique',
+        severity: 'medium',
+        size: 2,
+        captured: now - 100,
+        source: 'src-unique',
+        recordedAt: now - 100,
+      },
+      {
+        traceId: 'trace-dup',
+        signature: 'sig-new',
+        severity: 'high',
+        size: 3,
+        captured: now,
+        source: 'src-new',
+        recordedAt: now,
+      },
+    ]
+
+    try {
+      writeFileSync(path, `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`, 'utf8')
+      const list = listTraceInspectionEntries(0, { path })
+
+      expect(list).toHaveLength(2)
+      expect(list[0]?.traceId).toBe('trace-dup')
+      expect(list[0]?.signature).toBe('sig-new')
+      expect(list[1]?.traceId).toBe('trace-unique')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('filters malformed and expired lines and enforces maxEntries', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-registry-test-'))
+    const path = join(dir, 'trace-registry.ndjson')
+    const now = Date.now()
+    const lines = [
+      JSON.stringify({
+        traceId: 'trace-expired',
+        signature: 'sig-expired',
+        severity: 'low',
+        size: 1,
+        captured: now - 5_000,
+        source: 'src-expired',
+        recordedAt: now - 5_000,
+      }),
+      '{',
+      JSON.stringify({
+        traceId: 'trace-1',
+        signature: 'sig-1',
+        severity: 'low',
+        size: 1,
+        captured: now - 30,
+        source: 'src-1',
+        recordedAt: now - 30,
+      }),
+      JSON.stringify({
+        traceId: 'trace-2',
+        signature: 'sig-2',
+        severity: 'medium',
+        size: 2,
+        captured: now - 20,
+        source: 'src-2',
+        recordedAt: now - 20,
+      }),
+      JSON.stringify({
+        traceId: 'trace-3',
+        signature: 'sig-3',
+        severity: 'high',
+        size: 3,
+        captured: now - 10,
+        source: 'src-3',
+        recordedAt: now - 10,
+      }),
+    ]
+
+    try {
+      writeFileSync(path, `${lines.join('\n')}\n`, 'utf8')
+      const list = listTraceInspectionEntries(10, { path, ttlMs: 100, maxEntries: 2 })
+
+      expect(list).toHaveLength(2)
+      expect(list[0]?.traceId).toBe('trace-3')
+      expect(list[1]?.traceId).toBe('trace-2')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('drops queued entries when maxQueueEntries is exceeded', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-registry-test-'))
+    const path = join(dir, 'trace-registry.ndjson')
+
+    try {
+      recordTraceInspectionEntry(
+        {
+          traceId: 'trace-q-1',
+          signature: 'sig-q-1',
+          severity: 'low',
+          size: 1,
+          captured: Date.now(),
+          source: 'src-q',
+        },
+        { path, maxQueueEntries: 1 },
+      )
+      recordTraceInspectionEntry(
+        {
+          traceId: 'trace-q-2',
+          signature: 'sig-q-2',
+          severity: 'high',
+          size: 1,
+          captured: Date.now(),
+          source: 'src-q',
+        },
+        { path, maxQueueEntries: 1 },
+      )
+
+      const stats = getTraceRegistryStats({ path, maxQueueEntries: 1 })
+      expect(stats.droppedCount).toBeGreaterThan(0)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('blocks writes when file size limit is reached and reports blocked stats', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-registry-test-'))
+    const path = join(dir, 'trace-registry.ndjson')
+
+    try {
+      writeFileSync(path, 'x', 'utf8')
+      recordTraceInspectionEntry(
+        {
+          traceId: 'trace-blocked-1',
+          signature: 'sig-blocked-1',
+          severity: 'critical',
+          size: 1,
+          captured: Date.now(),
+          source: 'src-blocked',
+        },
+        { path, maxFileBytes: 1 },
+      )
+
+      for (let i = 0; i < 25; i++) {
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        if (getTraceRegistryStats({ path, maxFileBytes: 1 }).blocked) {
+          break
+        }
+      }
+
+      const stats = getTraceRegistryStats({ path, maxFileBytes: 1 })
+      expect(stats.blocked).toBe(true)
+      expect(stats.droppedCount).toBeGreaterThan(0)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps clear operations successful when file does not exist', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-registry-test-'))
+    const path = join(dir, 'trace-registry.ndjson')
+
+    try {
+      const history = clearTraceInspectionHistory({ path })
+      expect(history.success).toBe(true)
+      expect(history.removedBytes).toBe(0)
+      expect(history.removedEntries).toBe(0)
+
+      const disk = clearTraceRegistryDisk({ path })
+      expect(disk.success).toBe(true)
+      expect(disk.removedBytes).toBe(0)
+      expect(disk.removedEntries).toBe(0)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

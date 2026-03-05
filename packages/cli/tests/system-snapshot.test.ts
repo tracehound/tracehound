@@ -202,4 +202,60 @@ describe('system snapshot freshness', () => {
     if (result.ok) return
     expect(result.code).toBe('INTEGRITY_VIOLATION')
   })
+
+  it('should return INTEGRITY_VIOLATION when snapshot json is malformed', () => {
+    writeFileSync(snapshotPath, '{', 'utf8')
+
+    const result = loadSystemSnapshot()
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
+  it('should return INTEGRITY_VIOLATION when signature is mismatched', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    writeFixtureSnapshotToDisk(createFixtureSnapshot(now.getTime()), snapshotPath, 'other-secret')
+
+    const result = loadSystemSnapshot()
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
+  it('should fallback to default max age when env override is invalid', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS = 'not-a-number'
+    writeFixtureSnapshotToDisk(
+      createFixtureSnapshot(now.getTime() - 5_001),
+      snapshotPath,
+      SNAPSHOT_SECRET,
+    )
+
+    const result = loadSystemSnapshot()
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('NO_INSTANCE')
+  })
+
+  it('should treat non-positive max age override as default value', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS = '0'
+    writeFixtureSnapshotToDisk(
+      createFixtureSnapshot(now.getTime() - 5_001),
+      snapshotPath,
+      SNAPSHOT_SECRET,
+    )
+
+    const result = loadSystemSnapshot()
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('NO_INSTANCE')
+  })
 })

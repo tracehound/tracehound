@@ -94,6 +94,14 @@ describe('HoundIPC', () => {
       expect(() => encodeHoundMessage(invalid)).toThrow(/status/i)
     })
 
+    it('should throw when message type is unknown at runtime', () => {
+      const invalid = {
+        type: 'unknown',
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/analysis/i)
+    })
+
     it('should encode metrics message', () => {
       const message: HoundMessage = { type: 'metrics', processingTime: 123.45, memoryUsed: 678.9 }
       const encoded = encodeHoundMessage(message)
@@ -150,6 +158,18 @@ describe('HoundIPC', () => {
         entropy: 1.23,
         contentType: 'exe',
         sizeBytes: 12,
+      } as unknown as HoundMessage
+
+      expect(() => encodeHoundMessage(invalid)).toThrow(/analysis/i)
+    })
+
+    it('should throw when analysis payload is structurally invalid at runtime', () => {
+      const invalid = {
+        type: 'analysis',
+        hash: undefined,
+        entropy: Number.NaN,
+        contentType: 'json',
+        sizeBytes: -1,
       } as unknown as HoundMessage
 
       expect(() => encodeHoundMessage(invalid)).toThrow(/analysis/i)

@@ -1,11 +1,27 @@
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
+
+const SAFE_REF_PATTERN = /^[\w./-]+$/;
 
 function run(command) {
   execSync(command, { stdio: "inherit" });
 }
 
-function read(command) {
-  return execSync(command, { stdio: "pipe" }).toString().trim();
+function gitRead(args) {
+  return execFileSync("git", args, { stdio: ["ignore", "pipe", "pipe"] })
+    .toString()
+    .trim();
+}
+
+function tryGitRead(args) {
+  try {
+    return gitRead(args);
+  } catch {
+    return null;
+  }
+}
+
+function gitRun(args) {
+  execFileSync("git", args, { stdio: "inherit" });
 }
 
 function fail(message) {
@@ -13,23 +29,24 @@ function fail(message) {
   process.exit(1);
 }
 
-function tryRead(command) {
-  try {
-    return read(command);
-  } catch {
-    return null;
-  }
+function isSafeRef(candidate) {
+  return SAFE_REF_PATTERN.test(candidate);
 }
 
 function resolveBaseRef() {
   const fromArg = process.argv[2];
   const fromEnv = process.env.REVIEW_BASE_REF;
   const candidates = [fromArg, fromEnv, "origin/main", "main", "master"].filter(
-    Boolean,
+    (value) => typeof value === "string" && value.length > 0,
   );
 
-  for (const candidate of candidates) {
-    const ok = tryRead(`git rev-parse --verify "${candidate}"`);
+  for (const rawCandidate of candidates) {
+    const candidate = rawCandidate.trim();
+    if (!isSafeRef(candidate)) {
+      continue;
+    }
+
+    const ok = tryGitRead(["rev-parse", "--verify", candidate]);
     if (ok) {
       return candidate;
     }
@@ -41,10 +58,11 @@ function resolveBaseRef() {
 }
 
 function listChangedFiles(range) {
-  const output = read(`git diff --name-only --diff-filter=ACMR ${range}`);
+  const output = gitRead(["diff", "--name-only", "--diff-filter=ACMR", range]);
   if (!output) {
     return [];
   }
+
   return output
     .split("\n")
     .map((line) => line.trim())
@@ -59,9 +77,9 @@ function main() {
   console.log("--- Tracehound Branch Review Gate ---");
 
   const baseRef = resolveBaseRef();
-  const mergeBase = read(`git merge-base HEAD "${baseRef}"`);
+  const mergeBase = gitRead(["merge-base", "HEAD", baseRef]);
   const range = `${mergeBase}..HEAD`;
-  const commitCount = Number(read(`git rev-list --count ${range}`));
+  const commitCount = Number(gitRead(["rev-list", "--count", range]));
   const changedFiles = listChangedFiles(range);
 
   console.log(`Base ref      : ${baseRef}`);
@@ -82,7 +100,7 @@ function main() {
   const touchedFastify = hasPrefix(changedFiles, "packages/fastify/");
 
   // 2) Hygiene checks across full changed branch range
-  run(`git diff --check ${range}`);
+  gitRun(["diff", "--check", range]);
   run("pnpm lint");
 
   // 3) Package-level test gates for all touched areas

@@ -66,13 +66,18 @@ export function getSnapshot(): CliSnapshotLoadResult {
 function toDashboardSnapshot(snapshotResult: Extract<CliSnapshotLoadResult, { ok: true }>): Snapshot {
   const snapshot = snapshotResult.snapshot
   const totalProcesses = snapshot.houndPool.totalProcesses
-  const recentThreats = listTraceInspectionEntries(5).map((entry) => ({
-    signature: entry.signature,
-    severity: entry.severity,
-    category: entry.signature.split(':')[0] ?? 'unknown',
-    size: formatBytes(entry.size),
-    time: new Date(entry.captured).toLocaleTimeString(),
-  }))
+  const recentThreats = listTraceInspectionEntries(5).map((entry) => {
+    const signature = entry.signature ?? ''
+    const category = parseSignatureCategory(signature)
+
+    return {
+      signature: entry.signature,
+      severity: entry.severity,
+      category,
+      size: formatBytes(entry.size),
+      time: new Date(entry.captured).toLocaleTimeString(),
+    }
+  })
 
   return {
     timestamp: new Date(snapshot.generatedAt).toISOString(),
@@ -319,4 +324,9 @@ function formatBytes(bytes: number): string {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+}
+
+function parseSignatureCategory(signature: string): string {
+  const colonIndex = signature.indexOf(':')
+  return colonIndex > 0 ? signature.slice(0, colonIndex) : 'unknown'
 }

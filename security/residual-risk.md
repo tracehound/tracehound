@@ -22,7 +22,7 @@ Document explicit remaining risk without claiming absolute security.
 ## Open Invariant and Evidence Gaps
 
 - No unresolved deterministic invariant failures are currently open.
-- Long-running/nightly assurance stability is continuously monitored in CI.
+- Long-running/nightly assurance stability is monitored via the private `tracehound/security-harness` pipeline.
 - Key rotation lifecycle policy for webhook secret handling remains open.
 
 ## Residual Risk Register (Current)
@@ -31,7 +31,7 @@ Document explicit remaining risk without claiming absolute security.
 | ----- | --------------------------------------------- | -------------------------------------------------------- | ------------------------------------------ | -------------- |
 | RR-01 | Deployment isolation misconfiguration         | Filesystem/network/syscall controls are platform-managed | **Accepted (platform responsibility)**     | Platform/SRE   |
 | RR-02 | Future unsafe logging regression              | Policy defined; enforcement checks partially automated   | Mitigate via checklist + CI lint follow-up | Security + App |
-| RR-03 | Future fuzz depth drift as code evolves       | Jazzer-free invariant fuzz/corpus in CI, requires upkeep | Mitigate via nightly assurance ownership   | Security       |
+| RR-03 | Future fuzz depth drift as code evolves       | Jazzer-free invariant fuzz/corpus runs in external harness, requires upkeep | Mitigate via harness pipeline ownership    | Security       |
 | RR-04 | Secret rotation ambiguity for webhook signing | Crypto baseline identifies gap                           | Mitigate via explicit rotation runbook     | Security + Ops |
 
 ## Exit Criteria

@@ -38,9 +38,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "clean": "rm -rf dist",
-    "test:fuzz:regression": "vitest run tests/fuzz/replay-corpus.test.ts",
-    "test:fuzz:assurance": "vitest run tests/fuzz/*.property.test.ts tests/fuzz/replay-corpus.test.ts"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "uuid": "^10.0.0"

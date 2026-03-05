@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 - Operational CLI truth model relies on verified snapshot state (no fabricated healthy/default-zero fallback in status surfaces).
 - Process adapter child spawn now uses minimal env allowlist instead of full parent env inheritance.
+- Local assurance gate scripts and corpus replay workflow were removed from this repository; corpus-driven assurance now runs in `tracehound/security-harness`.
 
 ## [1.5.0] - 2026-03-04 - M3 Pressure Containment and Governance Delivery
 

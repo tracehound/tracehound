@@ -199,6 +199,30 @@ describe('watch dashboard rendering', () => {
     expect(outputAfterSigint).toContain('Dashboard closed')
   })
 
+  it('should render unknown category when signature has no delimiter', () => {
+    const snapshotPath = join(fixtureDir, 'system-snapshot.json')
+    const registryPath = join(fixtureDir, 'trace-registry.ndjson')
+    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
+    process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+    process.env.TRACEHOUND_TRACE_REGISTRY_PATH = registryPath
+
+    writeFixtureSnapshotToDisk(createFixtureSnapshot(), snapshotPath, SNAPSHOT_SECRET)
+    recordTraceInspectionEntry({
+      traceId: 'trace-watch-unknown-01',
+      signature: 'signature-without-delimiter',
+      severity: 'high',
+      size: 1024,
+      captured: Date.now(),
+      source: '127.0.0.1',
+    })
+
+    watchCommand.exitOverride()
+    watchCommand.parse(['watch', '--refresh', '250'], { from: 'user' })
+
+    const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n')
+    expect(output).toContain('unknown')
+  })
+
   it('should render exhausted pool status from live snapshot mapping', () => {
     const snapshotPath = join(fixtureDir, 'system-snapshot.json')
     process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath

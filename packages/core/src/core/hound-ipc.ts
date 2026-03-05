@@ -73,6 +73,7 @@ const LENGTH_PREFIX_SIZE = 4
 
 /** Maximum message size (1MB) */
 const MAX_MESSAGE_SIZE = 1024 * 1024
+const MAX_UINT32 = 0xffff_ffff
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Encoding
@@ -141,6 +142,18 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
     )
   }
 
+  if (message.type !== 'analysis') {
+    const rawType = (message as { type?: unknown }).type
+    if (typeof rawType === 'number' && Number.isInteger(rawType)) {
+      throw Errors.processIpcUnknownMessageType(rawType)
+    }
+    throw Errors.processIpcInvalidAnalysisMessage()
+  }
+
+  if (!isValidAnalysisMessage(message)) {
+    throw Errors.processIpcInvalidAnalysisMessage()
+  }
+
   // Type 0x03 = analysis
   // [1 byte type][2 bytes hashLen][hash utf8][8 bytes entropy][1 byte contentType][4 bytes sizeBytes]
   const hashBytes = Buffer.from(message.hash, 'utf8')
@@ -201,6 +214,20 @@ function encodeContentType(contentType: HoundContentType): number {
     default:
       throw Errors.processIpcInvalidAnalysisMessage()
   }
+}
+
+function isValidAnalysisMessage(message: HoundAnalysisMessage): boolean {
+  return (
+    typeof message.hash === 'string' &&
+    message.hash.length > 0 &&
+    typeof message.contentType === 'string' &&
+    typeof message.entropy === 'number' &&
+    Number.isFinite(message.entropy) &&
+    typeof message.sizeBytes === 'number' &&
+    Number.isInteger(message.sizeBytes) &&
+    message.sizeBytes >= 0 &&
+    message.sizeBytes <= MAX_UINT32
+  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

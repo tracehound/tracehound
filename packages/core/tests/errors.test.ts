@@ -70,13 +70,22 @@ describe('Error Factories', () => {
   })
 
   describe('Agent Errors', () => {
-    it('should create payload and intercept errors', () => {
+    it('should create payload, intercept, and coordination contract errors', () => {
       expect(Errors.payloadTooLarge(2, 1).code).toBe('AGENT_PAYLOAD_TOO_LARGE')
       expect(Errors.serializationFailed('json').code).toBe('AGENT_SERIALIZATION_FAILED')
       expect(Errors.interceptFailed('panic').code).toBe('AGENT_INTERCEPT_FAILED')
       expect(Errors.interceptFailed('panic', { scentId: 'scent-1' }).context).toEqual({
         reason: 'panic',
         scentId: 'scent-1',
+      })
+      expect(
+        Errors.coordinationContractInvalid('provider-1', 'health() returned invalid payload').code,
+      ).toBe('AGENT_COORDINATION_CONTRACT_INVALID')
+      expect(
+        Errors.coordinationContractInvalid('provider-1', 'health() is required').context,
+      ).toEqual({
+        providerId: 'provider-1',
+        issue: 'health() is required',
       })
     })
   })

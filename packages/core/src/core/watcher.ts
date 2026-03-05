@@ -41,14 +41,17 @@ export interface Alert {
 /**
  * Alert types.
  */
-export type AlertType =
-  | "threat_detected"
-  | "evidence_neutralized"
-  | "quarantine_full"
-  | "quarantine_high"
-  | "rate_limit_exceeded"
-  | "hound_timeout"
-  | "system_overload";
+export const WATCHER_ALERT_TYPES = Object.freeze([
+  "threat_detected",
+  "evidence_neutralized",
+  "quarantine_full",
+  "quarantine_high",
+  "rate_limit_exceeded",
+  "hound_timeout",
+  "system_overload",
+] as const);
+
+export type AlertType = (typeof WATCHER_ALERT_TYPES)[number];
 
 /**
  * Threat statistics.

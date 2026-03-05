@@ -4,21 +4,47 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-03-06 - Operational Truth, Deterministic Analysis, and Release Readiness
+
+## Release Notes
+
+Covers the complete critical refactor plan delivered after `v1.5.0`: RFC-0013 operational-truth grounding, signed snapshot integrity, deterministic hound analysis, IPC and lifecycle hardening, typed runtime error cleanup, public API parity, and release-readiness validation.
+
 ### Breaking
 
-- `IAgent` contract now includes `getStats(): Readonly<AgentStats>` for interface parity.
-- Snapshot export config requires deterministic secret when enabled (`snapshot.secret` or `TRACEHOUND_SNAPSHOT_SECRET`).
+- CLI operational surfaces (`status`, `stats`, `watch`) no longer fabricate healthy or zero-value state when no verified runtime snapshot exists. Operators now see explicit `NO_INSTANCE` or `INTEGRITY_VIOLATION` outcomes instead of false assurance.
+- `IAgent` contract now includes `getStats(): Readonly<AgentStats>` for interface parity. Custom implementations must provide the method.
+- Snapshot export configuration now requires a deterministic secret whenever snapshots are enabled (`snapshot.secret` or `TRACEHOUND_SNAPSHOT_SECRET` / `SYSTEM_SNAPSHOT_ENV.SECRET`).
 
 ### Added
 
-- Signed system snapshot model (`SystemSnapshot`) with HMAC-SHA256 verification and atomic write path.
-- Deterministic hound analysis metadata (`hash`, `entropy`, `contentType`, `sizeBytes`) via IPC `analysis` messages.
+- Signed system snapshot support centered on `SystemSnapshot`, `ITracehound.snapshot()`, and snapshot export options on `TracehoundOptions`.
+- Snapshot read/write utilities with HMAC-SHA256 signing, constant-time verification, atomic file replacement, centralized environment-key helpers, and public path/secret resolution helpers for CLI and external tooling.
+- Deterministic hound analysis metadata over IPC `analysis` messages: `hash`, `entropy`, `contentType`, and `sizeBytes`.
+- Canonical public operational helpers and constants for release-safe integrations, including snapshot helpers and hound pressure matching exports: `HOUND_PRESSURE_ERRORS`, `HoundPressureErrorCode`, and `isHoundPressureError`.
 
 ### Changed
 
-- Operational CLI truth model relies on verified snapshot state (no fabricated healthy/default-zero fallback in status surfaces).
-- Process adapter child spawn now uses minimal env allowlist instead of full parent env inheritance.
+- Operational truth is now grounded in verified runtime snapshots end-to-end. CLI status surfaces, watch dashboard flows, and JSON stats output all consume signed snapshot state instead of inferred defaults.
+- Snapshot integrity now enforces freshness and rejects implausibly future-dated signed snapshots by default.
+- Runtime shutdown and planned teardown paths now remove snapshot files so stale healthy-state artifacts do not survive process exit.
+- Hound IPC result handling now requires analysis data on completed work and treats malformed completion payloads as contract violations instead of silently accepting partial results.
+- Process isolation is hardened by spawning child hounds with a minimal environment allowlist rather than inheriting the full parent environment.
+- Overload observability wiring now sets and clears pressure state deterministically across drop, defer, escalate, timeout, and error flows.
+- Public documentation and examples are aligned around canonical constants and shared environment-key helpers to remove raw-string drift between runtime, CLI, tests, and docs.
 - Local assurance gate scripts and corpus replay workflow were removed from this repository; corpus-driven assurance now runs in `tracehound/security-harness`.
+
+### Hardened
+
+- Core runtime paths continue the typed error model migration and remove uncategorized contract failures from coordination and panic-reporting flows.
+- Planned shutdown handling suppresses misleading panic noise and duplicate exit callback behavior in release teardown paths.
+- Snapshot integrity and operational event reporting now preserve explicit failure reasons instead of degrading to ambiguous generic errors.
+
+### Tests
+
+- Added and updated regression coverage for absent snapshots, tampered snapshots, future-dated snapshot rejection, disconnected stats output, and shutdown snapshot cleanup.
+- Added and updated regression coverage for deterministic hound analysis, malformed or incomplete IPC completion payloads, coordination contract violations, typed error factories, and overload set/clear behavior under pressure.
+- Release-readiness gates validated this wave across core, CLI, adapters, and workspace linting before the `v1.6.0` cut.
 
 ## [1.5.0] - 2026-03-04 - M3 Pressure Containment and Governance Delivery
 

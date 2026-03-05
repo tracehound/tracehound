@@ -205,6 +205,19 @@ export TRACEHOUND_SYSTEM_SNAPSHOT_PATH=/var/run/tracehound/system-snapshot.json
 export TRACEHOUND_SNAPSHOT_SECRET=your-shared-secret
 # Optional: freshness window override (default 5000ms)
 export TRACEHOUND_SNAPSHOT_MAX_AGE_MS=5000
+# Optional: future timestamp tolerance (default 5000ms)
+export TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS=5000
+```
+
+You can reference these keys programmatically instead of hard-coding strings:
+
+```ts
+import { SYSTEM_SNAPSHOT_ENV } from '@tracehound/core'
+
+process.env[SYSTEM_SNAPSHOT_ENV.PATH] = '/var/run/tracehound/system-snapshot.json'
+process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = 'your-shared-secret'
+process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS] = '5000'
+process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS] = '5000'
 ```
 
 ---

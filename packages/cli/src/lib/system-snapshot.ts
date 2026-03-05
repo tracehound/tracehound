@@ -2,13 +2,13 @@ import {
   readSystemSnapshotFromDisk,
   resolveSystemSnapshotPath,
   resolveSystemSnapshotSecret,
+  SYSTEM_SNAPSHOT_ENV,
   type SnapshotReadResult,
   type SystemSnapshot,
 } from '@tracehound/core'
 
 const DEFAULT_MAX_SNAPSHOT_AGE_MS = 5_000
 const DEFAULT_MAX_FUTURE_SKEW_MS = 5_000
-
 export type CliSystemSnapshot = SystemSnapshot
 
 export type CliSnapshotErrorCode = 'NO_INSTANCE' | 'INTEGRITY_VIOLATION'
@@ -56,7 +56,7 @@ export function loadSystemSnapshot(): CliSnapshotLoadResult {
 }
 
 function resolveSnapshotMaxAgeMs(): number {
-  const raw = process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS
+  const raw = process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS]
   if (typeof raw !== 'string' || raw.length === 0) {
     return DEFAULT_MAX_SNAPSHOT_AGE_MS
   }
@@ -70,7 +70,7 @@ function resolveSnapshotMaxAgeMs(): number {
 }
 
 function resolveSnapshotMaxFutureSkewMs(): number {
-  const raw = process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
+  const raw = process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS]
   if (typeof raw !== 'string' || raw.length === 0) {
     return DEFAULT_MAX_FUTURE_SKEW_MS
   }

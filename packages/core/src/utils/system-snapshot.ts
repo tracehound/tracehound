@@ -25,7 +25,7 @@ import type { HoundPoolStats } from "../core/hound-pool.js";
 import type { QuarantineStats } from "../core/quarantine.js";
 import type { RateLimiterStats } from "../core/rate-limiter.js";
 import type { ITracehound } from "../core/tracehound.js";
-import type { WatcherSnapshot } from "../core/watcher.js";
+import { WATCHER_ALERT_TYPES, type WatcherSnapshot } from "../core/watcher.js";
 import { Errors } from "../types/errors.js";
 import { constantTimeEqual } from "./compare.js";
 
@@ -65,7 +65,20 @@ const DEFAULT_SNAPSHOT_PATH = join(
   "tracehound",
   "system-snapshot.json",
 );
+
+export const SYSTEM_SNAPSHOT_ENV = Object.freeze({
+  /** Snapshot file path used by resolveSystemSnapshotPath() and CLI readers. */
+  PATH: "TRACEHOUND_SYSTEM_SNAPSHOT_PATH",
+  /** HMAC secret used by resolveSystemSnapshotSecret() and snapshot verification. */
+  SECRET: "TRACEHOUND_SNAPSHOT_SECRET",
+  /** Optional CLI freshness threshold override consumed by loadSystemSnapshot(). */
+  MAX_AGE_MS: "TRACEHOUND_SNAPSHOT_MAX_AGE_MS",
+  /** Optional CLI future-skew tolerance override consumed by loadSystemSnapshot(). */
+  MAX_FUTURE_SKEW_MS: "TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS",
+} as const);
+
 let windowsAclWarningEmitted = false;
+const WATCHER_ALERT_TYPE_SET: ReadonlySet<string> = new Set(WATCHER_ALERT_TYPES);
 
 /**
  * Resolve snapshot path from explicit path, env, or default.
@@ -75,7 +88,7 @@ export function resolveSystemSnapshotPath(pathOverride?: string): string {
     return pathOverride;
   }
 
-  const fromEnv = process.env["TRACEHOUND_SYSTEM_SNAPSHOT_PATH"];
+  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.PATH];
   if (typeof fromEnv === "string" && fromEnv.length > 0) {
     return fromEnv;
   }
@@ -93,7 +106,7 @@ export function resolveSystemSnapshotSecret(
     return secretOverride;
   }
 
-  const fromEnv = process.env["TRACEHOUND_SNAPSHOT_SECRET"];
+  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
   if (typeof fromEnv === "string" && fromEnv.length > 0) {
     return fromEnv;
   }
@@ -497,15 +510,7 @@ function isAlertOrNull(value: unknown): boolean {
 }
 
 function isAlertType(value: unknown): boolean {
-  return (
-    value === "threat_detected" ||
-    value === "evidence_neutralized" ||
-    value === "quarantine_full" ||
-    value === "quarantine_high" ||
-    value === "rate_limit_exceeded" ||
-    value === "hound_timeout" ||
-    value === "system_overload"
-  );
+  return typeof value === "string" && WATCHER_ALERT_TYPE_SET.has(value);
 }
 
 function isAlertSeverity(value: unknown): boolean {

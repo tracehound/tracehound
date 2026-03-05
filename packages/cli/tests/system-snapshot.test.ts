@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto'
 import { mkdtempSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { SystemSnapshot } from '@tracehound/core'
+import { SYSTEM_SNAPSHOT_ENV, type SystemSnapshot } from '@tracehound/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { loadSystemSnapshot } from '../src/lib/system-snapshot.js'
 
@@ -111,13 +111,13 @@ describe('system snapshot freshness', () => {
     fixtureDir = mkdtempSync(join(tmpdir(), 'tracehound-cli-system-snapshot-'))
     snapshotPath = join(fixtureDir, 'system-snapshot.json')
 
-    previousSnapshotPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
-    previousSnapshotSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET
-    previousSnapshotMaxAgeMs = process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS
-    previousSnapshotMaxFutureSkewMs = process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
+    previousSnapshotPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+    previousSnapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
+    previousSnapshotMaxAgeMs = process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS]
+    previousSnapshotMaxFutureSkewMs = process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS]
 
-    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
-    process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
   })
 
   afterEach(() => {
@@ -125,27 +125,27 @@ describe('system snapshot freshness', () => {
     rmSync(fixtureDir, { recursive: true, force: true })
 
     if (previousSnapshotPath === undefined) {
-      delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+      delete process.env[SYSTEM_SNAPSHOT_ENV.PATH]
     } else {
-      process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = previousSnapshotPath
+      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousSnapshotPath
     }
 
     if (previousSnapshotSecret === undefined) {
-      delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+      delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
     } else {
-      process.env.TRACEHOUND_SNAPSHOT_SECRET = previousSnapshotSecret
+      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSnapshotSecret
     }
 
     if (previousSnapshotMaxAgeMs === undefined) {
-      delete process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS
+      delete process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS]
     } else {
-      process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS = previousSnapshotMaxAgeMs
+      process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS] = previousSnapshotMaxAgeMs
     }
 
     if (previousSnapshotMaxFutureSkewMs === undefined) {
-      delete process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
+      delete process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS]
     } else {
-      process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS = previousSnapshotMaxFutureSkewMs
+      process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS] = previousSnapshotMaxFutureSkewMs
     }
   })
 
@@ -194,7 +194,7 @@ describe('system snapshot freshness', () => {
   it('should honor TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS override', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)
-    process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS = '10000'
+    process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS] = '10000'
     writeFixtureSnapshotToDisk(
       createFixtureSnapshot(now.getTime() + 6_000),
       snapshotPath,
@@ -208,7 +208,7 @@ describe('system snapshot freshness', () => {
   it('should fallback to default future skew when override is negative', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)
-    process.env.TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS = '-1'
+    process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS] = '-1'
     writeFixtureSnapshotToDisk(
       createFixtureSnapshot(now.getTime() + 5_001),
       snapshotPath,
@@ -224,7 +224,7 @@ describe('system snapshot freshness', () => {
   it('should honor TRACEHOUND_SNAPSHOT_MAX_AGE_MS override', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)
-    process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS = '100'
+    process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS] = '100'
     writeFixtureSnapshotToDisk(createFixtureSnapshot(now.getTime() - 101), snapshotPath, SNAPSHOT_SECRET)
 
     const result = loadSystemSnapshot()
@@ -235,7 +235,7 @@ describe('system snapshot freshness', () => {
   })
 
   it('should return NO_INSTANCE when snapshot file is missing even if secret is missing', () => {
-    delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+    delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
 
     const result = loadSystemSnapshot()
 
@@ -248,7 +248,7 @@ describe('system snapshot freshness', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)
     writeFixtureSnapshotToDisk(createFixtureSnapshot(now.getTime()), snapshotPath, SNAPSHOT_SECRET)
-    delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+    delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
 
     const result = loadSystemSnapshot()
 
@@ -282,7 +282,7 @@ describe('system snapshot freshness', () => {
   it('should fallback to default max age when env override is invalid', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)
-    process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS = 'not-a-number'
+    process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS] = 'not-a-number'
     writeFixtureSnapshotToDisk(
       createFixtureSnapshot(now.getTime() - 5_001),
       snapshotPath,
@@ -299,7 +299,7 @@ describe('system snapshot freshness', () => {
   it('should treat non-positive max age override as default value', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)
-    process.env.TRACEHOUND_SNAPSHOT_MAX_AGE_MS = '0'
+    process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS] = '0'
     writeFixtureSnapshotToDisk(
       createFixtureSnapshot(now.getTime() - 5_001),
       snapshotPath,

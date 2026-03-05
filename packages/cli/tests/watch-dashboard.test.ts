@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto'
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { recordTraceInspectionEntry, type SystemSnapshot } from '@tracehound/core'
+import { recordTraceInspectionEntry, SYSTEM_SNAPSHOT_ENV, type SystemSnapshot } from '@tracehound/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderDashboard, watchCommand } from '../src/commands/watch.js'
 
@@ -113,8 +113,8 @@ describe('watch dashboard rendering', () => {
 
   beforeEach(() => {
     fixtureDir = mkdtempSync(join(tmpdir(), 'tracehound-watch-dashboard-'))
-    previousSnapshotPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
-    previousSnapshotSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET
+    previousSnapshotPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+    previousSnapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
     previousRegistryPath = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
 
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
@@ -137,14 +137,14 @@ describe('watch dashboard rendering', () => {
     rmSync(fixtureDir, { recursive: true, force: true })
 
     if (previousSnapshotPath === undefined) {
-      delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+      delete process.env[SYSTEM_SNAPSHOT_ENV.PATH]
     } else {
-      process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = previousSnapshotPath
+      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousSnapshotPath
     }
     if (previousSnapshotSecret === undefined) {
-      delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+      delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
     } else {
-      process.env.TRACEHOUND_SNAPSHOT_SECRET = previousSnapshotSecret
+      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSnapshotSecret
     }
     if (previousRegistryPath === undefined) {
       delete process.env.TRACEHOUND_TRACE_REGISTRY_PATH
@@ -154,8 +154,8 @@ describe('watch dashboard rendering', () => {
   })
 
   it('should render disconnected dashboard when snapshot is unavailable', () => {
-    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = join(fixtureDir, 'missing-snapshot.json')
-    process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = join(fixtureDir, 'missing-snapshot.json')
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
 
     watchCommand.exitOverride()
     watchCommand.parse(['watch', '--refresh', '250'], { from: 'user' })
@@ -168,8 +168,8 @@ describe('watch dashboard rendering', () => {
   it('should render connected dashboard and handle SIGINT teardown', () => {
     const snapshotPath = join(fixtureDir, 'system-snapshot.json')
     const registryPath = join(fixtureDir, 'trace-registry.ndjson')
-    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
-    process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
     process.env.TRACEHOUND_TRACE_REGISTRY_PATH = registryPath
 
     writeFixtureSnapshotToDisk(createFixtureSnapshot(), snapshotPath, SNAPSHOT_SECRET)
@@ -202,8 +202,8 @@ describe('watch dashboard rendering', () => {
   it('should render unknown category when signature has no delimiter', () => {
     const snapshotPath = join(fixtureDir, 'system-snapshot.json')
     const registryPath = join(fixtureDir, 'trace-registry.ndjson')
-    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
-    process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
     process.env.TRACEHOUND_TRACE_REGISTRY_PATH = registryPath
 
     writeFixtureSnapshotToDisk(createFixtureSnapshot(), snapshotPath, SNAPSHOT_SECRET)
@@ -225,8 +225,8 @@ describe('watch dashboard rendering', () => {
 
   it('should render exhausted pool status from live snapshot mapping', () => {
     const snapshotPath = join(fixtureDir, 'system-snapshot.json')
-    process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
-    process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
 
     writeFixtureSnapshotToDisk(
       createFixtureSnapshot({ activeProcesses: 2, totalProcesses: 2 }),

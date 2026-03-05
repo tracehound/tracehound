@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
   recordTraceInspectionEntry,
+  SYSTEM_SNAPSHOT_ENV,
   type SystemSnapshot,
 } from '@tracehound/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,6 +18,8 @@ import { watchCommand } from '../src/commands/watch.js'
 const SEEDED_TRACE_ID = 'trace-seeded-0001'
 const SEEDED_SIGNATURE = 'injection:seeded-signature'
 const SNAPSHOT_SECRET = 'tracehound-cli-test-snapshot-secret'
+
+type ConsoleLogSpy = ReturnType<typeof vi.spyOn>
 
 function createFixtureSnapshot(): SystemSnapshot {
   const now = Date.now()
@@ -110,6 +113,10 @@ function writeFixtureSnapshotToDisk(snapshot: SystemSnapshot, path: string, secr
   renameSync(tmpPath, path)
 }
 
+function readLogOutput(logSpy: ConsoleLogSpy): string {
+  return logSpy.mock.calls.map((call) => String(call[0])).join('\n')
+}
+
 describe('CLI Commands', () => {
   describe('Smoke tests', () => {
     it('should have inspect command', async () => {
@@ -191,7 +198,7 @@ describe('CLI Commands', () => {
   })
 
   describe('Command execution', () => {
-    let logSpy: any
+    let logSpy: ConsoleLogSpy
     let previousRegistryPath: string | undefined
     let previousSnapshotPath: string | undefined
     let previousSnapshotSecret: string | undefined
@@ -202,13 +209,13 @@ describe('CLI Commands', () => {
       logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
 
       previousRegistryPath = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
-      previousSnapshotPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
-      previousSnapshotSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET
+      previousSnapshotPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+      previousSnapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
       registryDir = mkdtempSync(join(tmpdir(), 'tracehound-cli-registry-'))
       process.env.TRACEHOUND_TRACE_REGISTRY_PATH = join(registryDir, 'trace-registry.ndjson')
       snapshotPath = join(registryDir, 'system-snapshot.json')
-      process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = snapshotPath
-      process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
+      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
       writeFixtureSnapshotToDisk(createFixtureSnapshot(), snapshotPath, SNAPSHOT_SECRET)
 
       recordTraceInspectionEntry({
@@ -240,14 +247,14 @@ describe('CLI Commands', () => {
       }
 
       if (previousSnapshotPath === undefined) {
-        delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+        delete process.env[SYSTEM_SNAPSHOT_ENV.PATH]
       } else {
-        process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = previousSnapshotPath
+        process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousSnapshotPath
       }
       if (previousSnapshotSecret === undefined) {
-        delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+        delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
       } else {
-        process.env.TRACEHOUND_SNAPSHOT_SECRET = previousSnapshotSecret
+        process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSnapshotSecret
       }
 
       // Reset commander options to avoid state leakage
@@ -265,7 +272,7 @@ describe('CLI Commands', () => {
       statusCommand.parse(['status'], { from: 'user' })
 
       expect(logSpy).toHaveBeenCalled()
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('TRACEHOUND STATUS')
     })
 
@@ -273,7 +280,7 @@ describe('CLI Commands', () => {
       statusCommand.exitOverride()
       statusCommand.parse(['status', '--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('"connected": true')
       expect(output).toContain('"health": "degraded"')
     })
@@ -282,7 +289,7 @@ describe('CLI Commands', () => {
       statsCommand.exitOverride()
       statsCommand.parse(['stats'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('THREAT STATISTICS')
       expect(output).toContain('TRACE REGISTRY')
     })
@@ -291,7 +298,7 @@ describe('CLI Commands', () => {
       statsCommand.exitOverride()
       statsCommand.parse(['stats', '--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('"connected": true')
       expect(output).toContain('"traceRegistry"')
       expect(output).toContain('"retainedEntries"')
@@ -304,7 +311,7 @@ describe('CLI Commands', () => {
       statusCommand.exitOverride()
       statusCommand.parse(['status', '--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('"connected": false')
       expect(output).toContain('"error": "NO_INSTANCE"')
     })
@@ -315,7 +322,7 @@ describe('CLI Commands', () => {
       statusCommand.exitOverride()
       statusCommand.parse(['status'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('Snapshot unavailable: NO_INSTANCE')
     })
 
@@ -325,7 +332,7 @@ describe('CLI Commands', () => {
       statsCommand.exitOverride()
       statsCommand.parse(['stats'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('Snapshot unavailable: NO_INSTANCE')
     })
 
@@ -335,7 +342,7 @@ describe('CLI Commands', () => {
       statsCommand.exitOverride()
       statsCommand.parse(['stats', '--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('"connected": false')
       expect(output).toContain('"error": "NO_INSTANCE"')
       expect(output).toContain('"path"')
@@ -346,7 +353,7 @@ describe('CLI Commands', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse(['--limit', '5'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('QUARANTINE CONTENTS')
     })
 
@@ -354,7 +361,7 @@ describe('CLI Commands', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse(['--signature', 'missing-sig'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('Evidence not found')
     })
 
@@ -362,7 +369,7 @@ describe('CLI Commands', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse(['--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain(SEEDED_TRACE_ID)
     })
 
@@ -370,7 +377,7 @@ describe('CLI Commands', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse(['--trace-id', SEEDED_TRACE_ID], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('EVIDENCE DETAILS')
       expect(output).toContain(SEEDED_TRACE_ID)
     })
@@ -379,7 +386,7 @@ describe('CLI Commands', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse([SEEDED_TRACE_ID, '--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('"traceId": "trace-seeded-0001"')
       expect(output).not.toContain('"bytes"')
     })
@@ -388,7 +395,7 @@ describe('CLI Commands', () => {
       historyCommand.exitOverride()
       historyCommand.parse(['clear', '--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('"mode": "history"')
       expect(output).toContain('"success": true')
 
@@ -397,7 +404,7 @@ describe('CLI Commands', () => {
       inspectCommand.exitOverride()
       inspectCommand.parse(['--json'], { from: 'user' })
 
-      const inspectOutput = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const inspectOutput = readLogOutput(logSpy)
       expect(inspectOutput).toContain('[]')
     })
 
@@ -408,11 +415,15 @@ describe('CLI Commands', () => {
       diskCommand.exitOverride()
       diskCommand.parse(['clear', '--json'], { from: 'user' })
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('"mode": "disk"')
       expect(output).toContain('"success": true')
 
-      expect(existsSync(registryPath as string)).toBe(false)
+      if (typeof registryPath !== 'string') {
+        expect.fail('TRACEHOUND_TRACE_REGISTRY_PATH must be set in test setup')
+        return
+      }
+      expect(existsSync(registryPath)).toBe(false)
     })
   })
 
@@ -473,21 +484,21 @@ describe('CLI Commands', () => {
   })
 
   describe('Watch command logic', () => {
-    let logSpy: any
+    let logSpy: ConsoleLogSpy
     let previousSnapshotPath: string | undefined
     let previousSnapshotSecret: string | undefined
     let snapshotDir = ''
 
     beforeEach(() => {
       logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-      previousSnapshotPath = process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
-      previousSnapshotSecret = process.env.TRACEHOUND_SNAPSHOT_SECRET
+      previousSnapshotPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+      previousSnapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
       snapshotDir = mkdtempSync(join(tmpdir(), 'tracehound-cli-watch-'))
-      process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = join(snapshotDir, 'system-snapshot.json')
-      process.env.TRACEHOUND_SNAPSHOT_SECRET = SNAPSHOT_SECRET
+      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = join(snapshotDir, 'system-snapshot.json')
+      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
       writeFixtureSnapshotToDisk(
         createFixtureSnapshot(),
-        process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH,
+        process.env[SYSTEM_SNAPSHOT_ENV.PATH],
         SNAPSHOT_SECRET,
       )
     })
@@ -496,14 +507,14 @@ describe('CLI Commands', () => {
       logSpy.mockRestore()
       rmSync(snapshotDir, { recursive: true, force: true })
       if (previousSnapshotPath === undefined) {
-        delete process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+        delete process.env[SYSTEM_SNAPSHOT_ENV.PATH]
       } else {
-        process.env.TRACEHOUND_SYSTEM_SNAPSHOT_PATH = previousSnapshotPath
+        process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousSnapshotPath
       }
       if (previousSnapshotSecret === undefined) {
-        delete process.env.TRACEHOUND_SNAPSHOT_SECRET
+        delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
       } else {
-        process.env.TRACEHOUND_SNAPSHOT_SECRET = previousSnapshotSecret
+        process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSnapshotSecret
       }
     })
 
@@ -549,7 +560,7 @@ describe('CLI Commands', () => {
         1000,
       )
 
-      const output = logSpy.mock.calls.map((call: any) => call[0]).join('\n')
+      const output = readLogOutput(logSpy)
       expect(output).toContain('TRACEHOUND LIVE DASHBOARD')
       expect(output).toContain('SYSTEM')
     })

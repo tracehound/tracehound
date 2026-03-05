@@ -7,13 +7,24 @@
 import { createAgent, type IAgent } from './agent.js'
 import { AuditChain } from './audit-chain.js'
 import { EvidenceFactory, type IEvidenceFactory } from './evidence-factory.js'
-import { createHoundPool, type HoundPoolConfig, type IHoundPool } from './hound-pool.js'
+import {
+  createHoundPool,
+  isHoundPressureError,
+  type HoundPoolConfig,
+  type HoundResult,
+  type IHoundPool,
+} from './hound-pool.js'
 import { createNotificationEmitter, type INotificationEmitter } from './notification-emitter.js'
 import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
 import { createWatcher, type IWatcher } from './watcher.js'
 import { Errors } from '../types/errors.js'
 import { existsSync, unlinkSync } from 'node:fs'
+import {
+  formatHoundErrorReason,
+  formatHoundTimeoutReason,
+  SYSTEM_PANIC_REASONS,
+} from './operational-events.js'
 import {
   exportSystemSnapshot,
   resolveSystemSnapshotPath,
@@ -194,6 +205,8 @@ class Tracehound implements ITracehound {
     // Wire HoundPool results back into Watcher and NotificationEmitter.
     // timeout/error outcomes are security-relevant events that SecOps must see.
     this.houndPool.onResult((result) => {
+      this.syncOverloadState(result)
+
       if (result.status === 'timeout') {
         this.watcher.alert({
           type: 'hound_timeout',
@@ -203,7 +216,7 @@ class Tracehound implements ITracehound {
         })
         this.notifications.emit('system.panic', {
           level: 'warning',
-          reason: `hound_timeout: signature=${result.signature}`,
+          reason: formatHoundTimeoutReason(result.signature),
         })
       } else if (result.status === 'error') {
         this.watcher.alert({
@@ -214,7 +227,7 @@ class Tracehound implements ITracehound {
         })
         this.notifications.emit('system.panic', {
           level: 'critical',
-          reason: `hound_error: ${result.error ?? 'unknown'}`,
+          reason: formatHoundErrorReason(result.error ?? 'unknown'),
         })
       }
     })
@@ -268,7 +281,7 @@ class Tracehound implements ITracehound {
       } catch (error: unknown) {
         this.notifications.emit('system.panic', {
           level: 'warning',
-          reason: 'snapshot_write_failed',
+          reason: SYSTEM_PANIC_REASONS.SNAPSHOT_WRITE_FAILED,
           context: { error: error instanceof Error ? error.message : 'unknown' },
         })
       }
@@ -302,10 +315,64 @@ class Tracehound implements ITracehound {
     } catch (error: unknown) {
       this.notifications.emit('system.panic', {
         level: 'warning',
-        reason: 'snapshot_cleanup_failed',
+        reason: SYSTEM_PANIC_REASONS.SNAPSHOT_CLEANUP_FAILED,
         context: { error: error instanceof Error ? error.message : 'unknown' },
       })
     }
+  }
+
+  private syncOverloadState(result: HoundResult): void {
+    const overloadSignal = this.isOverloadSignal(result)
+    if (overloadSignal) {
+      this.watcher.setOverloaded(true)
+    }
+
+    if (!this.shouldEvaluateOverloadRecovery(result)) {
+      return
+    }
+
+    // HoundPool emits results before deferred queue reassignment in the same
+    // tick, so recovery checks must run in a microtask.
+    queueMicrotask(() => {
+      const stats = this.houndPool.stats
+      const hasHeadroom =
+        stats.totalProcesses === 0 || stats.activeProcesses < stats.totalProcesses
+      if (hasHeadroom) {
+        this.watcher.setOverloaded(false)
+      }
+    })
+  }
+
+  private shouldEvaluateOverloadRecovery(result: HoundResult): boolean {
+    if (result.status === 'processed' || result.status === 'timeout') {
+      return true
+    }
+
+    if (result.status !== 'error') {
+      return false
+    }
+
+    if (!result.error) {
+      return true
+    }
+
+    return !isHoundPressureError(result.error)
+  }
+
+  private isOverloadSignal(result: HoundResult): boolean {
+    if (result.status === 'timeout') {
+      return true
+    }
+
+    if (result.status !== 'error') {
+      return false
+    }
+
+    if (!result.error) {
+      return false
+    }
+
+    return isHoundPressureError(result.error)
   }
 }
 

@@ -120,9 +120,11 @@ export type { AgentConfig, AgentStats, IAgent } from './core/agent.js'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { HoundPool, createHoundPool, createMockAdapter } from './core/hound-pool.js'
+export { HOUND_PRESSURE_ERRORS, isHoundPressureError } from './core/hound-pool.js'
 export type {
   HoundPoolConfig,
   HoundPoolStats,
+  HoundPressureErrorCode,
   HoundResult,
   IHoundPool,
   PoolExhaustedAction,
@@ -191,6 +193,7 @@ export {
   readSystemSnapshotFromDisk,
   resolveSystemSnapshotPath,
   resolveSystemSnapshotSecret,
+  SYSTEM_SNAPSHOT_ENV,
   writeSystemSnapshotToDisk,
 } from './utils/system-snapshot.js'
 export type { SnapshotReadResult, SystemHealth, SystemSnapshot } from './utils/system-snapshot.js'
@@ -301,6 +304,11 @@ export type {
 
 export { createTracehound } from './core/tracehound.js'
 export type { ITracehound, TracehoundOptions } from './core/tracehound.js'
+export {
+  formatHoundErrorReason,
+  formatHoundTimeoutReason,
+  SYSTEM_PANIC_REASONS,
+} from './core/operational-events.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Notification Emitter
@@ -338,8 +346,4 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
-
-
-
-
 

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   clearTraceInspectionHistory,
   clearTraceRegistryDisk,
@@ -383,16 +383,14 @@ describe('trace inspection registry', () => {
         { path, maxFileBytes: 1 },
       )
 
-      for (let i = 0; i < 25; i++) {
-        await new Promise<void>((resolve) => setImmediate(resolve))
-        if (getTraceRegistryStats({ path, maxFileBytes: 1 }).blocked) {
-          break
-        }
-      }
-
-      const stats = getTraceRegistryStats({ path, maxFileBytes: 1 })
-      expect(stats.blocked).toBe(true)
-      expect(stats.droppedCount).toBeGreaterThan(0)
+      await vi.waitFor(
+        () => {
+          const stats = getTraceRegistryStats({ path, maxFileBytes: 1 })
+          expect(stats.blocked).toBe(true)
+          expect(stats.droppedCount).toBeGreaterThan(0)
+        },
+        { timeout: 3_000, interval: 25 },
+      )
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

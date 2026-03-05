@@ -59,6 +59,17 @@ CLI commands (`status`, `stats`, `watch`) read:
 3. `TRACEHOUND_SNAPSHOT_MAX_AGE_MS` (optional freshness window override, default `5000`)
 4. `TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS` (optional future timestamp skew tolerance, default `5000`)
 
+Programmatic key access is available via `SYSTEM_SNAPSHOT_ENV`:
+
+```ts
+import { SYSTEM_SNAPSHOT_ENV } from '@tracehound/core'
+
+process.env[SYSTEM_SNAPSHOT_ENV.PATH] = '/var/run/tracehound/system-snapshot.json'
+process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = 'shared-secret'
+process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS] = '5000'
+process.env[SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS] = '5000'
+```
+
 If snapshot cannot be trusted:
 
 1. `NO_INSTANCE` when file is absent or stale.

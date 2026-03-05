@@ -52,6 +52,46 @@ export interface HoundResult {
   analysis?: Omit<HoundAnalysisMessage, "type">;
 }
 
+export const HOUND_PRESSURE_ERRORS = Object.freeze({
+  POOL_EXHAUSTED: "pool_exhausted",
+  POOL_EXHAUSTED_ESCALATED: "pool_exhausted_escalated",
+  DEFER_QUEUE_FULL: "defer_queue_full",
+  SPAWN_FAILED: "spawn_failed",
+} as const);
+
+export type HoundPressureErrorCode =
+  (typeof HOUND_PRESSURE_ERRORS)[keyof typeof HOUND_PRESSURE_ERRORS];
+
+const HOUND_PRESSURE_ERROR_SET: ReadonlySet<string> = new Set(
+  Object.values(HOUND_PRESSURE_ERRORS),
+);
+
+const HOUND_SPAWN_PRESSURE_PATTERNS: ReadonlyArray<RegExp> = [
+  /^spawn_failed(?:\b|:)/i,
+  /\bfailed to spawn process\b/i,
+  /\bprocess spawn failed\b/i,
+];
+
+const POOL_PROCESS_ID = "pool";
+
+/**
+ * Checks whether an error payload indicates capacity/pressure stress.
+ * Accepts canonical codes and descriptive spawn-failure message variants.
+ */
+export function isHoundPressureError(errorMessage: string): boolean {
+  if (HOUND_PRESSURE_ERROR_SET.has(errorMessage)) {
+    return true;
+  }
+
+  for (const pattern of HOUND_SPAWN_PRESSURE_PATTERNS) {
+    if (pattern.test(errorMessage)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Hound pool statistics (immutable snapshot).
  *
@@ -239,8 +279,8 @@ export class HoundPool implements IHoundPool {
           signature: evidence.signature,
           status: "error",
           durationMs: 0,
-          processId: "pool",
-          error: "pool_exhausted",
+          processId: POOL_PROCESS_ID,
+          error: HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED,
         });
         break;
 
@@ -251,8 +291,8 @@ export class HoundPool implements IHoundPool {
           signature: evidence.signature,
           status: "error",
           durationMs: 0,
-          processId: "pool",
-          error: "pool_exhausted_escalated",
+          processId: POOL_PROCESS_ID,
+          error: HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED_ESCALATED,
         });
         break;
 
@@ -266,8 +306,8 @@ export class HoundPool implements IHoundPool {
             signature: evidence.signature,
             status: "error",
             durationMs: 0,
-            processId: "pool",
-            error: "defer_queue_full",
+            processId: POOL_PROCESS_ID,
+            error: HOUND_PRESSURE_ERRORS.DEFER_QUEUE_FULL,
           });
         }
         break;
@@ -394,7 +434,7 @@ export class HoundPool implements IHoundPool {
           status: "error",
           durationMs: 0,
           processId: processState.id,
-          error: toErrorMessage(err, "spawn_failed"),
+          error: toErrorMessage(err, HOUND_PRESSURE_ERRORS.SPAWN_FAILED),
         });
         processState.busy = false;
         processState.currentSignature = null;

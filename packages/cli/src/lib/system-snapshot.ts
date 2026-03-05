@@ -3,13 +3,7 @@ import type { SnapshotReadResult, SystemSnapshot } from '@tracehound/core'
 
 const DEFAULT_MAX_SNAPSHOT_AGE_MS = 5_000
 const DEFAULT_MAX_FUTURE_SKEW_MS = 5_000
-const FALLBACK_SNAPSHOT_ENV = Object.freeze({
-  PATH: 'TRACEHOUND_SYSTEM_SNAPSHOT_PATH',
-  SECRET: 'TRACEHOUND_SNAPSHOT_SECRET',
-  MAX_AGE_MS: 'TRACEHOUND_SNAPSHOT_MAX_AGE_MS',
-  MAX_FUTURE_SKEW_MS: 'TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS',
-} as const)
-const SNAPSHOT_ENV = tracehoundCore.SYSTEM_SNAPSHOT_ENV ?? FALLBACK_SNAPSHOT_ENV
+const SNAPSHOT_ENV = tracehoundCore.SYSTEM_SNAPSHOT_ENV
 
 export type CliSystemSnapshot = SystemSnapshot
 

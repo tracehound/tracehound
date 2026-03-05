@@ -213,12 +213,26 @@ console.log(runtime.houndPool.isolationTelemetry?.capabilities)
 For disk transport:
 
 ```ts
-import { readSystemSnapshotFromDisk } from '@tracehound/core'
+import { readSystemSnapshotFromDisk, SYSTEM_SNAPSHOT_ENV } from '@tracehound/core'
 
-const verified = readSystemSnapshotFromDisk('/tmp/tracehound/system-snapshot.json', process.env.TRACEHOUND_SNAPSHOT_SECRET!)
+const verified = readSystemSnapshotFromDisk(
+  '/tmp/tracehound/system-snapshot.json',
+  process.env[SYSTEM_SNAPSHOT_ENV.SECRET]!,
+)
 if (verified.ok) {
   console.log(verified.snapshot.generatedAt)
 }
+```
+
+Environment key constants are exposed via `SYSTEM_SNAPSHOT_ENV`:
+
+```ts
+import { SYSTEM_SNAPSHOT_ENV } from '@tracehound/core'
+
+console.log(SYSTEM_SNAPSHOT_ENV.PATH) // TRACEHOUND_SYSTEM_SNAPSHOT_PATH
+console.log(SYSTEM_SNAPSHOT_ENV.SECRET) // TRACEHOUND_SNAPSHOT_SECRET
+console.log(SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS) // TRACEHOUND_SNAPSHOT_MAX_AGE_MS
+console.log(SYSTEM_SNAPSHOT_ENV.MAX_FUTURE_SKEW_MS) // TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS
 ```
 
 ### Runtime Teardown (`th.shutdown()`)
@@ -242,6 +256,18 @@ th.notifications.on('system.panic', (payload) => {
   console.error(`[PANIC] System level ${payload.level}: ${payload.reason}`)
 })
 ```
+
+`system.panic` reason patterns used by runtime:
+
+1. `hound_timeout: signature=<signature>`
+2. `hound_error: <error_code_or_message>`
+3. `snapshot_write_failed`
+4. `snapshot_cleanup_failed`
+5. `coordination.invalid_contract`
+6. `coordination.health_failure`
+7. `membrane.payload_egress_blocked`
+
+These reason values are intended for deterministic telemetry parsing.
 
 ---
 

@@ -66,3 +66,14 @@ This is intentional and prevents unsigned or unverifiable operational state.
 Snapshot file permission hardening is strict on POSIX (`0600` best-effort), but Windows ACL enforcement is best-effort in Node runtime.
 
 Use host-level ACL policy for strict production controls on Windows.
+
+## 6) Operational env key constants (non-breaking, recommended)
+
+`@tracehound/core` exposes `SYSTEM_SNAPSHOT_ENV` for snapshot env key access:
+
+- `PATH` -> `TRACEHOUND_SYSTEM_SNAPSHOT_PATH`
+- `SECRET` -> `TRACEHOUND_SNAPSHOT_SECRET`
+- `MAX_AGE_MS` -> `TRACEHOUND_SNAPSHOT_MAX_AGE_MS`
+- `MAX_FUTURE_SKEW_MS` -> `TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS`
+
+This avoids hard-coded env key strings in application and tooling code.

@@ -69,5 +69,48 @@ describe('process-adapter', () => {
 
     vi.doUnmock('node:child_process')
   })
-})
 
+  it('includes mixed-case Path in child env when PATH is missing', async () => {
+    const previousPathUpper = process.env.PATH
+    const previousPathMixed = process.env.Path
+    const mixedPathValue = 'C:\\Windows\\System32'
+    let capturedEnv: NodeJS.ProcessEnv | undefined
+
+    try {
+      delete process.env.PATH
+      process.env.Path = mixedPathValue
+
+      vi.resetModules()
+      vi.doMock('node:child_process', () => ({
+        spawn: (_command: string, _args: string[], options: { env?: NodeJS.ProcessEnv }) => {
+          capturedEnv = options.env
+          return ({
+            pid: 4321,
+            stdin: null,
+            stdout: null,
+            on: () => {},
+            kill: () => true,
+          }) as unknown
+        },
+      }))
+
+      const { createProcessAdapter } = await import('../src/core/process-adapter.js')
+      const adapter = createProcessAdapter()
+      adapter.spawn('noop.js')
+
+      expect(capturedEnv?.Path).toBe(mixedPathValue)
+    } finally {
+      if (previousPathUpper === undefined) {
+        delete process.env.PATH
+      } else {
+        process.env.PATH = previousPathUpper
+      }
+      if (previousPathMixed === undefined) {
+        delete process.env.Path
+      } else {
+        process.env.Path = previousPathMixed
+      }
+      vi.doUnmock('node:child_process')
+    }
+  })
+})

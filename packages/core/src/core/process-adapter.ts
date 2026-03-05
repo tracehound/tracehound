@@ -338,6 +338,7 @@ export function createMockAdapter(): IHoundProcessAdapter & {
 
 const CHILD_ENV_ALLOWLIST = [
   "PATH",
+  "Path",
   "SystemRoot",
   "WINDIR",
   "ComSpec",

@@ -181,7 +181,7 @@ describe('HoundIPC', () => {
       const buffer = Buffer.alloc(4)
       buffer.writeUInt32BE(2 * 1024 * 1024, 0) // 2MB > max
 
-      expect(() => tryParseMessage(buffer)).toThrow('Invalid message length')
+      expect(() => tryParseMessage(buffer)).toThrow('Message too large')
     })
   })
 

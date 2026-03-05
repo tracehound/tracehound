@@ -224,7 +224,7 @@ export function tryParseMessage(buffer: Buffer): ParsedMessage | null {
 
   // Validate length
   if (length > MAX_MESSAGE_SIZE) {
-    throw Errors.processIpcInvalidLength(length)
+    throw Errors.processIpcMessageTooLarge(length, MAX_MESSAGE_SIZE)
   }
 
   const totalSize = LENGTH_PREFIX_SIZE + length

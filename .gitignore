@@ -4,6 +4,7 @@ node_modules/
 .agent/
 .cursor/
 .codex/
+.claude/
 
 # Build output
 dist/
@@ -38,3 +39,4 @@ pnpm-debug.log*
 internal/
 AGENTS.md
 CLAUDE.md
+SECURITY-CHECKLIST.md

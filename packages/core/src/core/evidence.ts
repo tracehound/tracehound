@@ -18,6 +18,7 @@ export class Evidence implements EvidenceHandle {
   private _bytes: ArrayBuffer | null
   private _disposed: boolean = false
   private readonly _compressed: boolean
+  private readonly _now: () => number
 
   constructor(
     bytes: ArrayBuffer,
@@ -25,7 +26,8 @@ export class Evidence implements EvidenceHandle {
     private readonly _expectedHash: string,
     private readonly _severity: Severity,
     private readonly _captured: number,
-    compressed: boolean = false
+    compressed: boolean = false,
+    now: () => number = Date.now,
   ) {
     // Validate bytes type
     if (!(bytes instanceof ArrayBuffer)) {
@@ -48,6 +50,7 @@ export class Evidence implements EvidenceHandle {
 
     this._bytes = bytes
     this._compressed = compressed
+    this._now = now
   }
 
   // ─── Getters ────────────────────────────────────────────────────────────────
@@ -83,6 +86,10 @@ export class Evidence implements EvidenceHandle {
     return this._disposed
   }
 
+  get compressed(): boolean {
+    return this._compressed
+  }
+
   // ─── Operations ─────────────────────────────────────────────────────────────
 
   /**
@@ -105,7 +112,7 @@ export class Evidence implements EvidenceHandle {
    * Atomically snapshot and destroy evidence.
    * Returns neutralization record for audit chain.
    *
-   * @param previousHash - Last hash in audit chain
+   * @param previousHash - Current sealed chain anchor at capture time
    */
   neutralize(previousHash: string): NeutralizationRecord {
     if (this._disposed) {
@@ -119,7 +126,7 @@ export class Evidence implements EvidenceHandle {
       hash: this._expectedHash,
       size: this._bytes!.byteLength,
       status: 'neutralized',
-      timestamp: Date.now(),
+      timestamp: this._now(),
       previousHash,
     }
 
@@ -147,8 +154,8 @@ export class Evidence implements EvidenceHandle {
       id: generateSecureId(),
       signature: this._signature,
       destination,
-      timestamp: Date.now(),
-      compressed: false, // TODO: Phase 3 compression
+      timestamp: this._now(),
+      compressed: this._compressed,
       size: this._bytes!.byteLength,
     }
 

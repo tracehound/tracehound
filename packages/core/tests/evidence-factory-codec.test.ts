@@ -101,6 +101,90 @@ describe('EvidenceFactory with Codec', () => {
   })
 
   describe('Security invariants', () => {
+    it('prefers raw ingress bytes for hashing when provided', () => {
+      const factory = createEvidenceFactory()
+      const raw = new TextEncoder().encode('raw-http-body')
+      const scent: Scent = {
+        id: 'raw-scent',
+        payload: { normalized: true },
+        ingressBytes: raw,
+        source: 'test',
+        timestamp: Date.now(),
+      }
+
+      const result = factory.create(scent, { category: 'spam', severity: 'low' }, 1_000_000)
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const payloadOnly = createEvidenceFactory().create(
+          createScent({ normalized: true }),
+          { category: 'spam', severity: 'low' },
+          1_000_000,
+        )
+
+        expect(payloadOnly.ok).toBe(true)
+        if (payloadOnly.ok) {
+          expect(result.signature).not.toBe(payloadOnly.signature)
+        }
+      }
+    })
+
+    it('accepts ArrayBuffer ingress bytes by copying them defensively', () => {
+      const factory = createEvidenceFactory()
+      const raw = new TextEncoder().encode('array-buffer-body')
+      const scent: Scent = {
+        id: 'array-buffer-scent',
+        payload: { normalized: true },
+        ingressBytes: raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
+        source: 'test',
+        timestamp: Date.now(),
+      }
+
+      const result = factory.create(scent, { category: 'spam', severity: 'low' }, 1_000_000)
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.size).toBe(raw.byteLength)
+      }
+    })
+
+    it('returns TracehoundError results when raw ingress bytes exceed the limit', () => {
+      const factory = createEvidenceFactory()
+      const raw = new Uint8Array(16)
+      const scent: Scent = {
+        id: 'oversized-ingress',
+        payload: { normalized: true },
+        ingressBytes: raw.buffer.slice(0),
+        source: 'test',
+        timestamp: Date.now(),
+      }
+
+      const result = factory.create(scent, { category: 'spam', severity: 'low' }, 8)
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error.code).toBe('AGENT_PAYLOAD_TOO_LARGE')
+      }
+    })
+
+    it('wraps unknown codec failures into Evidence creation errors', () => {
+      const factory = createEvidenceFactory({
+        codec: {
+          encode: () => {
+            throw new Error('codec exploded')
+          },
+        },
+      })
+
+      const result = factory.create(createScent({ payload: true }), { category: 'spam', severity: 'low' }, 1_000_000)
+
+      expect(result.ok).toBe(false)
+      if (!result.ok) {
+        expect(result.error.code).toBe('EVIDENCE_CREATION_FAILED')
+        expect(result.error.message).toBe('codec exploded')
+      }
+    })
+
     it('HotPathCodec cannot decode', () => {
       const codec = createHotPathCodec()
 

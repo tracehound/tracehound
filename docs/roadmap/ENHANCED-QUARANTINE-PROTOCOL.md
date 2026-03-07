@@ -1,9 +1,21 @@
 # Enhanced App-Level Quarantine Protocol & Risk Analysis
 
+> **Status:** Completed
+> **Use:** Implemented core feature record and historical design analysis.
 > [!NOTE]
-> Source module document. The authoritative technical roadmap is
+>
+> The active technical roadmap remains
 > [TRACEHOUND-UNIFIED-ROADMAP.md](./TRACEHOUND-UNIFIED-ROADMAP.md).
-
+> This document is completed as an implementation record for the quarantine expansion delivered in core/runtime code.
+>
+> [!TIP]
+> Implemented outcome summary:
+>
+> 1. Metadata-only runtime membrane and trace-id workflow are in place.
+> 2. Pressure containment uses deterministic Drop and Count with graceful adapter shielding.
+> 3. Quarantine supports TTL decay, background archival, and archive failure policy selection.
+> 4. AuditChain now includes purge and decay custody with batched Merkle sealing.
+>
 > [!WARNING]
 > This protocol has undergone a rigorous Execution-Grade Analysis based on global architectural constraints. Severe failure modes, second-order effects, and unknowns have been identified for the proposed Membrane, Decay, and AuditChain mechanisms. A final Action Plan determines operational pivots required before implementation.
 
@@ -75,9 +87,7 @@ Given the severe systemic risks identified, the following architectural pivots M
 **Decision:** PIVOT TO BATCHED MERKLE TREES
 **Action:** Hashing every individual eviction event is CPU suicide. We will implement **Merkle Tree Batching**. Lifecycle events (insert/purge/decay) are accumulated in memory and hashed as a single Merkle Root every 1000ms (1 second). This reduces cryptography overhead by over 99% while maintaining mathematical chain-of-custody.
 
-<br>
-<hr>
-<br>
+---
 
 ## Sprints
 

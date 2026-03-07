@@ -1,0 +1,13 @@
+title = "Tracehound Gitleaks Config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic AWS-style key fragments in quarantine sanitization tests"
+paths = [
+  '''packages/core/tests/quarantine\.test\.ts''',
+]
+regexes = [
+  '''\b(AKIA|ASIA)[A-Z0-9]{16}\b''',
+]

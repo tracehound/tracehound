@@ -1,7 +1,10 @@
 # Resilience Edge V2 Roadmap & Risk Analysis
 
+> **Status:** Archived Reference
+> **Use:** Historical product and risk exploration only. Not an active execution plan.
+
 > [!NOTE]
-> Source module document. The authoritative technical roadmap is
+> Archived reference document. The active technical roadmap is
 > [TRACEHOUND-UNIFIED-ROADMAP.md](./TRACEHOUND-UNIFIED-ROADMAP.md).
 
 This roadmap outlines the next evolution of Tracehound's deterministic security guarantees. While Tracehound v1 achieved isolated processing and fail-open survival, v2 focuses on **Developer Experience (DX) simplicity**, **Pre-extraction safety**, and **Zero-overhead cold storage**.

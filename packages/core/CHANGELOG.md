@@ -4,6 +4,26 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Quarantine TTL decay with background scheduling, deterministic decay ordering, decay batch sizing, and configurable archive failure policy.
+- Cold-storage-backed decay archival exposed through `TracehoundOptions.coldStorage` and `ITracehound.coldStorage`.
+- Raw ingress byte hashing support via optional `Scent.ingressBytes`, with Express/Fastify adapters preferring `rawBody` when available.
+- Batched Merkle sealing for `AuditChain`, including purge and decay lifecycle custody.
+
+### Changed
+
+- Quarantine stats now expose `evictedCount`, decay/archive counters, and next-expiry metadata.
+- `ingressBytes` extraction in Express/Fastify adapters now requires `rawBody` to be set by the body-parser middleware; falling back to `req.body` was removed to preserve signature determinism.
+- Purge events now participate in audit chain continuity instead of bypassing custody logging.
+- Enhanced quarantine protocol roadmap work is now implemented in core/runtime behavior rather than tracked as a partial roadmap concept.
+
+### Breaking Changes
+
+- **`PurgeRecord.purgeTimestamp` renamed to `PurgeRecord.timestamp`** to align with all other lifecycle record types. Any code reading `record.purgeTimestamp` must be updated to `record.timestamp`.
+
+  **Migration:** Replace all `purgeRecord.purgeTimestamp` references with `purgeRecord.timestamp`.
+
 ## [1.6.1] - 2026-03-07 - Memory Safety and Cryptographic RNG Hardening
 
 ## Release Notes

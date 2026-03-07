@@ -2,6 +2,7 @@
  * Express middleware tests.
  */
 
+import { Buffer } from 'node:buffer'
 import type { IAgent, InterceptResult } from '@tracehound/core'
 import type { NextFunction, Request, Response } from 'express'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -226,6 +227,75 @@ describe('tracehound middleware', () => {
       expect(scent.payload.query.circ).toBeUndefined()
     })
 
+    it('captures rawBody bytes into ingressBytes when available', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+
+      middleware(
+        createMockReq({
+          rawBody: Buffer.from('{"raw":true}', 'utf8') as unknown as Request['body'],
+          body: { ignored: 'for hashing preference' },
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.ingressBytes).toBeInstanceOf(Uint8Array)
+      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
+    })
+
+    it('does not populate ingressBytes from string body when rawBody is absent', () => {
+      // ingressBytes is only populated from rawBody to preserve signature determinism.
+      // Falling back to req.body would produce different signatures across middleware configs.
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+
+      middleware(
+        createMockReq({
+          body: 'plain-text-body' as unknown as Request['body'],
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.ingressBytes).toBeUndefined()
+    })
+
+    it('does not populate ingressBytes from Uint8Array body when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+
+      middleware(
+        createMockReq({
+          body: new Uint8Array([1, 2, 3]) as unknown as Request['body'],
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.ingressBytes).toBeUndefined()
+    })
+
+    it('does not populate ingressBytes from ArrayBuffer body when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+      const bytes = new Uint8Array([4, 5, 6])
+
+      middleware(
+        createMockReq({
+          body: bytes.buffer.slice(0) as unknown as Request['body'],
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.ingressBytes).toBeUndefined()
+    })
+
     it('should use defaultOnIntercept when result is blocked', () => {
       const agent = createMockAgent({ status: 'rate_limited', retryAfter: 2000 })
       const middleware = tracehound({ agent })
@@ -235,6 +305,17 @@ describe('tracehound middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(429)
       expect(res.set).toHaveBeenCalledWith('Retry-After', '2')
+    })
+
+    it('fails open for unexpected intercept statuses by continuing the middleware chain', () => {
+      const agent = createMockAgent({ status: 'unexpected' } as unknown as InterceptResult)
+      const middleware = tracehound({ agent })
+      const res = createMockRes()
+
+      middleware(createMockReq(), res, next)
+
+      expect(res.status).not.toHaveBeenCalled()
+      expect(next).toHaveBeenCalled()
     })
   })
 
@@ -266,6 +347,7 @@ describe('tracehound middleware', () => {
     middleware(req, res, next)
 
     expect(onIntercept).toHaveBeenCalledWith({ status: 'rate_limited', retryAfter: 1000 }, req, res)
+    expect(next).toHaveBeenCalled()
   })
 
   it('should propagate error when custom onIntercept throws after headers are sent', () => {
@@ -303,4 +385,3 @@ describe('tracehound middleware', () => {
     expect(res.status).not.toHaveBeenCalled()
   })
 })
-

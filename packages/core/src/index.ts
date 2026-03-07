@@ -9,6 +9,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
+  AuditLifecycleRecord,
+  DecayRecord,
   AlertConfig,
   AuditConfig,
   ColdStorageConfig,
@@ -16,8 +18,10 @@ export type {
   CoordinationHealth,
   CoordinationMode,
   CoordinationProvider,
+  DropRecord,
   ErrorState,
   EvacuateRecord,
+  EvictionRecord,
   EvidenceHandle,
   GenerateSignatureOptions,
   HoundConfig,
@@ -88,7 +92,7 @@ export { Evidence } from './core/evidence.js'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export { Quarantine } from './core/quarantine.js'
-export type { InsertResult, QuarantineStats } from './core/quarantine.js'
+export type { DecayResult, InsertResult, QuarantineStats } from './core/quarantine.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Rate Limiter
@@ -346,4 +350,3 @@ export type {
   SecurityStateConfig,
   SecurityStateStats,
 } from './core/security-state.js'
-

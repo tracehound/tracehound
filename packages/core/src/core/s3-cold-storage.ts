@@ -212,10 +212,18 @@ export class S3ColdStorage implements IColdStorageAdapter {
     return `${this.prefix}${id}.thcs`
   }
 
-  async write(id: string, payload: EncodedPayload): Promise<ColdStorageWriteResult> {
+  async write(id: string, payload: EncodedPayload, signal?: AbortSignal): Promise<ColdStorageWriteResult> {
+    if (signal?.aborted) {
+      return { success: false, error: 'aborted' }
+    }
+
     try {
       const envelope = packEnvelope(payload)
       const key = this.key(id)
+
+      if (signal?.aborted) {
+        return { success: false, error: 'aborted' }
+      }
 
       await this.client.putObject({
         Bucket: this.bucket,

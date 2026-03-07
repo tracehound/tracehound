@@ -55,6 +55,14 @@ Status values in this table reflect RFC governance lifecycle, not roadmap capabi
 
 ---
 
+## Roadmap
+
+`docs/roadmap/TRACEHOUND-UNIFIED-ROADMAP.md` is the only active roadmap.
+`ENHANCED-QUARANTINE-PROTOCOL.md` is now a completed implementation record for the core quarantine expansion.
+Other roadmap files remain historical reference material unless restated in the unified roadmap.
+
+---
+
 ## Legend
 
 | Status         | Meaning                                     |

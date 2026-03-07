@@ -2,120 +2,448 @@
  * AuditChain - cryptographic hash chain for evidence integrity.
  */
 
-import { createHash, createHmac } from "node:crypto";
-import type { AuditRecord, IAuditChain } from "../types/audit.js";
-import type {
-  EvacuateRecord,
-  NeutralizationRecord,
-} from "../types/evidence.js";
+import { createHash, createHmac } from 'node:crypto'
+import type { AuditLifecycleRecord, AuditRecord, IAuditChain } from '../types/audit.js'
+import { constantTimeEqual } from '../utils/compare.js'
 
 /** Genesis hash (anchor for chain) */
-export const GENESIS_HASH = "0".repeat(64);
+export const GENESIS_HASH = '0'.repeat(64)
+
+interface AuditChainOptions {
+  hmacSecret?: string
+  batchWindowMs?: number
+  /**
+   * Maximum sealed records to keep in memory (FIFO eviction).
+   * Default: 100_000. Set 0 for unlimited (not recommended in production).
+   * Controls retention only — does not affect batch sealing frequency.
+   */
+  maxRecords?: number
+  /**
+   * Maximum pending events before a batch is force-sealed.
+   * Default: 1_024. Controls sealing frequency independently of retention.
+   */
+  maxBatchSize?: number
+}
+
+interface PendingAuditEvent {
+  readonly id: string
+  readonly type: AuditRecord['type']
+  readonly signature: string
+  readonly timestamp: number
+  readonly eventData: string
+  readonly eventHash: string
+}
+
+const DEFAULT_BATCH_WINDOW_MS = 1_000
 
 /**
  * Cryptographic hash chain for audit integrity.
- * Each record contains hash of previous record.
- * Tampering with any record breaks the chain.
+ * Lifecycle events are sealed into Merkle batches to reduce per-event chain overhead.
  */
-export class AuditChain implements IAuditChain {
-  private records: AuditRecord[] = [];
-  private _lastHash: string = GENESIS_HASH;
-  private readonly hmacSecret: string | undefined;
+const DEFAULT_MAX_RECORDS = 100_000
+const DEFAULT_MAX_BATCH_SIZE = 1_024
 
-  constructor(hmacSecret?: string) {
-    this.hmacSecret = hmacSecret;
+export class AuditChain implements IAuditChain {
+  private readonly records: AuditRecord[] = []
+  private readonly pendingEvents: PendingAuditEvent[] = []
+  private _lastHash = GENESIS_HASH
+  private _batchCounter = 0
+  private readonly hmacSecret: string | undefined
+  private readonly batchWindowMs: number
+  private readonly maxRecords: number
+  private readonly maxBatchSize: number
+
+  constructor(config?: string | AuditChainOptions) {
+    if (typeof config === 'string') {
+      this.hmacSecret = config
+      this.batchWindowMs = DEFAULT_BATCH_WINDOW_MS
+      this.maxRecords = DEFAULT_MAX_RECORDS
+      this.maxBatchSize = DEFAULT_MAX_BATCH_SIZE
+      return
+    }
+
+    this.hmacSecret = config?.hmacSecret
+    this.batchWindowMs = normalizeBatchWindow(config?.batchWindowMs)
+    this.maxRecords = normalizeMaxRecords(config?.maxRecords)
+    this.maxBatchSize = normalizeMaxBatchSize(config?.maxBatchSize)
   }
 
   get lastHash(): string {
-    return this._lastHash;
+    return this._lastHash
   }
 
   get length(): number {
-    return this.records.length;
+    return this.records.length + this.pendingEvents.length
   }
 
-  /**
-   * Append a record to the chain.
-   */
-  append(record: NeutralizationRecord | EvacuateRecord): void {
-    const hash = this.computeHash(record, this._lastHash);
+  append(record: AuditLifecycleRecord): void {
+    const pending = toPendingAuditEvent(record, (data) => this.digest(data))
 
-    const auditRecord: AuditRecord = {
-      id: record.id,
-      type: "status" in record ? "neutralization" : "evacuation",
-      signature: record.signature,
-      timestamp: record.timestamp,
-      previousHash: this._lastHash,
-      hash,
-    };
+    if (this.shouldSealBeforeAppend(pending.timestamp)) {
+      this.sealPending()
+    }
 
-    this.records.push(auditRecord);
-    this._lastHash = hash;
+    this.pendingEvents.push(pending)
   }
 
-  /**
-   * Verify chain integrity.
-   */
+  flushPending(): void {
+    this.sealPending()
+  }
+
   verify(): boolean {
-    let expectedPreviousHash = GENESIS_HASH;
+    this.sealPending()
 
-    for (const record of this.records) {
-      // Check chain continuity
-      if (record.previousHash !== expectedPreviousHash) {
-        return false;
+    // After FIFO rotation, records no longer start from GENESIS_HASH.
+    // Use the first retained record's previousHash as the segment anchor
+    // so the retained chain verifies correctly even after eviction.
+    let expectedPreviousHash = this.records[0]?.previousHash ?? GENESIS_HASH
+    let index = 0
+
+    while (index < this.records.length) {
+      const head = this.records[index]
+      if (!head) {
+        return false
       }
 
-      // Check hash integrity
-      const computedHash = this.recomputeHash(record);
-      if (computedHash !== record.hash) {
-        return false;
+      const batch = this.collectBatch(index, head.batchId)
+      if (batch.length === 0) {
+        return false
       }
 
-      expectedPreviousHash = record.hash;
+      const eventHashes: string[] = []
+      for (const record of batch) {
+        const recomputedEventHash = this.digest(record.eventData)
+        if (!constantTimeEqual(recomputedEventHash, record.eventHash)) {
+          return false
+        }
+        eventHashes.push(recomputedEventHash)
+      }
+
+      const expectedBatchRoot = buildMerkleRoot(eventHashes, (data) => this.digest(data))
+
+      if (!constantTimeEqual(expectedBatchRoot, head.batchRoot)) {
+        return false
+      }
+
+      const expectedChainHash = this.digest(
+        JSON.stringify({
+          batchRoot: head.batchRoot,
+          previousHash: expectedPreviousHash,
+          batchId: head.batchId,
+          batchSize: batch.length,
+        }),
+      )
+
+      for (let batchIndex = 0; batchIndex < batch.length; batchIndex++) {
+        const record = batch[batchIndex]
+        if (!record) {
+          return false
+        }
+
+        if (
+          !constantTimeEqual(record.previousHash, expectedPreviousHash) ||
+          !constantTimeEqual(record.hash, expectedChainHash) ||
+          !constantTimeEqual(record.batchRoot, head.batchRoot) ||
+          record.batchSize !== batch.length ||
+          record.batchIndex !== batchIndex
+        ) {
+          return false
+        }
+      }
+
+      expectedPreviousHash = expectedChainHash
+      index += batch.length
     }
 
-    return true;
+    return true
   }
 
-  /**
-   * Export all records (defensive copy).
-   */
   export(): AuditRecord[] {
-    return [...this.records];
+    this.sealPending()
+    return this.records.map((record) =>
+      Object.freeze({
+        ...record,
+      }),
+    )
   }
 
-  /**
-   * Compute hash for a new record.
-   */
-  private computeHash(
-    record: NeutralizationRecord | EvacuateRecord,
-    previousHash: string,
-  ): string {
-    const data = JSON.stringify({
-      id: record.id,
-      signature: record.signature,
-      timestamp: record.timestamp,
-      previousHash,
-    });
-    if (this.hmacSecret) {
-      return createHmac("sha256", this.hmacSecret).update(data).digest("hex");
+  private shouldSealBeforeAppend(timestamp: number): boolean {
+    if (this.maxBatchSize > 0 && this.pendingEvents.length >= this.maxBatchSize) {
+      return true
     }
-    return createHash("sha256").update(data).digest("hex");
+
+    const firstPending = this.pendingEvents[0]
+    if (!firstPending) {
+      return false
+    }
+
+    return timestamp - firstPending.timestamp >= this.batchWindowMs
   }
 
-  /**
-   * Recompute hash for verification.
-   */
-  private recomputeHash(record: AuditRecord): string {
-    const data = JSON.stringify({
+  private sealPending(): void {
+    if (this.pendingEvents.length === 0) {
+      return
+    }
+
+    const previousHash = this._lastHash
+    const pending = this.pendingEvents.splice(0, this.pendingEvents.length)
+    const batchRoot = buildMerkleRoot(
+      pending.map((event) => event.eventHash),
+      (data) => this.digest(data),
+    )
+    const batchId = `batch-${pending[0]!.timestamp}-${this._batchCounter++}`
+    const chainHash = this.digest(
+      JSON.stringify({
+        batchRoot,
+        previousHash,
+        batchId,
+        batchSize: pending.length,
+      }),
+    )
+
+    pending.forEach((event, batchIndex) => {
+      const sealedRecord: AuditRecord = {
+        id: event.id,
+        type: event.type,
+        signature: event.signature,
+        timestamp: event.timestamp,
+        eventData: event.eventData,
+        eventHash: event.eventHash,
+        previousHash,
+        hash: chainHash,
+        batchId,
+        batchRoot,
+        batchIndex,
+        batchSize: pending.length,
+      }
+      Object.freeze(sealedRecord)
+      this.records.push(sealedRecord)
+    })
+
+    this._lastHash = chainHash
+
+    this.enforceMaxRecords()
+  }
+
+  private collectBatch(startIndex: number, batchId: string): AuditRecord[] {
+    const batch: AuditRecord[] = []
+
+    for (let index = startIndex; index < this.records.length; index++) {
+      const record = this.records[index]
+      if (!record || record.batchId !== batchId) {
+        break
+      }
+      batch.push(record)
+    }
+
+    return batch
+  }
+
+  private digest(data: string): string {
+    if (this.hmacSecret) {
+      return createHmac('sha256', this.hmacSecret).update(data).digest('hex')
+    }
+
+    return createHash('sha256').update(data).digest('hex')
+  }
+
+  private enforceMaxRecords(): void {
+    if (this.maxRecords <= 0 || this.records.length <= this.maxRecords) {
+      return
+    }
+
+    let removeCount = 0
+
+    while (this.records.length - removeCount > this.maxRecords) {
+      const nextBatchBoundary = this.findNextBatchBoundary(removeCount)
+      if (nextBatchBoundary >= this.records.length) {
+        // Defensive fallback for legacy/injected oversized single-batch state:
+        // drop the remaining segment to restore the configured bound.
+        removeCount = this.records.length
+        break
+      }
+
+      removeCount = nextBatchBoundary
+    }
+
+    if (removeCount > 0) {
+      this.records.splice(0, removeCount)
+    }
+  }
+
+  private findNextBatchBoundary(startIndex: number): number {
+    const firstRecord = this.records[startIndex]
+    if (!firstRecord) {
+      return this.records.length
+    }
+
+    const batchId = firstRecord.batchId
+    let index = startIndex
+
+    while (index < this.records.length && this.records[index]?.batchId === batchId) {
+      index++
+    }
+
+    return index
+  }
+}
+
+function normalizeBatchWindow(batchWindowMs: number | undefined): number {
+  if (typeof batchWindowMs !== 'number' || !Number.isFinite(batchWindowMs) || batchWindowMs <= 0) {
+    return DEFAULT_BATCH_WINDOW_MS
+  }
+
+  return Math.floor(batchWindowMs)
+}
+
+function normalizeMaxRecords(maxRecords: number | undefined): number {
+  if (typeof maxRecords !== 'number' || !Number.isFinite(maxRecords) || maxRecords < 0) {
+    return DEFAULT_MAX_RECORDS
+  }
+
+  return Math.floor(maxRecords)
+}
+
+function normalizeMaxBatchSize(maxBatchSize: number | undefined): number {
+  if (typeof maxBatchSize !== 'number' || !Number.isFinite(maxBatchSize) || maxBatchSize <= 0) {
+    return DEFAULT_MAX_BATCH_SIZE
+  }
+
+  return Math.floor(maxBatchSize)
+}
+
+function toPendingAuditEvent(
+  record: AuditLifecycleRecord,
+  digest: (data: string) => string,
+): PendingAuditEvent {
+  const normalized = normalizeLifecycleRecord(record)
+  const eventData = JSON.stringify(normalized)
+
+  return {
+    id: normalized.id,
+    type: normalized.type,
+    signature: normalized.signature,
+    timestamp: normalized.timestamp,
+    eventData,
+    eventHash: digest(eventData),
+  }
+}
+
+function normalizeLifecycleRecord(record: AuditLifecycleRecord): {
+  id: string
+  type: AuditRecord['type']
+  signature: string
+  timestamp: number
+  details: Record<string, boolean | number | string | null>
+} {
+  if ('status' in record && record.status === 'neutralized') {
+    return {
       id: record.id,
+      type: 'neutralization',
       signature: record.signature,
       timestamp: record.timestamp,
+      details: {
+        hash: record.hash,
+        size: record.size,
+        previousHash: record.previousHash,
+      },
+    }
+  }
+
+  if ('destination' in record) {
+    return {
+      id: record.id,
+      type: 'evacuation',
+      signature: record.signature,
+      timestamp: record.timestamp,
+      details: {
+        destination: record.destination,
+        compressed: record.compressed,
+        size: record.size,
+      },
+    }
+  }
+
+  if ('status' in record && record.status === 'purged') {
+    return {
+      id: record.id,
+      type: 'purge',
+      signature: record.signature,
+      timestamp: record.timestamp,
+      details: {
+        hash: record.hash,
+        size: record.size,
+        reason: record.reason,
+        previousHash: record.previousHash,
+      },
+    }
+  }
+
+  if ('status' in record && record.status === 'dropped') {
+    return {
+      id: record.id,
+      type: 'drop',
+      signature: record.signature,
+      timestamp: record.timestamp,
+      details: {
+        hash: record.hash,
+        size: record.size,
+        reason: record.reason,
+        previousHash: record.previousHash,
+      },
+    }
+  }
+
+  if ('status' in record && record.status === 'evicted') {
+    return {
+      id: record.id,
+      type: 'eviction',
+      signature: record.signature,
+      timestamp: record.timestamp,
+      details: {
+        hash: record.hash,
+        size: record.size,
+        reason: record.reason,
+        previousHash: record.previousHash,
+      },
+    }
+  }
+
+  return {
+    id: record.id,
+    type: 'decay',
+    signature: record.signature,
+    timestamp: record.timestamp,
+    details: {
+      hash: record.hash,
+      size: record.size,
+      archived: record.archived,
+      reason: record.reason,
+      storageId: record.storageId ?? null,
+      storageError: record.storageError ?? null,
       previousHash: record.previousHash,
-    });
-    if (this.hmacSecret) {
-      return createHmac("sha256", this.hmacSecret).update(data).digest("hex");
-    }
-    return createHash("sha256").update(data).digest("hex");
+    },
   }
+}
+
+function buildMerkleRoot(leaves: readonly string[], digest: (data: string) => string): string {
+  if (leaves.length === 0) {
+    return digest('[]')
+  }
+
+  let level = [...leaves]
+
+  while (level.length > 1) {
+    const nextLevel: string[] = []
+
+    for (let index = 0; index < level.length; index += 2) {
+      const left = level[index]
+      const right = level[index + 1] ?? left
+      nextLevel.push(digest(`${left}${right}`))
+    }
+
+    level = nextLevel
+  }
+
+  return level[0]!
 }

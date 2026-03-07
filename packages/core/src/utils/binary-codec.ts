@@ -7,7 +7,7 @@
  * - Agent / Hound Pool MUST NOT have access to decode
  *
  * INTEGRITY INVARIANT (Cold Storage):
- * - Always call verify() BEFORE decode()
+ * - Verify integrity before any manual decompression path
  * - Decoding without verification is a DoS vector
  * - Empty payloads are VALID (originalSize=0, compressedSize>0)
  */
@@ -305,8 +305,9 @@ export function encodeWithIntegrity(payload: Uint8Array): EncodedPayload {
 /**
  * Verify integrity of encoded payload.
  *
- * MUST be called BEFORE decodeWithIntegrity().
- * This is a cheap operation (hash only, no decompression).
+ * This is a cheap operation (hash only, no decompression) and is useful when
+ * callers need an explicit integrity decision before attempting any manual
+ * decompression or before calling decodeWithIntegrity*().
  *
  * @param encoded - Payload to verify
  * @returns true if hash matches, false if tampered
@@ -319,13 +320,22 @@ export function verify(encoded: EncodedPayload): boolean {
 /**
  * Decode payload from cold storage.
  *
- * CRITICAL: Call verify() first. Decoding untrusted data wastes CPU.
+ * Internally enforces integrity verification before decompression.
+ * Integrity violations indicate untrusted or corrupted input and should be
+ * treated as fatal to the decode attempt.
  *
- * @param encoded - Verified encoded payload
+ * @param encoded - Encoded payload to decode
  * @returns Original uncompressed bytes
- * @throws CodecError if decompression fails (storage corruption)
+ * @throws CodecError if integrity check fails or decompression fails
  */
 export function decodeWithIntegrity(encoded: EncodedPayload): Uint8Array {
+  if (!verify(encoded)) {
+    throw new CodecError(
+      'Integrity check failed — payload may have been tampered with',
+      'INTEGRITY_VIOLATION',
+    )
+  }
+
   try {
     const decompressed = gunzipSync(encoded.compressed);
     const result = new Uint8Array(decompressed);
@@ -385,15 +395,24 @@ export async function encodeWithIntegrityAsync(
  * Async decode payload from cold storage.
  * Non-blocking version of decodeWithIntegrity().
  *
- * CRITICAL: Call verify() first. Decoding untrusted data wastes CPU.
+ * Internally enforces integrity verification before decompression.
+ * Integrity violations indicate untrusted or corrupted input and should be
+ * treated as fatal to the decode attempt.
  *
- * @param encoded - Verified encoded payload
+ * @param encoded - Encoded payload to decode
  * @returns Original uncompressed bytes
- * @throws CodecError if decompression fails (storage corruption)
+ * @throws CodecError if integrity check fails or decompression fails
  */
 export async function decodeWithIntegrityAsync(
   encoded: EncodedPayload,
 ): Promise<Uint8Array> {
+  if (!verify(encoded)) {
+    throw new CodecError(
+      'Integrity check failed — payload may have been tampered with',
+      'INTEGRITY_VIOLATION',
+    )
+  }
+
   try {
     const decompressed = await gunzipAsync(encoded.compressed);
     const result = new Uint8Array(decompressed);

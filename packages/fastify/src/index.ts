@@ -4,6 +4,7 @@
  * Fastify plugin for Tracehound security buffer.
  */
 
+import { Buffer } from 'node:buffer'
 import {
   generateSecureId,
   recordTraceInspectionEntry,
@@ -49,6 +50,8 @@ export interface TracehoundPluginOptions {
   onIntercept?: (result: InterceptResult, req: FastifyRequest, reply: FastifyReply) => void
 }
 
+const textEncoder = new TextEncoder()
+
 /**
  * Defensive clone for safely copying deeply nested or cyclical external payloads
  * without crashing the process.
@@ -62,6 +65,37 @@ function safeClone(value: unknown): JsonSerializable | undefined {
   }
 }
 
+function toIngressBytes(value: unknown): Uint8Array | undefined {
+  if (typeof value === 'string') {
+    return textEncoder.encode(value)
+  }
+
+  if (Buffer.isBuffer(value)) {
+    // Create a zero-copy Uint8Array view over the Buffer's underlying memory.
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  }
+
+  if (value instanceof Uint8Array) {
+    // Reuse existing bytes; core performs the single defensive copy.
+    return value
+  }
+
+  if (value instanceof ArrayBuffer) {
+    // Create a view without copying; core performs the single defensive copy.
+    return new Uint8Array(value)
+  }
+
+  return undefined
+}
+
+function extractIngressBytes(req: FastifyRequest): Uint8Array | undefined {
+  // Only use rawBody — set explicitly by Fastify's rawBody plugin/config.
+  // Falling back to req.body would create signature non-determinism: the same logical
+  // payload would produce different signatures depending on middleware configuration.
+  const rawBody = Reflect.get(req, 'rawBody')
+  return toIngressBytes(rawBody)
+}
+
 /**
  * Default scent extraction from Fastify request.
  */
@@ -69,6 +103,7 @@ function defaultExtractScent(req: FastifyRequest): Scent {
   const ip = req.ip || 'unknown'
   const query = safeClone(req.query) ?? {}
   const body = safeClone(req.body)
+  const ingressBytes = extractIngressBytes(req)
   const payload: Record<string, JsonSerializable> = {
     method: req.method,
     path: req.url,
@@ -88,6 +123,7 @@ function defaultExtractScent(req: FastifyRequest): Scent {
     timestamp: Date.now(),
     source: ip,
     payload,
+    ...(ingressBytes ? { ingressBytes } : {}),
   }
 }
 
@@ -201,7 +237,10 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
 
         defaultOnIntercept(result, req, reply, interceptOptions)
       }
-      // Don't call hookDone() - response is already sent
+      // Forward-compat fail-open: continue if no response was sent.
+      if (!reply.sent) {
+        hookDone()
+      }
     } catch (error: unknown) {
       // Preserve Fastify error pipeline after partial writes from custom handlers.
       if (reply.sent) {

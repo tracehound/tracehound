@@ -4,6 +4,7 @@
  * Express middleware for Tracehound security buffer.
  */
 
+import { Buffer } from 'node:buffer'
 import {
   generateSecureId,
   recordTraceInspectionEntry,
@@ -49,6 +50,8 @@ export interface TracehoundMiddlewareOptions {
   onIntercept?: (result: InterceptResult, req: Request, res: Response) => void;
 }
 
+const textEncoder = new TextEncoder()
+
 /**
  * Defensive clone for safely copying deeply nested or cyclical external payloads
  * without crashing the process.
@@ -62,6 +65,37 @@ function safeClone(obj: unknown): JsonSerializable | undefined {
   }
 }
 
+function toIngressBytes(value: unknown): Uint8Array | undefined {
+  if (typeof value === 'string') {
+    return textEncoder.encode(value)
+  }
+
+  if (Buffer.isBuffer(value)) {
+    // Create a zero-copy Uint8Array view over the Buffer's underlying memory.
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+  }
+
+  if (value instanceof Uint8Array) {
+    // Reuse existing bytes; core performs the single defensive copy.
+    return value
+  }
+
+  if (value instanceof ArrayBuffer) {
+    // Create a view without copying; core performs the single defensive copy.
+    return new Uint8Array(value)
+  }
+
+  return undefined
+}
+
+function extractIngressBytes(req: Request): Uint8Array | undefined {
+  // Only use rawBody — set explicitly by body-parser middleware (e.g. verify callback).
+  // Falling back to req.body would create signature non-determinism: the same logical
+  // payload would produce different signatures depending on middleware configuration.
+  const rawBody = Reflect.get(req, 'rawBody')
+  return toIngressBytes(rawBody)
+}
+
 /**
  * Default scent extraction from Express request.
  */
@@ -69,6 +103,7 @@ function defaultExtractScent(req: Request): Scent {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
   const query = safeClone(req.query) ?? {};
   const body = safeClone(req.body);
+  const ingressBytes = extractIngressBytes(req)
   const payload: Record<string, JsonSerializable> = {
     method: req.method,
     path: req.path,
@@ -88,6 +123,7 @@ function defaultExtractScent(req: Request): Scent {
     timestamp: Date.now(),
     source: ip,
     payload,
+    ...(ingressBytes ? { ingressBytes } : {}),
   };
 }
 
@@ -204,7 +240,27 @@ export function tracehound(
         return;
       }
 
+      const isDefaultTerminalStatus =
+        result.status === "rate_limited" ||
+        result.status === "payload_too_large" ||
+        result.status === "quarantined" ||
+        result.status === "error";
+
       interceptHandler(result, req, res);
+
+      // Forward-compat fail-open:
+      // - default handler: pass through unknown statuses
+      // - custom handler: pass through when no response was sent
+      if (onIntercept) {
+        if (!res.headersSent) {
+          next();
+        }
+        return;
+      }
+
+      if (!isDefaultTerminalStatus) {
+        next();
+      }
     } catch (error: unknown) {
       // Preserve Express error pipeline after partial writes from custom handlers.
       if (res.headersSent) {

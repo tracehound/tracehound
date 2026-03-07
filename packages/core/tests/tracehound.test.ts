@@ -16,6 +16,7 @@ import { encodeHoundMessage } from "../src/core/hound-ipc.js";
 import {
   createMockAdapter,
   HOUND_PRESSURE_ERRORS,
+  type HoundResult,
 } from "../src/core/hound-pool.js";
 import {
   formatHoundErrorReason,
@@ -645,6 +646,69 @@ describe("Tracehound Factory", () => {
 
       await flushMicrotasks();
       expect(tracehound.watcher.snapshot().overloaded).toBe(false);
+      tracehound.shutdown();
+    });
+
+    it("creates the decay scheduler when TTL is enabled without a custom interval", () => {
+      const tracehound = createTracehound({
+        quarantine: {
+          ttlMs: 10,
+        },
+      });
+
+      const internal = tracehound as unknown as { scheduler: unknown };
+
+      expect(internal.scheduler).not.toBeNull();
+      tracehound.shutdown();
+    });
+
+    it("skips the decay scheduler when the configured interval is invalid", () => {
+      const tracehound = createTracehound({
+        quarantine: {
+          ttlMs: 10,
+          decayIntervalMs: Number.NaN,
+        },
+      });
+
+      const internal = tracehound as unknown as { scheduler: unknown };
+
+      expect(internal.scheduler).toBeNull();
+      tracehound.shutdown();
+    });
+
+    it("treats missing error details as recoverable without marking overload", () => {
+      const tracehound = createTracehound();
+      const internal = tracehound as unknown as {
+        shouldEvaluateOverloadRecovery: (result: HoundResult) => boolean;
+        isOverloadSignal: (result: HoundResult) => boolean;
+      };
+      const result = {
+        status: "error",
+        signature: "sig-no-error",
+        durationMs: 1,
+        processId: "hound-1",
+      } as HoundResult;
+
+      expect(internal.shouldEvaluateOverloadRecovery(result)).toBe(true);
+      expect(internal.isOverloadSignal(result)).toBe(false);
+      tracehound.shutdown();
+    });
+
+    it("ignores non-timeout non-error statuses for overload decisions", () => {
+      const tracehound = createTracehound();
+      const internal = tracehound as unknown as {
+        shouldEvaluateOverloadRecovery: (result: HoundResult) => boolean;
+        isOverloadSignal: (result: HoundResult) => boolean;
+      };
+      const result = {
+        status: "noop",
+        signature: "sig-noop",
+        durationMs: 1,
+        processId: "hound-1",
+      } as unknown as HoundResult;
+
+      expect(internal.shouldEvaluateOverloadRecovery(result)).toBe(false);
+      expect(internal.isOverloadSignal(result)).toBe(false);
       tracehound.shutdown();
     });
   });

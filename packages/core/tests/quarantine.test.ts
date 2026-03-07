@@ -31,6 +31,17 @@ describe('Quarantine', () => {
     return new Evidence(bytes, signature, contentHash, severity, captured)
   }
 
+  function createDisposedEvidence(
+    signature: string,
+    severity: 'low' | 'medium' | 'high' | 'critical',
+    size: number = 1024,
+    captured: number = Date.now(),
+  ): Evidence {
+    const evidence = createEvidence(signature, severity, size, captured)
+    evidence.transfer()
+    return evidence
+  }
+
   beforeEach(() => {
     config = {
       maxCount: 5,
@@ -129,6 +140,38 @@ describe('Quarantine', () => {
       expect(quarantine.stats.droppedBytes).toBe(20_000)
     })
 
+    it('drops incoming evidence when quarantine capacity is hard-capped to zero', () => {
+      const zeroCapacityQuarantine = new Quarantine(
+        {
+          ...config,
+          maxCount: 0,
+        },
+        auditChain,
+      )
+
+      const result = zeroCapacityQuarantine.insert(createEvidence('sig-zero', 'high', 256))
+
+      expect(result.status).toBe('dropped')
+      expect(result.reason).toBe('capacity')
+      expect(zeroCapacityQuarantine.stats.droppedCount).toBe(1)
+      expect(auditChain.export()[0]!.type).toBe('drop')
+    })
+
+    it('best-effort drops already disposed evidence under hard-cap pressure', () => {
+      const zeroCapacityQuarantine = new Quarantine(
+        {
+          ...config,
+          maxBytes: 0,
+        },
+        auditChain,
+      )
+
+      expect(() => {
+        zeroCapacityQuarantine.insert(createDisposedEvidence('sig-disposed', 'low'))
+      }).not.toThrow()
+      expect(zeroCapacityQuarantine.stats.droppedCount).toBe(1)
+    })
+
     it('drops incoming low-priority evidence under count pressure deterministically', () => {
       quarantine.insert(createEvidence('crit-1', 'critical', 100))
       quarantine.insert(createEvidence('high-1', 'high', 100))
@@ -143,6 +186,12 @@ describe('Quarantine', () => {
       expect(quarantine.has('low-new')).toBe(false)
       expect(quarantine.stats.count).toBe(5)
       expect(quarantine.stats.droppedCount).toBe(1)
+      expect(auditChain.export().at(-1)?.type).toBe('drop')
+      expect(JSON.parse(auditChain.export().at(-1)!.eventData)).toMatchObject({
+        type: 'drop',
+        signature: 'low-new',
+        details: { reason: 'pressure' },
+      })
     })
   })
 
@@ -276,9 +325,32 @@ describe('Quarantine', () => {
       expect(auditChain.length).toBe(1)
       expect(auditChain.export()[0]!.type).toBe('purge')
     })
+
+    it('returns null when purging unknown evidence', () => {
+      expect(quarantine.purge('missing', 'panic')).toBeNull()
+    })
+
+    it('best-effort purges already disposed evidence still present in quarantine', () => {
+      const disposed = createDisposedEvidence('sig-disposed', 'medium')
+      quarantine.insert(disposed)
+
+      expect(() => quarantine.purge('sig-disposed', 'abort')).not.toThrow()
+      expect(quarantine.has('sig-disposed')).toBe(false)
+    })
   })
 
   describe('decay', () => {
+    it('returns no decay work when TTL is disabled', async () => {
+      const result = await quarantine.decayExpired(10_000)
+
+      expect(result).toEqual({
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 0,
+        retainedCount: 0,
+      })
+    })
+
     it('decays expired evidence and archives it to cold storage', async () => {
       const coldStorage = new MemoryColdStorage()
       const expiringQuarantine = new Quarantine(
@@ -343,6 +415,257 @@ describe('Quarantine', () => {
       expect(result.decayedCount).toBe(0)
       expect(retainingQuarantine.has('sig-retain')).toBe(true)
     })
+
+    it('decays in expiry order and floors the decay batch size', async () => {
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          decayBatchSize: 2.9,
+          archiveOnDecay: false,
+        },
+        localAuditChain,
+        {
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-b', 'low', 64, 1_000))
+      expiringQuarantine.insert(createEvidence('sig-a', 'low', 64, 1_000))
+      expiringQuarantine.insert(createEvidence('sig-c', 'high', 64, 1_000))
+
+      const result = await expiringQuarantine.decayExpired()
+      const decays = localAuditChain.export().map((record) => JSON.parse(record.eventData))
+
+      expect(result.decayedCount).toBe(2)
+      expect(decays.map((record: { signature: string }) => record.signature)).toEqual(['sig-a', 'sig-b'])
+      expect(expiringQuarantine.has('sig-c')).toBe(true)
+    })
+
+    it('uses the default decay batch size when the configured value is invalid', async () => {
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 200,
+          maxBytes: 1_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          decayBatchSize: Number.NaN,
+          archiveOnDecay: false,
+        },
+        localAuditChain,
+        {
+          now: () => 200,
+        },
+      )
+
+      for (let index = 0; index < 130; index++) {
+        expiringQuarantine.insert(createEvidence(`sig-${index}`, 'low', 1, 0))
+      }
+
+      const result = await expiringQuarantine.decayExpired()
+
+      expect(result.decayedCount).toBe(128)
+      expect(expiringQuarantine.stats.count).toBe(2)
+    })
+
+    it('records a sanitized archive failure when cold storage is not configured', async () => {
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        localAuditChain,
+        {
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-no-storage', 'high', 64, 1_000))
+
+      const result = await expiringQuarantine.decayExpired()
+      const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+        details: { storageError: string | null }
+      }
+
+      expect(result.archiveFailureCount).toBe(1)
+      expect(decay.details.storageError).toBe('cold storage not configured')
+    })
+
+    it('records archive timeouts without leaking internal adapter details', async () => {
+      const hangingStorage = {
+        isAvailable: async () => true,
+        write: async () => new Promise<never>(() => {}),
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      }
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+          archiveTimeoutMs: 5,
+        },
+        localAuditChain,
+        {
+          coldStorage: hangingStorage,
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-timeout', 'high', 64, 1_000))
+
+      const result = await expiringQuarantine.decayExpired()
+      const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+        details: { storageError: string | null }
+      }
+
+      expect(result.archiveFailureCount).toBe(1)
+      expect(decay.details.storageError).toContain('archive timed out after 5ms')
+    })
+
+    it('sanitizes archive adapter errors before recording them', async () => {
+      const noisyStorage = {
+        isAvailable: async () => true,
+        write: async () => ({
+          success: false,
+          error:
+            'https://s3.internal.example/upload arn:aws:s3:::tracehound AKIAABCDEFGHIJKLMNOP extra-detail',
+        }),
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      }
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        localAuditChain,
+        {
+          coldStorage: noisyStorage,
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-sanitize', 'high', 64, 1_000))
+
+      await expiringQuarantine.decayExpired()
+      const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+        details: { storageError: string | null }
+      }
+
+      expect(decay.details.storageError).toContain('[endpoint]')
+      expect(decay.details.storageError).toContain('[arn]')
+      expect(decay.details.storageError).toContain('[key]')
+      expect(decay.details.storageError).not.toContain('https://s3.internal.example/upload')
+    })
+
+    it('falls back to a generic archive error when the adapter returns an empty error message', async () => {
+      const noisyStorage = {
+        isAvailable: async () => true,
+        write: async () => ({
+          success: false,
+          error: '',
+        }),
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      }
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        localAuditChain,
+        {
+          coldStorage: noisyStorage,
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-generic-error', 'high', 64, 1_000))
+
+      await expiringQuarantine.decayExpired()
+      const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+        details: { storageError: string | null }
+      }
+
+      expect(decay.details.storageError).toBe('storage write failed')
+    })
+
+    it('best-effort decays already disposed evidence still tracked by TTL', async () => {
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: false,
+        },
+        localAuditChain,
+        {
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createDisposedEvidence('sig-decayed', 'low', 64, 1_000))
+
+      const result = await expiringQuarantine.decayExpired()
+
+      expect(result.decayedCount).toBe(1)
+      expect(expiringQuarantine.stats.count).toBe(0)
+    })
+  })
+
+  describe('replace', () => {
+    it('inserts new evidence when the old signature does not exist', () => {
+      const replacement = createEvidence('sig-new', 'high')
+
+      const result = quarantine.replace('missing', replacement)
+
+      expect(result).toEqual({
+        status: 'inserted_only',
+        inserted: true,
+      })
+      expect(quarantine.has('sig-new')).toBe(true)
+    })
+
+    it('returns duplicate metadata when replacement insertion collides with existing evidence', () => {
+      quarantine.insert(createEvidence('sig-old', 'medium'))
+      const duplicate = createEvidence('sig-duplicate', 'high')
+      quarantine.insert(duplicate)
+
+      const replacement = createEvidence('sig-new', 'critical')
+      Object.defineProperty(replacement, '_signature', { value: 'sig-duplicate' })
+
+      const result = quarantine.replace('sig-old', replacement)
+
+      expect(result.status).toBe('replaced')
+      expect(result.inserted).toBe(false)
+      expect(result.duplicate).toBe(duplicate)
+    })
   })
 
   describe('eviction', () => {
@@ -381,6 +704,24 @@ describe('Quarantine', () => {
 
       expect(quarantine.stats.bytes).toBeLessThanOrEqual(10000)
       expect(quarantine.has('large')).toBe(true)
+    })
+
+    it('best-effort evicts already disposed evidence without aborting rebalancing', () => {
+      const tinyQuarantine = new Quarantine(
+        {
+          maxCount: 1,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+        },
+        auditChain,
+      )
+
+      tinyQuarantine.insert(createDisposedEvidence('sig-evict', 'low'))
+
+      expect(() => {
+        tinyQuarantine.insert(createEvidence('sig-keep', 'high', 64))
+      }).not.toThrow()
+      expect(tinyQuarantine.has('sig-keep')).toBe(true)
     })
   })
 

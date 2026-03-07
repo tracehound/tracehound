@@ -76,6 +76,12 @@ describe('Evidence', () => {
       expect(evidence.captured).toBe(captured)
       expect(evidence.size).toBe(validBytes.byteLength)
     })
+
+    it('exposes whether evidence bytes were stored in compressed form', () => {
+      const evidence = new Evidence(validBytes, validSignature, validHash, 'high', Date.now(), true)
+
+      expect(evidence.compressed).toBe(true)
+    })
   })
 
   describe('transfer', () => {
@@ -196,6 +202,13 @@ describe('Evidence', () => {
       const record = evidence.evacuate('s3://bucket/path')
 
       expect(record.compressed).toBe(false) // Phase 3
+    })
+
+    it('uses the injected clock for evacuation timestamps', () => {
+      const evidence = new Evidence(validBytes, validSignature, validHash, 'high', 1000, false, () => 4242)
+      const record = evidence.evacuate('s3://bucket/path')
+
+      expect(record.timestamp).toBe(4242)
     })
   })
 

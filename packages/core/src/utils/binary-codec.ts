@@ -7,7 +7,7 @@
  * - Agent / Hound Pool MUST NOT have access to decode
  *
  * INTEGRITY INVARIANT (Cold Storage):
- * - Always call verify() BEFORE decode()
+ * - Verify integrity before any manual decompression path
  * - Decoding without verification is a DoS vector
  * - Empty payloads are VALID (originalSize=0, compressedSize>0)
  */
@@ -305,8 +305,9 @@ export function encodeWithIntegrity(payload: Uint8Array): EncodedPayload {
 /**
  * Verify integrity of encoded payload.
  *
- * MUST be called BEFORE decodeWithIntegrity().
- * This is a cheap operation (hash only, no decompression).
+ * This is a cheap operation (hash only, no decompression) and is useful when
+ * callers need an explicit integrity decision before attempting any manual
+ * decompression or before calling decodeWithIntegrity*().
  *
  * @param encoded - Payload to verify
  * @returns true if hash matches, false if tampered
@@ -320,8 +321,8 @@ export function verify(encoded: EncodedPayload): boolean {
  * Decode payload from cold storage.
  *
  * Internally enforces integrity verification before decompression.
- * Throws CodecError with INTEGRITY_VIOLATION if hash does not match —
- * caller must not catch and suppress this error.
+ * Integrity violations indicate untrusted or corrupted input and should be
+ * treated as fatal to the decode attempt.
  *
  * @param encoded - Encoded payload to decode
  * @returns Original uncompressed bytes
@@ -395,8 +396,8 @@ export async function encodeWithIntegrityAsync(
  * Non-blocking version of decodeWithIntegrity().
  *
  * Internally enforces integrity verification before decompression.
- * Throws CodecError with INTEGRITY_VIOLATION if hash does not match —
- * caller must not catch and suppress this error.
+ * Integrity violations indicate untrusted or corrupted input and should be
+ * treated as fatal to the decode attempt.
  *
  * @param encoded - Encoded payload to decode
  * @returns Original uncompressed bytes

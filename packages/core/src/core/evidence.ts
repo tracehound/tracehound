@@ -154,7 +154,7 @@ export class Evidence implements EvidenceHandle {
       id: generateSecureId(),
       signature: this._signature,
       destination,
-      timestamp: Date.now(),
+      timestamp: this._now(),
       compressed: this._compressed,
       size: this._bytes!.byteLength,
     }

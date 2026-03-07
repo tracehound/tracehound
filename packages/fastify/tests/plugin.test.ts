@@ -327,6 +327,64 @@ describe('tracehoundPlugin', () => {
       expect(scent.ingressBytes).toBeInstanceOf(Uint8Array)
       expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
     })
+
+    it('captures string request bodies into ingressBytes when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        body: 'plain-text-body' as unknown as FastifyRequest['body'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('plain-text-body')
+    })
+
+    it('captures Uint8Array request bodies into ingressBytes when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        body: new Uint8Array([1, 2, 3]) as unknown as FastifyRequest['body'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Array.from(scent.ingressBytes as Uint8Array)).toEqual([1, 2, 3])
+    })
+
+    it('captures ArrayBuffer request bodies into ingressBytes when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+      const bytes = new Uint8Array([4, 5, 6])
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        body: bytes.buffer.slice(0) as unknown as FastifyRequest['body'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Array.from(scent.ingressBytes as Uint8Array)).toEqual([4, 5, 6])
+    })
   })
 
   it('should use custom extractScent', () => {
@@ -413,5 +471,22 @@ describe('tracehoundPlugin', () => {
 
     expect(next).toHaveBeenCalled()
     expect(reply.status).not.toHaveBeenCalled()
+  })
+
+  it('falls through unexpected intercept statuses without mutating the reply', () => {
+    const agent = createMockAgent({ status: 'unexpected' } as unknown as InterceptResult)
+    const fastify = createMockFastify()
+    const next = vi.fn()
+
+    tracehoundPlugin(fastify as any, { agent }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, next)
+
+    expect(reply.status).not.toHaveBeenCalled()
+    expect(next).not.toHaveBeenCalled()
   })
 })

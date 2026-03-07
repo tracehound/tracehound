@@ -245,6 +245,55 @@ describe('tracehound middleware', () => {
       expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
     })
 
+    it('captures string request bodies into ingressBytes when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+
+      middleware(
+        createMockReq({
+          body: 'plain-text-body' as unknown as Request['body'],
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('plain-text-body')
+    })
+
+    it('captures Uint8Array request bodies into ingressBytes when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+
+      middleware(
+        createMockReq({
+          body: new Uint8Array([1, 2, 3]) as unknown as Request['body'],
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Array.from(scent.ingressBytes as Uint8Array)).toEqual([1, 2, 3])
+    })
+
+    it('captures ArrayBuffer request bodies into ingressBytes when rawBody is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+      const bytes = new Uint8Array([4, 5, 6])
+
+      middleware(
+        createMockReq({
+          body: bytes.buffer.slice(0) as unknown as Request['body'],
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Array.from(scent.ingressBytes as Uint8Array)).toEqual([4, 5, 6])
+    })
+
     it('should use defaultOnIntercept when result is blocked', () => {
       const agent = createMockAgent({ status: 'rate_limited', retryAfter: 2000 })
       const middleware = tracehound({ agent })
@@ -254,6 +303,17 @@ describe('tracehound middleware', () => {
 
       expect(res.status).toHaveBeenCalledWith(429)
       expect(res.set).toHaveBeenCalledWith('Retry-After', '2')
+    })
+
+    it('falls through unexpected intercept statuses without mutating the response', () => {
+      const agent = createMockAgent({ status: 'unexpected' } as unknown as InterceptResult)
+      const middleware = tracehound({ agent })
+      const res = createMockRes()
+
+      middleware(createMockReq(), res, next)
+
+      expect(res.status).not.toHaveBeenCalled()
+      expect(next).not.toHaveBeenCalled()
     })
   })
 

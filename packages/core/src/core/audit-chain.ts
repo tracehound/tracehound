@@ -153,6 +153,10 @@ export class AuditChain implements IAuditChain {
   }
 
   private shouldSealBeforeAppend(timestamp: number): boolean {
+    if (this.maxRecords > 0 && this.pendingEvents.length >= this.maxRecords) {
+      return true
+    }
+
     const firstPending = this.pendingEvents[0]
     if (!firstPending) {
       return false
@@ -201,10 +205,7 @@ export class AuditChain implements IAuditChain {
 
     this._lastHash = chainHash
 
-    // FIFO rotation: evict oldest records when cap exceeded.
-    if (this.maxRecords > 0 && this.records.length > this.maxRecords) {
-      this.records.splice(0, this.records.length - this.maxRecords)
-    }
+    this.enforceMaxRecords()
   }
 
   private collectBatch(startIndex: number, batchId: string): AuditRecord[] {
@@ -227,6 +228,46 @@ export class AuditChain implements IAuditChain {
     }
 
     return createHash('sha256').update(data).digest('hex')
+  }
+
+  private enforceMaxRecords(): void {
+    if (this.maxRecords <= 0 || this.records.length <= this.maxRecords) {
+      return
+    }
+
+    let removeCount = 0
+
+    while (this.records.length - removeCount > this.maxRecords) {
+      const nextBatchBoundary = this.findNextBatchBoundary(removeCount)
+      if (nextBatchBoundary >= this.records.length) {
+        // Defensive fallback for legacy/injected oversized single-batch state:
+        // drop the remaining segment to restore the configured bound.
+        removeCount = this.records.length
+        break
+      }
+
+      removeCount = nextBatchBoundary
+    }
+
+    if (removeCount > 0) {
+      this.records.splice(0, removeCount)
+    }
+  }
+
+  private findNextBatchBoundary(startIndex: number): number {
+    const firstRecord = this.records[startIndex]
+    if (!firstRecord) {
+      return this.records.length
+    }
+
+    const batchId = firstRecord.batchId
+    let index = startIndex
+
+    while (index < this.records.length && this.records[index]?.batchId === batchId) {
+      index++
+    }
+
+    return index
   }
 }
 

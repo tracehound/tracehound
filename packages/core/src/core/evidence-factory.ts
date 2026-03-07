@@ -167,11 +167,15 @@ export class EvidenceFactory implements IEvidenceFactory {
 
 function normalizeIngressBytes(input: Scent['ingressBytes']): Uint8Array | null {
   if (input instanceof Uint8Array) {
-    return new Uint8Array(input)
+    // Reuse existing view; Evidence construction performs the single
+    // defensive copy for ownership isolation.
+    return input
   }
 
   if (input instanceof ArrayBuffer) {
-    return new Uint8Array(input.slice(0))
+    // Create a view without copying; Evidence construction performs the
+    // defensive copy.
+    return new Uint8Array(input)
   }
 
   return null

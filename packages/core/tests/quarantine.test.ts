@@ -426,6 +426,70 @@ describe("Quarantine", () => {
       expect(retainingQuarantine.has("sig-retain")).toBe(true);
     });
 
+    it("does not re-track retain failures when evidence is removed during in-flight archival", async () => {
+      let releaseWrite: (() => void) | null = null;
+      let notifyWriteStarted: (() => void) | null = null;
+      const writeStarted = new Promise<void>((resolve) => {
+        notifyWriteStarted = resolve;
+      });
+
+      const delayedFailingStorage = {
+        isAvailable: async () => true,
+        write: async () => {
+          notifyWriteStarted?.();
+          await new Promise<void>((resolve) => {
+            releaseWrite = resolve;
+          });
+          return {
+            success: false,
+            error: "offline",
+          };
+        },
+        read: async () => ({ success: false, error: "offline" }),
+        delete: async () => false,
+      };
+
+      const retainingQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: "priority",
+          ttlMs: 100,
+          decayBatchSize: 10,
+          archiveOnDecay: true,
+          archiveFailureMode: "retain",
+        },
+        auditChain,
+        {
+          coldStorage: delayedFailingStorage,
+          now: () => 1_500,
+        },
+      );
+
+      retainingQuarantine.insert(createEvidence("sig-race", "high", 256, 1_000));
+
+      const decayPromise = retainingQuarantine.decayExpired();
+      await writeStarted;
+
+      const neutralized = retainingQuarantine.neutralize("sig-race");
+      releaseWrite?.();
+
+      const result = await decayPromise;
+      const internals = retainingQuarantine as unknown as {
+        expirations: Map<string, number>;
+      };
+
+      expect(neutralized).not.toBeNull();
+      expect(result).toEqual({
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 0,
+        retainedCount: 0,
+      });
+      expect(retainingQuarantine.stats.archiveFailureCount).toBe(0);
+      expect(internals.expirations.has("sig-race")).toBe(false);
+    });
+
     it("decays in expiry order and floors the decay batch size", async () => {
       const localAuditChain = new AuditChain();
       const expiringQuarantine = new Quarantine(
@@ -484,6 +548,37 @@ describe("Quarantine", () => {
 
       expect(result.decayedCount).toBe(128);
       expect(expiringQuarantine.stats.count).toBe(2);
+    });
+
+    it("self-heals stale expiry entries that have no backing evidence", async () => {
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: "priority",
+          ttlMs: 100,
+          archiveOnDecay: false,
+        },
+        auditChain,
+        {
+          now: () => 1_500,
+        },
+      );
+
+      const internals = expiringQuarantine as unknown as {
+        expirations: Map<string, number>;
+      };
+      internals.expirations.set("ghost-signature", 1_000);
+
+      const result = await expiringQuarantine.decayExpired();
+
+      expect(result).toEqual({
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 0,
+        retainedCount: 0,
+      });
+      expect(internals.expirations.has("ghost-signature")).toBe(false);
     });
 
     it("records a sanitized archive failure when cold storage is not configured", async () => {

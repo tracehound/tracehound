@@ -73,6 +73,7 @@ const SEVERITY_RANK: Record<Severity, number> = {
 export class Quarantine {
   private store = new Map<string, EvidenceHandle>()
   private readonly expirations = new Map<string, number>()
+  private readonly decayingSignatures = new Set<string>()
   private totalBytes = 0
   private droppedCount = 0
   private droppedBytes = 0
@@ -497,9 +498,16 @@ export class Quarantine {
 
     for (const [signature, expiry] of this.expirations) {
       if (expiry <= now) {
+        if (this.decayingSignatures.has(signature)) {
+          continue
+        }
+
         const evidence = this.store.get(signature)
         if (evidence) {
           candidates.push(evidence)
+        } else {
+          // Self-heal TTL index when backing evidence has already been removed.
+          this.expirations.delete(signature)
         }
       }
     }
@@ -527,73 +535,101 @@ export class Quarantine {
     evidence: EvidenceHandle,
     now: number,
   ): Promise<DecayResult> {
+    if (!this.store.has(evidence.signature) || this.decayingSignatures.has(evidence.signature)) {
+      return {
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 0,
+        retainedCount: 0,
+      }
+    }
+
+    this.decayingSignatures.add(evidence.signature)
+
     // Remove from expirations synchronously before the first await so that
     // concurrent decayExpired() calls (e.g. from back-to-back scheduler ticks)
     // cannot re-select this entry while archival is in flight.
     this.expirations.delete(evidence.signature)
 
-    const archiveAttempted = this.config.archiveOnDecay !== false
-    let archived = false
-    let storageId: string | undefined
-    let storageError: string | undefined
-
-    if (archiveAttempted) {
-      const archiveResult = await this.archiveEvidence(evidence)
-      archived = archiveResult.archived
-      storageId = archiveResult.storageId
-      storageError = archiveResult.storageError
-    }
-
-    if (archiveAttempted && !archived && this.config.archiveFailureMode === 'retain') {
-      // Re-track expiry so the entry is retried on the next decay cycle.
-      this.trackExpiry(evidence)
-      this.archiveFailureCount++
-      return {
-        decayedCount: 0,
-        archivedCount: 0,
-        archiveFailureCount: 1,
-        retainedCount: 1,
-      }
-    }
-
-    const record: DecayRecord = {
-      id: `dcy-${generateSecureId()}`,
-      signature: evidence.signature,
-      hash: evidence.hash,
-      size: evidence.size,
-      status: 'decayed',
-      reason: 'ttl_expired',
-      timestamp: now,
-      previousHash: this.auditChain.lastHash,
-      archived,
-      storageId,
-      storageError,
-    }
-
-    this.auditChain.append(record)
-
     try {
-      evidence.transfer()
-    } catch {
-      // Best-effort disposal only.
-    }
+      const archiveAttempted = this.config.archiveOnDecay !== false
+      let archived = false
+      let storageId: string | undefined
+      let storageError: string | undefined
 
-    this.store.delete(evidence.signature)
-    this.expirations.delete(evidence.signature)
-    this.totalBytes -= record.size
-    this.decayedCount++
+      if (archiveAttempted) {
+        const archiveResult = await this.archiveEvidence(evidence)
+        archived = archiveResult.archived
+        storageId = archiveResult.storageId
+        storageError = archiveResult.storageError
+      }
 
-    if (archived) {
-      this.archivedCount++
-    } else if (archiveAttempted) {
-      this.archiveFailureCount++
-    }
+      if (archiveAttempted && !archived && this.config.archiveFailureMode === 'retain') {
+        // Evidence may have been removed while archival was in-flight.
+        const current = this.store.get(evidence.signature)
+        const stillOwned = current === evidence && !evidence.disposed
 
-    return {
-      decayedCount: 1,
-      archivedCount: archived ? 1 : 0,
-      archiveFailureCount: archiveAttempted && !archived ? 1 : 0,
-      retainedCount: 0,
+        if (stillOwned) {
+          // Re-track expiry so the entry is retried on the next decay cycle.
+          this.trackExpiry(evidence)
+          this.archiveFailureCount++
+          return {
+            decayedCount: 0,
+            archivedCount: 0,
+            archiveFailureCount: 1,
+            retainedCount: 1,
+          }
+        }
+
+        return {
+          decayedCount: 0,
+          archivedCount: 0,
+          archiveFailureCount: 0,
+          retainedCount: 0,
+        }
+      }
+
+      const record: DecayRecord = {
+        id: `dcy-${generateSecureId()}`,
+        signature: evidence.signature,
+        hash: evidence.hash,
+        size: evidence.size,
+        status: 'decayed',
+        reason: 'ttl_expired',
+        timestamp: now,
+        previousHash: this.auditChain.lastHash,
+        archived,
+        storageId,
+        storageError,
+      }
+
+      this.auditChain.append(record)
+
+      try {
+        evidence.transfer()
+      } catch {
+        // Best-effort disposal only.
+      }
+
+      this.store.delete(evidence.signature)
+      this.expirations.delete(evidence.signature)
+      this.totalBytes -= record.size
+      this.decayedCount++
+
+      if (archived) {
+        this.archivedCount++
+      } else if (archiveAttempted) {
+        this.archiveFailureCount++
+      }
+
+      return {
+        decayedCount: 1,
+        archivedCount: archived ? 1 : 0,
+        archiveFailureCount: archiveAttempted && !archived ? 1 : 0,
+        retainedCount: 0,
+      }
+    } finally {
+      this.decayingSignatures.delete(evidence.signature)
     }
   }
 

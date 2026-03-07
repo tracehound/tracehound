@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-03-07 - Memory Safety and Cryptographic RNG Hardening
+
+## Release Notes
+
+Targeted security hardening pass on two latent vulnerability classes in the core runtime: uninitialized-memory disclosure via `Buffer.allocUnsafe` in IPC encoding paths, and weak RNG via `Math.random()` in forensic ID construction. No public API changes. No breaking changes.
+
+### Hardened
+
+- **IPC buffer allocation** (`hound-ipc.ts`): Replaced `Buffer.allocUnsafe` with `Buffer.alloc` across all four IPC message encoding paths. `allocUnsafe` can expose stale heap memory to child processes; zero-initialized allocation eliminates the uninitialized-memory disclosure class entirely.
+- **Forensic RNG** (`quarantine.ts`): Replaced `Math.random()` with `generateSecureId()` for `PurgeRecord` ID construction. All forensic pipeline identifiers now use crypto-strength randomness end-to-end.
+
+### Documentation
+
+- `security/crypto-review.md`: Added webhook secret key rotation policy.
+- `security/logging-model.md`: Closed log injection verification — all 5 test cases pass; no user-controlled data reaches any log sink.
+- `security/memory-buffer-audit.md`: Updated with `allocUnsafe` → `alloc` migration rationale and affected paths.
+
+### Supply Chain
+
+- Added `security/artifacts/dependency-tree.txt`, `pnpm-audit.json`, `sbom.cdx.json`. `pnpm audit --prod` reports 0 vulnerabilities at time of release.
+
 ## [1.6.0] - 2026-03-06 - Operational Truth, Deterministic Analysis, and Release Readiness
 
 ## Release Notes

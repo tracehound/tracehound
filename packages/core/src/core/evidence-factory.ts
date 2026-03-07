@@ -179,13 +179,13 @@ function normalizeIngressBytes(
   if (input instanceof Uint8Array) {
     // Reuse existing view; Evidence construction performs the single
     // defensive copy for ownership isolation.
-    return input.byteLength > 0 ? input : null;
+    return input;
   }
 
   if (input instanceof ArrayBuffer) {
     // Create a view without copying; Evidence construction performs the
     // defensive copy.
-    return input.byteLength > 0 ? new Uint8Array(input) : null;
+    return new Uint8Array(input);
   }
 
   return null;

@@ -25,11 +25,11 @@ Validate cryptographic usage for forensic integrity claims.
 
 ## Webhook Secret Key Rotation Policy
 
-Enforcement point: `notification-emitter.ts` — HMAC-SHA256 signing, minimum 16-char secret required at construction time.
+Enforcement point: `notification-emitter.ts` — HMAC-SHA256 signing; when a secret is configured, a minimum 16-char secret is enforced (secret is optional in `WebhookConfig`).
 
 ### Secret requirements
 
-- Minimum 16 characters enforced at construction; recommended minimum is 32 random bytes (256-bit).
+- When a secret is set, a minimum of 16 characters is enforced; recommended minimum is 32 random bytes (256-bit).
 - Generate with `crypto.randomBytes(32).toString('hex')` — never a passphrase or human-readable string.
 - Store in an environment variable or secrets manager (Vault, AWS SSM); never hardcode in source or config.
 

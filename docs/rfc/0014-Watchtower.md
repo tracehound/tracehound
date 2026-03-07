@@ -167,7 +167,7 @@ interface EvidenceMetadata {
 }
 ```
 
-### 4. Module Plugin Contract
+### 6. Module Plugin Contract
 
 Every satellite module that integrates with Watchtower implements `WatchtowerModule`:
 
@@ -203,7 +203,7 @@ interface ModuleHealth {
 - `'auto'` — module hooks into runtime without user code changes (e.g., Argos).
 - `'manual'` — module requires user to add imports or config; documentation is shown post-activation.
 
-### 5. Module Catalog
+### 7. Module Catalog
 
 Watchtower includes a Modules page. Each available module is presented as a card:
 
@@ -247,7 +247,7 @@ Card content is synchronized with tracehoundlabs.com (same title, summary, and f
 4. On confirm: module stopped → UI panels removed → package unlinked → hub restarted.
 5. Subscription line item removed; takes effect next billing cycle.
 
-### 6. Hub Core Capabilities
+### 8. Hub Core Capabilities
 
 These are always present regardless of which modules are installed:
 
@@ -263,7 +263,7 @@ These are always present regardless of which modules are installed:
 | RBAC | Role-based access control; audit log of all Watchtower actions |
 | Billing & subscription | Active modules, payment method, invoice history |
 
-### 7. Policy Engine
+### 9. Policy Engine
 
 Watchtower authors policy; core executes it deterministically. The core is never aware of "why" a threshold was set — it only sees the committed config.
 
@@ -282,7 +282,7 @@ interface EscalationRule {
 
 Blocklist entries are pushed to core via `CoreConfigPush`. Core applies them as deterministic quarantine rules — same fail-open semantics apply. Blocklist push failure does not interrupt host request flow.
 
-### 8. Forensic Readiness Score (FRS)
+### 10. Forensic Readiness Score (FRS)
 
 FRS is Watchtower's composite score, computed from primitives emitted by core via `CoreTelemetryFrame.readiness`:
 
@@ -295,15 +295,15 @@ FRS is Watchtower's composite score, computed from primitives emitted by core vi
 
 FRS is computed in Watchtower, never in core. Core emits raw primitives; scoring algorithm is a Watchtower concern and may evolve without core changes.
 
-### 11. Multi-Instance Support
+### 12. Multi-Instance Support
 
 Phase 1 (MVP): single instance. Watchtower connects to one core agent.
 
-Phase 3: Watchtower receives `CoreTelemetryFrame` from multiple instances (identified by `instanceId`). Dashboard shows per-instance panels and aggregate FRS. Policy pushes are broadcast to all registered instances.
+Phase 2: Watchtower receives `CoreTelemetryFrame` from multiple instances (identified by `instanceId`). Dashboard shows per-instance panels and aggregate FRS. Policy pushes are broadcast to all registered instances.
 
 Instance registration is coordinated via `packages/coordination` (RFC-0009 native implementation).
 
-### 12. License Enforcement
+### 13. License Enforcement
 
 Watchtower is commercial software distributed as a compiled binary. Protection is layered across three mechanisms.
 
@@ -356,7 +356,7 @@ Customers can verify binary authenticity before deployment. Tampering invalidate
 
 Module availability is resolved from the license token at startup. A module not listed in `token.modules` does not appear in the catalog and cannot be activated, regardless of whether its package is present on disk.
 
-### 13. Phased Implementation
+### 14. Phased Implementation
 
 | Phase | Scope |
 | --- | --- |

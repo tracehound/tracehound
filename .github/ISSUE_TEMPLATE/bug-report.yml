@@ -1,0 +1,112 @@
+name: Bug report
+description: Report a reproducible defect or regression in Tracehound.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a defect.
+
+        Before filing:
+        - Confirm the issue is reproducible on a supported release.
+        - Search for an existing report.
+        - If this is a vulnerability or sensitive security concern, do not open a public issue. Follow [SECURITY.md](../../SECURITY.md).
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I can reproduce this on the latest released version that applies to my package.
+          required: true
+        - label: This is not a sensitive security disclosure covered by SECURITY.md.
+          required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Affected package
+      options:
+        - "@tracehound/core"
+        - "@tracehound/express"
+        - "@tracehound/fastify"
+        - "@tracehound/cli"
+        - docs
+        - ci/release
+        - other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Affected version
+      description: Package version, git ref, or container tag.
+      placeholder: "e.g. 1.6.1"
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the failure in one or two sentences.
+      placeholder: A concise description of the defect.
+    validations:
+      required: true
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Current behavior
+      placeholder: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected_behavior
+    attributes:
+      label: Expected behavior
+      placeholder: What should have happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide exact steps, a minimal repro repo, or a focused code sample.
+      placeholder: |
+        1. Install ...
+        2. Configure ...
+        3. Call ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or stack traces
+      description: Redact secrets and payload data before posting.
+      render: shell
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include runtime and toolchain details.
+      value: |
+        - OS:
+        - Node.js:
+        - pnpm:
+        - Framework/runtime:
+        - Deployment target:
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - low
+        - medium
+        - high
+        - critical
+    validations:
+      required: true

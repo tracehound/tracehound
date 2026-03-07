@@ -12,15 +12,9 @@ The system does not classify threats or enforce policies. Instead, it guarantees
 
 [![Advanced CodeQL Analysis](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml)
 [![Semgrep Security Analysis](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml)
-[![CodeQL](https://github.com/tracehound/tracehound/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/github-code-scanning/codeql)
-[![Dependabot Updates](https://github.com/tracehound/tracehound/actions/workflows/dependabot/dependabot-updates/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/dependabot/dependabot-updates)
-[![PR CI](https://github.com/tracehound/tracehound/actions/workflows/ci-pr.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/ci-pr.yml)
-[![Main CI](https://github.com/tracehound/tracehound/actions/workflows/ci-main.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/ci-main.yml)
 [![Paranoid Validation](https://github.com/tracehound/tracehound/actions/workflows/security-paranoid.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/security-paranoid.yml)
-[![Chaos Suite](https://github.com/tracehound/tracehound/actions/workflows/chaos-verify.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/chaos-verify.yml)
-[![Copilot code review](https://github.com/tracehound/tracehound/actions/workflows/copilot-pull-request-reviewer/copilot-pull-request-reviewer/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/copilot-pull-request-reviewer/copilot-pull-request-reviewer)
+[![CodeCov](https://codecov.io/github/tracehound/tracehound/tree/main/badge.svg)](<https://codecov.io/github/tracehound/tracehound/tree/main/badge.svg)>)
 [![License: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/license/apache-2-0)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 
 [Official Website](https://tracehoundlabs.com) · [Documentation](./docs/README.md) · [Migration Guide](./docs/BREAKING-CHANGES.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
@@ -29,7 +23,7 @@ The system does not classify threats or enforce policies. Instead, it guarantees
 
 ## About the Project
 
-Tracehound is a deterministic runtime security substrate. It doesn't use heuristics or "guess" if a request is malicious; instead, it acts as a high-integrity buffer for explicit security signals (Scents) from external detectors. By quarantining suspicious events and preserving them in a tamper-evident AuditChain, Tracehound ensures that security events are forever auditable without disrupting production traffic.
+Tracehound doesn't use heuristics or "guess" if a request is malicious; instead, it acts as a high-integrity buffer for explicit security signals (Scents) from external detectors. By quarantining suspicious events and preserving them in a tamper-evident AuditChain, Tracehound ensures that security events are forever auditable without disrupting production traffic.
 
 ## Why we built this
 
@@ -123,22 +117,17 @@ app.register(tracehoundPlugin, { agent: th.agent });
 
 ## Architecture
 
-```
-        External Detector (WAF, SIEM, ML)
-                      │
-                      ▼
-┌───────────────────────────────────────────────┐
-│                   TRACEHOUND                  │
-├───────────────────────────────────────────────┤
-│  Agent         → Traffic orchestrator         │
-│  Quarantine    → Evidence buffer              │
-│  AuditChain    → Tamper-evident log           │
-│  HoundPool     → Process-separated analysis   │
-│  Scheduler     → Jittered background          │
-│  Notifications → Universal events             │
-│  SecurityState → Unified metrics              │
-└───────────────────────────────────────────────┘
-```
+1. External Detector (WAF, SIEM, ML)
+
+2. Tracehound
+
+    - Agent         → Traffic orchestrator
+    - Quarantine    → Evidence buffer
+    - AuditChain    → Tamper-evident log
+    - HoundPool     → Process-separated analysis
+    - Scheduler     → Jittered background
+    - Notifications → Universal events
+    - SecurityState → Unified metrics
 
 ---
 

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security disclosure
+    url: https://github.com/tracehound/tracehound/security/policy
+    about: Report vulnerabilities privately using the repository security policy.
+  - name: Documentation index
+    url: https://github.com/tracehound/tracehound/blob/main/docs/README.md
+    about: Check the docs before opening a question or support issue.

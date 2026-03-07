@@ -3,6 +3,7 @@ node_modules/
 .pnpm-store/
 .agent/
 .cursor/
+.codex/
 
 # Build output
 dist/
@@ -36,4 +37,4 @@ pnpm-debug.log*
 # Internal Files and Folders
 internal/
 AGENTS.md
-.codex/
+CLAUDE.md

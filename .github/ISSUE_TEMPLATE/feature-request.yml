@@ -1,0 +1,80 @@
+name: Feature request
+description: Propose a new capability or improvement for Tracehound.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for product or developer-experience improvements.
+
+        Tracehound is decision-free by design. Requests that add threat detection logic to core are out of scope unless backed by an RFC that preserves project invariants.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I searched existing issues and did not find the same request.
+          required: true
+        - label: This request aligns with Tracehound's decision-free, fail-open design constraints.
+          required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Requested scope
+      options:
+        - "@tracehound/core"
+        - "@tracehound/express"
+        - "@tracehound/fastify"
+        - "@tracehound/cli"
+        - docs
+        - ci/release
+        - architecture/rfc
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What concrete user or operator problem are you trying to solve?
+      placeholder: Describe the gap or friction.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      placeholder: Describe the capability you want and how it should behave.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds, competing approaches, or why current behavior is insufficient.
+  - type: textarea
+    id: rationale
+    attributes:
+      label: RFC or design rationale
+      description: Required for core architecture or behavior changes; otherwise provide brief reasoning.
+      placeholder: Link the relevant RFC, issue, or design notes.
+    validations:
+      required: true
+  - type: dropdown
+    id: breaking_change
+    attributes:
+      label: Breaking change risk
+      options:
+        - none known
+        - possible
+        - likely
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation idea
+      description: How should this be tested or evaluated if implemented?
+      placeholder: Unit/integration coverage, scenario validation, docs update, benchmark, etc.

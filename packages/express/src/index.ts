@@ -50,6 +50,8 @@ export interface TracehoundMiddlewareOptions {
   onIntercept?: (result: InterceptResult, req: Request, res: Response) => void;
 }
 
+const textEncoder = new TextEncoder()
+
 /**
  * Defensive clone for safely copying deeply nested or cyclical external payloads
  * without crashing the process.
@@ -65,19 +67,22 @@ function safeClone(obj: unknown): JsonSerializable | undefined {
 
 function toIngressBytes(value: unknown): Uint8Array | undefined {
   if (typeof value === 'string') {
-    return new TextEncoder().encode(value)
+    return textEncoder.encode(value)
   }
 
   if (Buffer.isBuffer(value)) {
-    return new Uint8Array(value)
+    // Create a zero-copy Uint8Array view over the Buffer's underlying memory.
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
   }
 
   if (value instanceof Uint8Array) {
-    return new Uint8Array(value)
+    // Reuse existing bytes; core performs the single defensive copy.
+    return value
   }
 
   if (value instanceof ArrayBuffer) {
-    return new Uint8Array(value.slice(0))
+    // Create a view without copying; core performs the single defensive copy.
+    return new Uint8Array(value)
   }
 
   return undefined

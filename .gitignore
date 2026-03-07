@@ -4,6 +4,7 @@ node_modules/
 .agent/
 .cursor/
 .codex/
+.claude/
 
 # Build output
 dist/

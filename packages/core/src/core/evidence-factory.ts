@@ -191,10 +191,29 @@ function normalizeIngressBytes(
   return null;
 }
 
+/**
+ * Sentinel payload for zero-length ingress bodies.
+ * An empty rawBody (e.g. body-less POST, content-length:0 probe) is a
+ * legitimate forensic signal — it must not be silently dropped or
+ * converted to a null fallback. The sentinel produces a deterministic,
+ * non-zero-length Evidence so the event is hashed, signed, and preserved
+ * in the audit chain like any other threat artifact.
+ */
+const EMPTY_INGRESS_SENTINEL = new TextEncoder().encode(
+  '{"__th_empty_ingress":true}',
+);
+
 function encodeIngressBytes(
   bytes: Uint8Array,
   maxPayloadSize: number,
 ): { bytes: Uint8Array; size: number } {
+  if (bytes.byteLength === 0) {
+    return {
+      bytes: EMPTY_INGRESS_SENTINEL,
+      size: EMPTY_INGRESS_SENTINEL.byteLength,
+    };
+  }
+
   if (bytes.byteLength > maxPayloadSize) {
     throw Errors.payloadTooLarge(bytes.byteLength, maxPayloadSize);
   }

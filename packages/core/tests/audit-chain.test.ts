@@ -4,6 +4,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { AuditChain, GENESIS_HASH } from '../src/core/audit-chain.js'
+import type { AuditRecord } from '../src/types/audit.js'
 import type { NeutralizationRecord } from '../src/types/evidence.js'
 
 function createRecord(id: string, overrides?: Partial<NeutralizationRecord>): NeutralizationRecord {
@@ -122,27 +123,36 @@ describe('AuditChain', () => {
 
     it('rejects verification when an event hash is tampered', () => {
       chain.append(createRecord('tamper-hash'))
-      const exported = chain.export()
-
-      exported[0]!.eventHash = 'f'.repeat(64)
+      chain.flushPending()
+      const internal = chain as unknown as { records: AuditRecord[] }
+      internal.records[0] = {
+        ...internal.records[0]!,
+        eventHash: 'f'.repeat(64),
+      }
 
       expect(chain.verify()).toBe(false)
     })
 
     it('rejects verification when a batch root is tampered', () => {
       chain.append(createRecord('tamper-root'))
-      const exported = chain.export()
-
-      exported[0]!.batchRoot = 'a'.repeat(64)
+      chain.flushPending()
+      const internal = chain as unknown as { records: AuditRecord[] }
+      internal.records[0] = {
+        ...internal.records[0]!,
+        batchRoot: 'a'.repeat(64),
+      }
 
       expect(chain.verify()).toBe(false)
     })
 
     it('rejects verification when batch metadata no longer matches the chain hash', () => {
       chain.append(createRecord('tamper-link'))
-      const exported = chain.export()
-
-      exported[0]!.batchIndex = 9
+      chain.flushPending()
+      const internal = chain as unknown as { records: AuditRecord[] }
+      internal.records[0] = {
+        ...internal.records[0]!,
+        batchIndex: 9,
+      }
 
       expect(chain.verify()).toBe(false)
     })
@@ -171,6 +181,24 @@ describe('AuditChain', () => {
 
       expect(exported1).not.toBe(exported2)
       expect(exported1).toEqual(exported2)
+    })
+
+    it('returns immutable records that cannot mutate chain state', () => {
+      chain.append(createRecord('immutable-export'))
+
+      const exported = chain.export()
+      const originalEventHash = exported[0]!.eventHash
+
+      expect(Object.isFrozen(exported[0])).toBe(true)
+
+      try {
+        exported[0]!.eventHash = 'f'.repeat(64)
+      } catch {
+        // Assignment can throw in strict mode for frozen records.
+      }
+
+      expect(exported[0]!.eventHash).toBe(originalEventHash)
+      expect(chain.verify()).toBe(true)
     })
 
     it('includes hash and previousHash', () => {

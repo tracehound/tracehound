@@ -66,6 +66,16 @@ const SEVERITY_RANK: Record<Severity, number> = {
   critical: 3,
 }
 
+class ArchiveTimeoutError extends Error {
+  readonly timeoutMs: number
+
+  constructor(timeoutMs: number) {
+    super('archive timeout')
+    this.name = 'ArchiveTimeoutError'
+    this.timeoutMs = timeoutMs
+  }
+}
+
 /**
  * Quarantine storage with priority-based eviction.
  * Stores evidence by signature and evicts lowest priority when limits exceeded.
@@ -89,7 +99,7 @@ export class Quarantine {
     dependencies: QuarantineDependencies = {},
   ) {
     this.coldStorage = dependencies.coldStorage
-    this.now = dependencies.now ?? (() => Date.now())
+    this.now = dependencies.now ?? Date.now
   }
 
   /**
@@ -669,7 +679,7 @@ export class Quarantine {
     let timeoutId: ReturnType<typeof setTimeout> | undefined
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error('archive timeout')), timeoutMs)
+      timeoutId = setTimeout(() => reject(new ArchiveTimeoutError(timeoutMs)), timeoutMs)
       // Prevent the timer from keeping the Node.js event loop alive after archive completes.
       if (typeof (timeoutId as unknown as { unref?: () => void }).unref === 'function') {
         ;(timeoutId as unknown as { unref: () => void }).unref()
@@ -679,10 +689,10 @@ export class Quarantine {
     try {
       return await Promise.race([this.runArchive(signature, bytes), timeoutPromise])
     } catch (err) {
-      if (err instanceof Error && err.message === 'archive timeout') {
+      if (err instanceof ArchiveTimeoutError) {
         return {
           archived: false,
-          storageError: `archive timed out after ${timeoutMs}ms`,
+          storageError: `archive timed out after ${err.timeoutMs}ms`,
         }
       }
       // Real adapter/encode error — sanitize before returning.

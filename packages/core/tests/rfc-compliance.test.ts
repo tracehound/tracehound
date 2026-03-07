@@ -410,7 +410,10 @@ describe('RFC-0000 Compliance', () => {
       // Tamper with internal state (simulate attack)
       const records = (auditChain as any).records
       if (records.length > 0) {
-        records[0].hash = 'tampered-hash'
+        records[0] = {
+          ...records[0],
+          hash: 'tampered-hash',
+        }
       }
 
       // Verification should fail

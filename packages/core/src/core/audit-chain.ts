@@ -187,7 +187,7 @@ export class AuditChain implements IAuditChain {
     )
 
     pending.forEach((event, batchIndex) => {
-      this.records.push({
+      const sealedRecord: AuditRecord = {
         id: event.id,
         type: event.type,
         signature: event.signature,
@@ -200,7 +200,9 @@ export class AuditChain implements IAuditChain {
         batchRoot,
         batchIndex,
         batchSize: pending.length,
-      })
+      }
+      Object.freeze(sealedRecord)
+      this.records.push(sealedRecord)
     })
 
     this._lastHash = chainHash

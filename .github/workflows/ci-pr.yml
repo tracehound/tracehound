@@ -184,6 +184,6 @@ jobs:
       issues: write
     steps:
       - name: CodeRabbit Review
-        uses: coderabbitai/ai-pr-reviewer@latest
+        uses: coderabbitai/ai-pr-reviewer@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

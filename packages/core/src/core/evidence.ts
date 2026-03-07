@@ -27,7 +27,7 @@ export class Evidence implements EvidenceHandle {
     private readonly _severity: Severity,
     private readonly _captured: number,
     compressed: boolean = false,
-    now: () => number = () => Date.now(),
+    now: () => number = Date.now,
   ) {
     // Validate bytes type
     if (!(bytes instanceof ArrayBuffer)) {

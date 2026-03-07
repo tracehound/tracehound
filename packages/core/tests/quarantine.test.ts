@@ -719,6 +719,47 @@ describe("Quarantine", () => {
       );
     });
 
+    it("treats adapter errors named archive timeout as regular storage errors", async () => {
+      const timeoutNamedErrorStorage = {
+        isAvailable: async () => true,
+        write: async () => {
+          throw new Error("archive timeout");
+        },
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      };
+      const localAuditChain = new AuditChain();
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: "priority",
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: "drop",
+          archiveTimeoutMs: 5,
+        },
+        localAuditChain,
+        {
+          coldStorage: timeoutNamedErrorStorage,
+          now: () => 1_500,
+        },
+      );
+
+      expiringQuarantine.insert(
+        createEvidence("sig-timeout-message", "high", 64, 1_000),
+      );
+
+      const result = await expiringQuarantine.decayExpired();
+      const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+        details: { storageError: string | null };
+      };
+
+      expect(result.archiveFailureCount).toBe(1);
+      expect(decay.details.storageError).toBe("archive timeout");
+      expect(decay.details.storageError).not.toContain("timed out after 5ms");
+    });
+
     it("sanitizes archive adapter errors before recording them", async () => {
       const mockedAccessKeyFragment = `AKIA${"ABCDEFGHIJKLMNOP"}`;
       const noisyStorage = {

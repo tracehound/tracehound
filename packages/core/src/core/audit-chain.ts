@@ -149,7 +149,11 @@ export class AuditChain implements IAuditChain {
 
   export(): AuditRecord[] {
     this.sealPending()
-    return [...this.records]
+    return this.records.map((record) =>
+      Object.freeze({
+        ...record,
+      }),
+    )
   }
 
   private shouldSealBeforeAppend(timestamp: number): boolean {

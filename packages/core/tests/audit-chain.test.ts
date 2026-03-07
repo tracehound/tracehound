@@ -392,7 +392,7 @@ describe('AuditChain', () => {
     })
 
     it('evicts whole batches from the front to preserve retained Merkle integrity', () => {
-      const bounded = new AuditChain({ batchWindowMs: 10, maxRecords: 2 })
+      const bounded = new AuditChain({ batchWindowMs: 10, maxRecords: 2, maxBatchSize: 2 })
 
       bounded.append(createRecord('batch-a-1', { timestamp: 1_000 }))
       bounded.append(createRecord('batch-a-2', { timestamp: 1_001 }))

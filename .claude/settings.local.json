@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --filter @tracehound/core test -- tests/audit-chain.test.ts)",
+      "Bash(pnpm lint)"
+    ]
+  }
+}

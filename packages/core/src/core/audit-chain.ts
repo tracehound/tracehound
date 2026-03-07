@@ -15,8 +15,14 @@ interface AuditChainOptions {
   /**
    * Maximum sealed records to keep in memory (FIFO eviction).
    * Default: 100_000. Set 0 for unlimited (not recommended in production).
+   * Controls retention only — does not affect batch sealing frequency.
    */
   maxRecords?: number
+  /**
+   * Maximum pending events before a batch is force-sealed.
+   * Default: 1_024. Controls sealing frequency independently of retention.
+   */
+  maxBatchSize?: number
 }
 
 interface PendingAuditEvent {
@@ -35,6 +41,7 @@ const DEFAULT_BATCH_WINDOW_MS = 1_000
  * Lifecycle events are sealed into Merkle batches to reduce per-event chain overhead.
  */
 const DEFAULT_MAX_RECORDS = 100_000
+const DEFAULT_MAX_BATCH_SIZE = 1_024
 
 export class AuditChain implements IAuditChain {
   private readonly records: AuditRecord[] = []
@@ -44,18 +51,21 @@ export class AuditChain implements IAuditChain {
   private readonly hmacSecret: string | undefined
   private readonly batchWindowMs: number
   private readonly maxRecords: number
+  private readonly maxBatchSize: number
 
   constructor(config?: string | AuditChainOptions) {
     if (typeof config === 'string') {
       this.hmacSecret = config
       this.batchWindowMs = DEFAULT_BATCH_WINDOW_MS
       this.maxRecords = DEFAULT_MAX_RECORDS
+      this.maxBatchSize = DEFAULT_MAX_BATCH_SIZE
       return
     }
 
     this.hmacSecret = config?.hmacSecret
     this.batchWindowMs = normalizeBatchWindow(config?.batchWindowMs)
     this.maxRecords = normalizeMaxRecords(config?.maxRecords)
+    this.maxBatchSize = normalizeMaxBatchSize(config?.maxBatchSize)
   }
 
   get lastHash(): string {
@@ -158,7 +168,7 @@ export class AuditChain implements IAuditChain {
   }
 
   private shouldSealBeforeAppend(timestamp: number): boolean {
-    if (this.maxRecords > 0 && this.pendingEvents.length >= this.maxRecords) {
+    if (this.maxBatchSize > 0 && this.pendingEvents.length >= this.maxBatchSize) {
       return true
     }
 
@@ -292,6 +302,14 @@ function normalizeMaxRecords(maxRecords: number | undefined): number {
   }
 
   return Math.floor(maxRecords)
+}
+
+function normalizeMaxBatchSize(maxBatchSize: number | undefined): number {
+  if (typeof maxBatchSize !== 'number' || !Number.isFinite(maxBatchSize) || maxBatchSize <= 0) {
+    return DEFAULT_MAX_BATCH_SIZE
+  }
+
+  return Math.floor(maxBatchSize)
 }
 
 function toPendingAuditEvent(

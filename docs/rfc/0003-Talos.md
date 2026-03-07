@@ -4,12 +4,14 @@
 
 | Field            | Value                               |
 | ---------------- | ----------------------------------- |
-| Status           | Placeholder (v2.0.0 scope)          |
+| Status           | Draft                               |
+| Implementation Status | Planned                         |
 | Security Impact  | High (active response capability)   |
 | Operational Risk | Medium (external policy dependency) |
 | Dependencies     | RFC-0000 (Core)                     |
 | Author           | -                                   |
 | Created          | 2024-12-27                          |
+| Updated          | 2026-03-07                          |
 
 ---
 
@@ -149,6 +151,4 @@ setInterval(() => {
 
 ---
 
-**Status: PLACEHOLDER**
-
-Full specification will be written during Phase 7 planning.
+**Implementation Status:** Planned for a future satellite track. This RFC remains in `Draft` until the Talos design is expanded beyond the current placeholder scope.

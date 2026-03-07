@@ -1,13 +1,15 @@
 # RFC-0008: Tracehound Rust Core Pivot
 
-> **Status:** On-Hold / Deferred (Pending Feedback)
+> **Status:** Draft
+> **Implementation Status:** On-Hold / Deferred (Pending Feedback)
 > **Author:** Cluster.127
 > **Created:** 2026-01-23
+> **Updated:** 2026-03-07
 > **Target Version:** v2.0.0
 
 ## Abstract
 
-Complete rewrite of Tracehound's core logic from TypeScript to Rust. **Note (Feb 2026):** This initiative is currently deferred. The primary focus is the Node.js + TypeScript market launch. Implementation of the Rust pivot will be re-evaluated based on feedback from the v1.x cycle.
+Complete rewrite of Tracehound's core logic from TypeScript to Rust. **Implementation note (Mar 2026):** The RFC remains in `Draft` for governance tracking, but implementation is currently deferred. The primary focus is the Node.js + TypeScript market launch. The Rust pivot will be re-evaluated based on feedback from the v1.x cycle.
 
 ---
 

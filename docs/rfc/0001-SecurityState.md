@@ -4,12 +4,13 @@
 
 | Field          | Value                                                |
 | -------------- | ---------------------------------------------------- |
-| Status         | **Accepted** (Replaces Security State Substrate RFC) |
+| Status         | Implemented                                          |
 | Classification | Internal / Critical Infrastructure                   |
 | Complexity     | Medium (Application Level)                           |
 | Dependencies   | Standard JS Map / Set (No native deps)               |
 | Author         | -                                                    |
 | Created        | 2024-12-27                                           |
+| Updated        | 2026-03-07                                           |
 
 ---
 

@@ -4,12 +4,14 @@
 
 | Field            | Value                                    |
 | ---------------- | ---------------------------------------- |
-| Status           | Placeholder (v2.0.0 scope)               |
+| Status           | Draft                                    |
+| Implementation Status | Planned                             |
 | Security Impact  | Medium (enrichment capability)           |
 | Operational Risk | Low (read-only integration)              |
 | Dependencies     | RFC-0000 (Core), RFC-0003 (ThreatLedger) |
 | Author           | -                                        |
 | Created          | 2024-12-27                               |
+| Updated          | 2026-03-07                               |
 
 ---
 
@@ -158,6 +160,4 @@ tracehound.on('quarantine', async (threat) => {
 
 ---
 
-**Status: PLACEHOLDER**
-
-Full specification will be written during Phase 7 planning.
+**Implementation Status:** Planned for a future satellite track. This RFC remains in `Draft` until the Huginn design is expanded beyond the current placeholder scope.

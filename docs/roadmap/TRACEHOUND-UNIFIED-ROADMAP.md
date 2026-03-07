@@ -1,7 +1,7 @@
 # Tracehound Unified Roadmap v2 (Authoritative Technical Source)
 
 > **Status:** Active
-> **Last Updated:** 2026-03-04
+> **Last Updated:** 2026-03-07
 > **Scope:** Technical roadmap only (milestone-based, no calendar binding)
 > **Authoritative Source:** This document is the single technical source of truth for roadmap execution.
 
@@ -25,10 +25,10 @@
 
 | Fact | Canonical Source | Value |
 | --- | --- | --- |
-| Current workspace version | `package.json` | Use current root workspace manifest value (release-tag aligned). |
-| Latest core changelog release | `packages/core/CHANGELOG.md` | Use latest release header present in core changelog. |
+| Current workspace version | `package.json` | `1.6.1` |
+| Latest core changelog release | `packages/core/CHANGELOG.md` | `1.6.1` (`2026-03-07`) |
 | Legacy internal roadmap marker | `internal/ROADMAP.md` | Reports `v1.2.0` (stale for active planning) |
-| Argos status (technical planning) | `docs/README.md`, `docs/rfc/0002-Argos.md` | `Planned` / `Draft` |
+| Argos status (technical planning) | `docs/README.md`, `docs/rfc/0002-Argos.md` | `Draft` RFC / `Planned` capability |
 | Horizon package availability in monorepo | `pnpm-workspace.yaml`, `packages/*` | Not present |
 | Sprint bootstrap governance pack status | `docs/roadmap/SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md` | `Completed` on `2026-03-04` (retained as historical artifact) |
 
@@ -37,7 +37,7 @@
 | Topic | Legacy Statement | Canonical Resolution |
 | --- | --- | --- |
 | Product status | `internal/ROADMAP.md` indicates `v1.2.0 stable` | Roadmap planning must use the current workspace release baseline from canonical sources |
-| Argos maturity | Legacy claims "approved" | Treated as planned/draft until governance status changes |
+| Argos maturity | Legacy claims "approved" | Treated as planned capability with draft RFC until governance status changes |
 | Horizon footprint | Appears as feature unlock in docs | Treated as external product and planned integration contract only |
 
 ### Milestone Status Snapshot
@@ -49,7 +49,7 @@
 | M2 | Completed | Internal technical delta intake is consolidated here. |
 | M3 | Completed | Governance pack and associated implementation backlog are closed. |
 | M4 | In Progress | Security audit alignment and release evidence packaging. |
-| M5 | Planned | Legacy deprecation and redirect closure. |
+| M5 | In Progress | `internal/ROADMAP.md` is deprecated and redirected; remaining closure is broader execution-reference cleanup. |
 
 ---
 
@@ -76,7 +76,7 @@ Every roadmap claim must use one of these labels:
 | --- | --- |
 | `Implemented` | Available in this repository and validated by tests/docs |
 | `External` | Exists outside this repository and is consumed through explicit contracts |
-| `Planned` | Not implemented yet; tracked as roadmap intent |
+| `Planned` | Not implemented in this repository yet; tracked as roadmap intent, including deferred or on-hold work until governance status changes |
 
 Boundary rule:
 
@@ -138,15 +138,15 @@ export interface CoordinationProvider {
 | Heimdall | Planned | Supply chain telemetry and CI/CD security integration |
 | Loki | Planned | Passive deception and tarpit layer for adversarial friction |
 
-### Deferred Tracks (RFC Required)
+### Deferred / On-Hold Tracks Within Planned Taxonomy
 
-The following tracks are intentionally deferred in this unified technical roadmap until formal RFCs are authored:
+The following tracks remain roadmap intent, but are not active implementation work until the listed governance conditions are met:
 
 | Component | Status | Activation Condition |
 | --- | --- | --- |
-| Norns | Deferred | Add RFC and security/performance contract |
-| Furies | Deferred | Add RFC and adversarial validation contract |
-| Watchtower | Deferred | Add RFC and control-plane boundary contract |
+| Norns | Planned | Add RFC and security/performance contract |
+| Furies | Planned | Add RFC and adversarial validation contract |
+| Watchtower | Planned | `RFC-0014` exists as `Draft`; requires control-plane boundary review before activation |
 
 ### Enterprise Integration Track (Planned)
 
@@ -162,7 +162,7 @@ The following tracks are intentionally deferred in this unified technical roadma
 | Runtime | Status | Notes |
 | --- | --- | --- |
 | Node.js / TypeScript | Implemented | Current production baseline |
-| Rust core pivot | Planned | Governed by RFC-0008 direction |
+| Rust core pivot | Planned | Governed by RFC-0008 direction; RFC is currently on-hold / deferred pending v1.x feedback |
 | Python / Go / other ports | Planned | Post-contract and reliability maturity |
 
 ---
@@ -293,4 +293,5 @@ These remain in `internal` strategy artifacts.
 10. [docs/rfc/0009-CoordinationProviderContract.md](../rfc/0009-CoordinationProviderContract.md)
 11. [docs/rfc/0010-OneWayMembrane.md](../rfc/0010-OneWayMembrane.md)
 12. [docs/rfc/0011-PressureContainment.md](../rfc/0011-PressureContainment.md)
-13. [SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md](./SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md)
+13. [docs/rfc/0014-Watchtower.md](../rfc/0014-Watchtower.md)
+14. [SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md](./SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md)

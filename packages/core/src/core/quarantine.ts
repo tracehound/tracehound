@@ -66,16 +66,6 @@ const SEVERITY_RANK: Record<Severity, number> = {
   critical: 3,
 };
 
-class ArchiveTimeoutError extends Error {
-  readonly timeoutMs: number;
-
-  constructor(timeoutMs: number) {
-    super("archive timeout");
-    this.name = "ArchiveTimeoutError";
-    this.timeoutMs = timeoutMs;
-  }
-}
-
 /**
  * Quarantine storage with priority-based eviction.
  * Stores evidence by signature and evicts lowest priority when limits exceeded.

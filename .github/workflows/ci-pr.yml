@@ -106,6 +106,10 @@ jobs:
         if: needs.affected.outputs.has_packages == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Build @tracehound/core
+        if: needs.affected.outputs.has_packages == 'true'
+        run: pnpm --filter @tracehound/core build
+
       - name: Lint affected workspaces
         if: needs.affected.outputs.has_packages == 'true'
         run: pnpm -r ${{ needs.affected.outputs.filters }} lint
@@ -158,6 +162,9 @@ jobs:
 
   secrets_pr_safe:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:

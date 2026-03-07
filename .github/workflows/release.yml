@@ -61,16 +61,20 @@ jobs:
 
       - name: Publish @tracehound/core
         if: ${{ inputs.publish_core }}
-        run: pnpm -C packages/core publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}
+        working-directory: packages/core
+        run: npm publish --access public --tag ${{ inputs.npm_tag }}
 
       - name: Publish @tracehound/express
         if: ${{ inputs.publish_express }}
-        run: pnpm -C packages/express publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}
+        working-directory: packages/express
+        run: npm publish --access public --tag ${{ inputs.npm_tag }}
 
       - name: Publish @tracehound/fastify
         if: ${{ inputs.publish_fastify }}
-        run: pnpm -C packages/fastify publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}
+        working-directory: packages/fastify
+        run: npm publish --access public --tag ${{ inputs.npm_tag }}
 
       - name: Publish @tracehound/cli
         if: ${{ inputs.publish_cli }}
-        run: pnpm -C packages/cli publish --access public --no-git-checks --tag ${{ inputs.npm_tag }}
+        working-directory: packages/cli
+        run: npm publish --access public --tag ${{ inputs.npm_tag }}

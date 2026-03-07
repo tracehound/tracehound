@@ -43,7 +43,7 @@ body:
     attributes:
       label: Affected version
       description: Package version, git ref, or container tag.
-      placeholder: "e.g. 1.6.1"
+      placeholder: "e.g. 1.7.0"
     validations:
       required: true
   - type: textarea

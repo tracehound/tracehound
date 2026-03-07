@@ -712,11 +712,15 @@ export class Quarantine {
         });
       }, timeoutMs);
       // Prevent the timer from keeping the Node.js event loop alive.
-      if (typeof (tid as unknown as { unref?: () => void }).unref === "function") {
+      if (
+        typeof (tid as unknown as { unref?: () => void }).unref === "function"
+      ) {
         (tid as unknown as { unref: () => void }).unref();
       }
       // Cancel the timeout once the archive promise settles first.
-      archivePromise.then(() => clearTimeout(tid)).catch(() => clearTimeout(tid));
+      archivePromise
+        .then(() => clearTimeout(tid))
+        .catch(() => clearTimeout(tid));
     });
 
     try {
@@ -805,14 +809,14 @@ function sanitizeStorageError(error: string): string {
   }
 
   // Truncate to prevent log injection via oversized error strings
-  const truncated = error.slice(0, 120);
+  // Replace potential endpoint/credential fragments on the full string first
+  const redacted = error
+    .replace(/https?:\/\/\S+/gi, "[endpoint]")
+    .replace(/arn:[a-z0-9:/_\-]+/gi, "[arn]")
+    .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, "[key]");
 
-  // Replace potential endpoint/credential fragments
-  return (
-    truncated
-      .replace(/https?:\/\/\S+/gi, "[endpoint]")
-      .replace(/arn:[a-z0-9:/_\-]+/gi, "[arn]")
-      .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, "[key]")
-      .trim() || "storage write failed"
-  );
+  const sanitized = redacted.trim() || "storage write failed";
+
+  // Truncate after redaction to prevent log injection via oversized strings
+  return sanitized.slice(0, 120);
 }

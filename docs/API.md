@@ -271,7 +271,7 @@ th.shutdown()
 
 ### Cold Storage (`th.coldStorage`)
 
-When TTL decay is enabled, Tracehound provisions a memory-first cold storage adapter by default unless you inject one explicitly.
+When TTL decay is configured with archiving enabled (for example, `ttlMs > 0` and `archiveOnDecay !== false`), Tracehound provisions a memory-first cold storage adapter by default; otherwise, `th.coldStorage` may be undefined unless you inject an adapter explicitly.
 
 ```ts
 if (th.coldStorage) {

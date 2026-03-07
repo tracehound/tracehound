@@ -44,10 +44,12 @@ app.use(
   tracehound({
     agent: th.agent,
     extractScent: (req) => {
+      const forwardedRequestId = Array.isArray(req.headers["x-request-id"])
+        ? req.headers["x-request-id"][0]
+        : (req.headers["x-request-id"] as string);
+
       return {
-        id:
-          (req.headers["x-request-id"] as string) ||
-          `chaos-${generateSecureId()}`,
+        id: `chaos-${generateSecureId()}`,
         timestamp: Date.now(),
         source: req.ip || "127.0.0.1",
         threat: req.headers["x-chaos-threat"]
@@ -59,6 +61,7 @@ app.use(
             }
           : undefined,
         payload: {
+          forwardedRequestId,
           method: req.method,
           path: req.path,
           query: req.query as any,

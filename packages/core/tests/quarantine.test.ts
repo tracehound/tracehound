@@ -98,7 +98,7 @@ describe("Quarantine", () => {
       Object.defineProperty(e2, "_signature", { value: "sig1" });
 
       const r1 = quarantine.insert(e1);
-      const r2 = quarantine.insert(e1); // same evidence
+      const r2 = quarantine.insert(e2); // different evidence, same signature
 
       expect(r1.status).toBe("inserted");
       expect(r2.status).toBe("duplicate");

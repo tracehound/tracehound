@@ -1,7 +1,10 @@
 # Tracehound Pilot Strategy (2026)
 
+> **Status:** Archived Reference
+> **Use:** Historical field-validation strategy input only. Not an active execution plan.
+
 > [!NOTE]
-> Source module document. The authoritative technical roadmap is
+> Archived reference document. The active technical roadmap is
 > [TRACEHOUND-UNIFIED-ROADMAP.md](./TRACEHOUND-UNIFIED-ROADMAP.md).
 
 ## Strategic Context: Moving Point-of-Proof to Reality

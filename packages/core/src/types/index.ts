@@ -3,6 +3,7 @@
  */
 
 export type { AuditRecord, IAuditChain } from './audit.js'
+export type { AuditLifecycleRecord } from './audit.js'
 export type { JsonPrimitive, JsonSerializable, Severity } from './common.js'
 export type {
   CoordinationFeature,
@@ -25,7 +26,10 @@ export type {
 export { ErrorCodes, Errors, createError } from './errors.js'
 export type { ErrorCode, ErrorState, TracehoundError } from './errors.js'
 export type {
+  DecayRecord,
+  DropRecord,
   EvacuateRecord,
+  EvictionRecord,
   EvidenceHandle,
   NeutralizationRecord,
   PurgeRecord,

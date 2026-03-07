@@ -405,6 +405,7 @@ describe('RFC-0000 Compliance', () => {
 
       const record = evidence.neutralize(auditChain.lastHash)
       auditChain.append(record)
+      auditChain.flushPending()
 
       // Tamper with internal state (simulate attack)
       const records = (auditChain as any).records

@@ -33,6 +33,9 @@ const th = createTracehound({
   quarantine: {
     maxCount: 15_000,
     maxBytes: 250_000_000, // 250MB
+    ttlMs: 86_400_000, // 24h
+    decayIntervalMs: 1000,
+    decayBatchSize: 128,
   },
   rateLimit: {
     windowMs: 60_000,
@@ -51,7 +54,7 @@ const th = createTracehound({
 })
 
 // The Tracehound instance provides access to the initialized components
-const { agent, quarantine, rateLimiter, watcher, auditChain, notifications, houndPool } = th
+const { agent, quarantine, rateLimiter, watcher, auditChain, notifications, houndPool, coldStorage } = th
 ```
 
 ### TracehoundOptions Overview
@@ -69,7 +72,20 @@ interface TracehoundOptions {
     maxCount?: number
     /** Maximum total bytes for all evidence. Default: 100_000_000 (100MB) */
     maxBytes?: number
+    /** Optional evidence TTL in milliseconds. Default: disabled (0) */
+    ttlMs?: number
+    /** Background decay cadence in milliseconds. Default: 1000 */
+    decayIntervalMs?: number
+    /** Maximum expired entries processed per decay run. Default: 128 */
+    decayBatchSize?: number
+    /** Archive expired evidence before eviction. Default: true */
+    archiveOnDecay?: boolean
+    /** If archival fails, drop or retain expired evidence. Default: 'drop' */
+    archiveFailureMode?: 'drop' | 'retain'
   }
+
+  /** Optional cold storage adapter used by TTL decay archival. */
+  coldStorage?: IColdStorageAdapter
 
   /** Rate limiter configuration. */
   rateLimit?: {
@@ -174,10 +190,13 @@ Evidence buffer with priority-based eviction. Evicts the lowest severity evidenc
 // Checking quarantine statistics
 const stats = th.quarantine.stats
 console.log(`Quarantine uses ${stats.bytes} bytes across ${stats.count} entries.`)
+console.log(`Next expiry: ${stats.nextExpiryAt}`)
 
 // Checking for specific evidence
 const hasEvidence = th.quarantine.has('evidence-signature')
 ```
+
+TTL decay runs in the background when `quarantine.ttlMs` is enabled. Expired evidence is archived to `th.coldStorage` when available, then removed from active quarantine with decay events appended to the audit chain.
 
 ### Rate Limiter (`th.rateLimiter`)
 
@@ -248,6 +267,16 @@ Stop runtime background resources (snapshot interval and hound processes):
 th.shutdown()
 ```
 
+### Cold Storage (`th.coldStorage`)
+
+When TTL decay is enabled, Tracehound provisions a memory-first cold storage adapter by default unless you inject one explicitly.
+
+```ts
+if (th.coldStorage) {
+  const archived = await th.coldStorage.read('signature')
+}
+```
+
 ### Notifications (`th.notifications`)
 
 Subscribe to internal system events (e.g., panic, thread detection, quarantine).
@@ -307,6 +336,7 @@ interface Scent {
   timestamp: number // Capture time (ms)
   source: string // Origin (IP, user agent)
   payload: JsonSerializable
+  ingressBytes?: Uint8Array | ArrayBuffer // Optional raw ingress bytes for hashing preference
   threat?: ThreatSignal
 }
 ```

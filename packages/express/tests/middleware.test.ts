@@ -2,6 +2,7 @@
  * Express middleware tests.
  */
 
+import { Buffer } from 'node:buffer'
 import type { IAgent, InterceptResult } from '@tracehound/core'
 import type { NextFunction, Request, Response } from 'express'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -226,6 +227,24 @@ describe('tracehound middleware', () => {
       expect(scent.payload.query.circ).toBeUndefined()
     })
 
+    it('captures rawBody bytes into ingressBytes when available', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+
+      middleware(
+        createMockReq({
+          rawBody: Buffer.from('{"raw":true}', 'utf8') as unknown as Request['body'],
+          body: { ignored: 'for hashing preference' },
+        }),
+        createMockRes(),
+        next,
+      )
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.ingressBytes).toBeInstanceOf(Uint8Array)
+      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
+    })
+
     it('should use defaultOnIntercept when result is blocked', () => {
       const agent = createMockAgent({ status: 'rate_limited', retryAfter: 2000 })
       const middleware = tracehound({ agent })
@@ -303,4 +322,3 @@ describe('tracehound middleware', () => {
     expect(res.status).not.toHaveBeenCalled()
   })
 })
-

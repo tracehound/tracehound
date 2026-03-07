@@ -22,6 +22,18 @@ export interface QuarantineConfig {
   maxBytes: number
   /** Eviction strategy */
   evictionPolicy: 'lru' | 'priority'
+  /** Optional TTL in milliseconds for quarantined evidence */
+  ttlMs?: number
+  /** Background decay cadence in milliseconds */
+  decayIntervalMs?: number
+  /** Maximum expired entries processed per decay run */
+  decayBatchSize?: number
+  /** Archive expired evidence to cold storage before eviction */
+  archiveOnDecay?: boolean
+  /** Behavior when archival fails during decay */
+  archiveFailureMode?: 'drop' | 'retain'
+  /** Timeout in milliseconds for a single cold storage archive write (default: 5000) */
+  archiveTimeoutMs?: number
 }
 
 /** Hound pool configuration */
@@ -112,6 +124,12 @@ export const DEFAULT_CONFIG: TracehoundConfig = {
     maxCount: 10_000,
     maxBytes: 100_000_000,
     evictionPolicy: 'priority',
+    ttlMs: 0,
+    decayIntervalMs: 1_000,
+    decayBatchSize: 128,
+    archiveOnDecay: true,
+    archiveFailureMode: 'drop',
+    archiveTimeoutMs: 5_000,
   },
   hound: {
     minimumDormant: 2,

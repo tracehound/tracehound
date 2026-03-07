@@ -2,6 +2,7 @@
  * Fastify plugin tests.
  */
 
+import { Buffer } from 'node:buffer'
 import type { IAgent, InterceptResult } from '@tracehound/core'
 import type { FastifyReply, FastifyRequest } from 'fastify'
 import { describe, expect, it, vi } from 'vitest'
@@ -305,6 +306,27 @@ describe('tracehoundPlugin', () => {
       expect(scent.payload.body).toBeUndefined()
       expect(scent.payload.query.circ).toBeUndefined()
     })
+
+    it('captures rawBody bytes into ingressBytes when available', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        rawBody: Buffer.from('{"raw":true}', 'utf8') as unknown as FastifyRequest['body'],
+        body: { ignored: 'for hashing preference' },
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.ingressBytes).toBeInstanceOf(Uint8Array)
+      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
+    })
   })
 
   it('should use custom extractScent', () => {
@@ -393,4 +415,3 @@ describe('tracehoundPlugin', () => {
     expect(reply.status).not.toHaveBeenCalled()
   })
 })
-

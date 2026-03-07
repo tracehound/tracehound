@@ -5,8 +5,17 @@
 import { generateSecureId } from '../utils/id.js'
 import type { Severity } from '../types/common.js'
 import type { QuarantineConfig } from '../types/config.js'
-import type { EvidenceHandle, NeutralizationRecord, PurgeRecord } from '../types/evidence.js'
+import type {
+  DecayRecord,
+  DropRecord,
+  EvictionRecord,
+  EvidenceHandle,
+  NeutralizationRecord,
+  PurgeRecord,
+} from '../types/evidence.js'
 import type { AuditChain } from './audit-chain.js'
+import type { IColdStorageAdapter } from './cold-storage.js'
+import { encodeWithIntegrityAsync } from '../utils/binary-codec.js'
 
 /** Result of insert operation */
 export interface InsertResult {
@@ -21,6 +30,11 @@ export interface QuarantineStats {
   bytes: number
   droppedCount: number
   droppedBytes: number
+  decayedCount: number
+  archivedCount: number
+  archiveFailureCount: number
+  ttlEnabled: boolean
+  nextExpiryAt: number | null
   bySeverity: Record<Severity, number>
 }
 
@@ -30,6 +44,18 @@ export interface ReplaceResult {
   neutralized?: NeutralizationRecord
   inserted: boolean
   duplicate?: EvidenceHandle
+}
+
+export interface DecayResult {
+  decayedCount: number
+  archivedCount: number
+  archiveFailureCount: number
+  retainedCount: number
+}
+
+export interface QuarantineDependencies {
+  coldStorage?: IColdStorageAdapter
+  now?: () => number
 }
 
 /** Severity ranking for eviction priority */
@@ -46,14 +72,24 @@ const SEVERITY_RANK: Record<Severity, number> = {
  */
 export class Quarantine {
   private store = new Map<string, EvidenceHandle>()
+  private readonly expirations = new Map<string, number>()
   private totalBytes = 0
   private droppedCount = 0
   private droppedBytes = 0
+  private decayedCount = 0
+  private archivedCount = 0
+  private archiveFailureCount = 0
+  private readonly coldStorage: IColdStorageAdapter | undefined
+  private readonly now: () => number
 
   constructor(
     private config: QuarantineConfig,
     private auditChain: AuditChain,
-  ) {}
+    dependencies: QuarantineDependencies = {},
+  ) {
+    this.coldStorage = dependencies.coldStorage
+    this.now = dependencies.now ?? (() => Date.now())
+  }
 
   /**
    * Insert evidence into quarantine.
@@ -70,7 +106,7 @@ export class Quarantine {
 
     // Hard-cap guard: impossible to retain this evidence.
     if (this.config.maxCount <= 0 || this.config.maxBytes <= 0) {
-      this.dropIncoming(evidence)
+      this.dropIncoming(evidence, 'capacity')
       return {
         status: 'dropped',
         reason: 'capacity',
@@ -78,7 +114,7 @@ export class Quarantine {
     }
 
     if (evidence.size > this.config.maxBytes) {
-      this.dropIncoming(evidence)
+      this.dropIncoming(evidence, 'oversized')
       return {
         status: 'dropped',
         reason: 'oversized',
@@ -87,6 +123,7 @@ export class Quarantine {
 
     // Insert new evidence first, then rebalance deterministically.
     this.store.set(evidence.signature, evidence)
+    this.trackExpiry(evidence)
     this.totalBytes += evidence.size
 
     // Evict until limits are satisfied.
@@ -142,6 +179,7 @@ export class Quarantine {
 
     // Remove from store
     this.store.delete(signature)
+    this.expirations.delete(signature)
     this.totalBytes -= size
 
     return record
@@ -162,6 +200,7 @@ export class Quarantine {
 
     // Clear store
     this.store.clear()
+    this.expirations.clear()
     this.totalBytes = 0
 
     return records
@@ -187,6 +226,10 @@ export class Quarantine {
     // Create purge record before disposing
     const record: PurgeRecord = {
       id: `prg-${generateSecureId()}`,
+      signature,
+      hash,
+      size,
+      status: 'purged',
       reason,
       scent: {
         id: evidence.signature, // Using signature as proxy for scent ID
@@ -195,21 +238,52 @@ export class Quarantine {
         payloadHash: hash,
         payloadSize: size,
       },
-      purgeTimestamp: Date.now(),
+      timestamp: this.now(),
+      previousHash: this.auditChain.lastHash,
     }
 
-    // Dispose evidence (force cleanup without audit chain)
+    this.auditChain.append(record)
+
+    // Dispose evidence after writing audit metadata
     try {
-      evidence.transfer() // Transfer ownership to force disposal
+      evidence.transfer()
     } catch {
       // Already disposed, ignore
     }
 
     // Remove from store
     this.store.delete(signature)
+    this.expirations.delete(signature)
     this.totalBytes -= size
 
     return record
+  }
+
+  /**
+   * Decay expired evidence outside the hot path.
+   * Expired entries are processed deterministically and optionally archived.
+   */
+  async decayExpired(now: number = this.now()): Promise<DecayResult> {
+    const expired = this.selectExpired(now)
+    let decayedCount = 0
+    let archivedCount = 0
+    let archiveFailureCount = 0
+    let retainedCount = 0
+
+    for (const evidence of expired) {
+      const outcome = await this.processDecay(evidence, now)
+      decayedCount += outcome.decayedCount
+      archivedCount += outcome.archivedCount
+      archiveFailureCount += outcome.archiveFailureCount
+      retainedCount += outcome.retainedCount
+    }
+
+    return {
+      decayedCount,
+      archivedCount,
+      archiveFailureCount,
+      retainedCount,
+    }
   }
 
   /**
@@ -264,6 +338,11 @@ export class Quarantine {
       bytes: this.totalBytes,
       droppedCount: this.droppedCount,
       droppedBytes: this.droppedBytes,
+      decayedCount: this.decayedCount,
+      archivedCount: this.archivedCount,
+      archiveFailureCount: this.archiveFailureCount,
+      ttlEnabled: this.isTtlEnabled(),
+      nextExpiryAt: this.getNextExpiryAt(),
       bySeverity,
     }
   }
@@ -274,17 +353,6 @@ export class Quarantine {
    */
   get maxBytes(): number {
     return this.config.maxBytes
-  }
-
-  /**
-   * Evict lowest priority evidence.
-   */
-  private evict(count: number): void {
-    const victims = this.selectForEviction(count)
-
-    for (const evidence of victims) {
-      this.dropStored(evidence)
-    }
   }
 
   /**
@@ -318,8 +386,20 @@ export class Quarantine {
     return this.store.size > this.config.maxCount || this.totalBytes > this.config.maxBytes
   }
 
-  private dropIncoming(evidence: EvidenceHandle): void {
+  private dropIncoming(evidence: EvidenceHandle, reason: DropRecord['reason']): void {
     const size = evidence.size
+    const record: DropRecord = {
+      id: `drp-${generateSecureId()}`,
+      signature: evidence.signature,
+      hash: evidence.hash,
+      size,
+      status: 'dropped',
+      reason,
+      timestamp: this.now(),
+      previousHash: this.auditChain.lastHash,
+    }
+
+    this.auditChain.append(record)
 
     this.droppedCount++
     this.droppedBytes += size
@@ -335,13 +415,254 @@ export class Quarantine {
     const size = evidence.size
     const signature = evidence.signature
 
-    const record = evidence.neutralize(this.auditChain.lastHash)
+    const record: EvictionRecord = {
+      id: `evc-${generateSecureId()}`,
+      signature,
+      hash: evidence.hash,
+      size,
+      status: 'evicted',
+      reason: 'pressure',
+      timestamp: this.now(),
+      previousHash: this.auditChain.lastHash,
+    }
+
     this.auditChain.append(record)
 
+    try {
+      evidence.transfer()
+    } catch {
+      // Best-effort disposal only.
+    }
+
     this.store.delete(signature)
+    this.expirations.delete(signature)
     this.totalBytes -= size
 
     this.droppedCount++
     this.droppedBytes += size
   }
+
+  private isTtlEnabled(): boolean {
+    return typeof this.config.ttlMs === 'number' && this.config.ttlMs > 0
+  }
+
+  private trackExpiry(evidence: EvidenceHandle): void {
+    if (!this.isTtlEnabled()) {
+      this.expirations.delete(evidence.signature)
+      return
+    }
+
+    const ttlMs = this.config.ttlMs ?? 0
+    this.expirations.set(evidence.signature, evidence.captured + ttlMs)
+  }
+
+  private getNextExpiryAt(): number | null {
+    let nextExpiryAt: number | null = null
+
+    for (const expiry of this.expirations.values()) {
+      if (nextExpiryAt === null || expiry < nextExpiryAt) {
+        nextExpiryAt = expiry
+      }
+    }
+
+    return nextExpiryAt
+  }
+
+  private selectExpired(now: number): EvidenceHandle[] {
+    if (!this.isTtlEnabled()) {
+      return []
+    }
+
+    const candidates: EvidenceHandle[] = []
+
+    for (const [signature, expiry] of this.expirations) {
+      if (expiry <= now) {
+        const evidence = this.store.get(signature)
+        if (evidence) {
+          candidates.push(evidence)
+        }
+      }
+    }
+
+    candidates.sort((left, right) => {
+      const leftExpiry = this.expirations.get(left.signature) ?? left.captured
+      const rightExpiry = this.expirations.get(right.signature) ?? right.captured
+      if (leftExpiry !== rightExpiry) {
+        return leftExpiry - rightExpiry
+      }
+
+      const severityDiff = SEVERITY_RANK[left.severity] - SEVERITY_RANK[right.severity]
+      if (severityDiff !== 0) {
+        return severityDiff
+      }
+
+      return left.signature.localeCompare(right.signature)
+    })
+
+    const batchSize = normalizeDecayBatchSize(this.config.decayBatchSize)
+    return candidates.slice(0, batchSize)
+  }
+
+  private async processDecay(
+    evidence: EvidenceHandle,
+    now: number,
+  ): Promise<DecayResult> {
+    const archiveAttempted = this.config.archiveOnDecay !== false
+    let archived = false
+    let storageId: string | undefined
+    let storageError: string | undefined
+
+    if (archiveAttempted) {
+      const archiveResult = await this.archiveEvidence(evidence)
+      archived = archiveResult.archived
+      storageId = archiveResult.storageId
+      storageError = archiveResult.storageError
+    }
+
+    if (archiveAttempted && !archived && this.config.archiveFailureMode === 'retain') {
+      this.archiveFailureCount++
+      return {
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 1,
+        retainedCount: 1,
+      }
+    }
+
+    const record: DecayRecord = {
+      id: `dcy-${generateSecureId()}`,
+      signature: evidence.signature,
+      hash: evidence.hash,
+      size: evidence.size,
+      status: 'decayed',
+      reason: 'ttl_expired',
+      timestamp: now,
+      previousHash: this.auditChain.lastHash,
+      archived,
+      storageId,
+      storageError,
+    }
+
+    this.auditChain.append(record)
+
+    try {
+      evidence.transfer()
+    } catch {
+      // Best-effort disposal only.
+    }
+
+    this.store.delete(evidence.signature)
+    this.expirations.delete(evidence.signature)
+    this.totalBytes -= record.size
+    this.decayedCount++
+
+    if (archived) {
+      this.archivedCount++
+    } else if (archiveAttempted) {
+      this.archiveFailureCount++
+    }
+
+    return {
+      decayedCount: 1,
+      archivedCount: archived ? 1 : 0,
+      archiveFailureCount: archiveAttempted && !archived ? 1 : 0,
+      retainedCount: 0,
+    }
+  }
+
+  private async archiveEvidence(
+    evidence: EvidenceHandle,
+  ): Promise<{ archived: boolean; storageId?: string; storageError?: string }> {
+    if (!this.coldStorage) {
+      return {
+        archived: false,
+        storageError: 'cold storage not configured',
+      }
+    }
+
+    const timeoutMs = normalizeArchiveTimeout(this.config.archiveTimeoutMs)
+
+    try {
+      return await Promise.race([
+        this.runArchive(evidence),
+        archiveTimeout(timeoutMs),
+      ])
+    } catch {
+      return {
+        archived: false,
+        storageError: `archive timed out after ${timeoutMs}ms`,
+      }
+    }
+  }
+
+  private async runArchive(
+    evidence: EvidenceHandle,
+  ): Promise<{ archived: boolean; storageId?: string; storageError?: string }> {
+    const availability = await this.coldStorage!.isAvailable()
+    if (!availability) {
+      return {
+        archived: false,
+        storageError: 'cold storage unavailable',
+      }
+    }
+
+    const bytes = new Uint8Array(evidence.bytes.slice(0))
+    const encoded = await encodeWithIntegrityAsync(bytes)
+    const result = await this.coldStorage!.write(evidence.signature, encoded)
+    const archiveResult: { archived: boolean; storageId?: string; storageError?: string } = {
+      archived: result.success,
+    }
+
+    if (result.id !== undefined) {
+      archiveResult.storageId = result.id
+    }
+    if (result.error !== undefined) {
+      archiveResult.storageError = sanitizeStorageError(result.error)
+    }
+
+    return archiveResult
+  }
+}
+
+function normalizeDecayBatchSize(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return 128
+  }
+
+  return Math.floor(value)
+}
+
+function normalizeArchiveTimeout(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return 5_000
+  }
+
+  return Math.floor(value)
+}
+
+function archiveTimeout(ms: number): Promise<never> {
+  return new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('archive timeout')), ms),
+  )
+}
+
+/**
+ * Strip internal storage error details before persisting to audit chain.
+ * Bucket names, ARNs, endpoint URLs, and credentials must not leak
+ * into forensic exports or logs (information disclosure risk).
+ */
+function sanitizeStorageError(error: string): string {
+  if (typeof error !== 'string' || error.length === 0) {
+    return 'storage write failed'
+  }
+
+  // Truncate to prevent log injection via oversized error strings
+  const truncated = error.slice(0, 120)
+
+  // Replace potential endpoint/credential fragments
+  return truncated
+    .replace(/https?:\/\/\S+/gi, '[endpoint]')
+    .replace(/arn:[a-z0-9:/_\-]+/gi, '[arn]')
+    .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, '[key]')
+    .trim() || 'storage write failed'
 }

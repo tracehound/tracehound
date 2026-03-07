@@ -241,8 +241,7 @@ describe('Cross-Component Consistency', () => {
 
         quarantine.neutralize(signature)
 
-        // Access records via internal property (for testing only)
-        const records = (auditChain as any).records
+        const records = auditChain.export()
         expect(records.length).toBe(1)
         expect(records[0].signature).toBe(signature)
       }

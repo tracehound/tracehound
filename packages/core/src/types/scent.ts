@@ -46,6 +46,12 @@ export interface Scent {
   readonly payload: import('./common.js').JsonSerializable
 
   /**
+   * Optional raw ingress bytes captured before payload normalization.
+   * When present, EvidenceFactory hashes these bytes instead of canonicalized payload bytes.
+   */
+  readonly ingressBytes?: ArrayBuffer | Uint8Array
+
+  /**
    * Origin identifier (IP, user agent, service name).
    * Used for rate limiting.
    */

@@ -4,6 +4,7 @@
  * Express middleware for Tracehound security buffer.
  */
 
+import { Buffer } from 'node:buffer'
 import {
   generateSecureId,
   recordTraceInspectionEntry,
@@ -62,6 +63,36 @@ function safeClone(obj: unknown): JsonSerializable | undefined {
   }
 }
 
+function toIngressBytes(value: unknown): Uint8Array | undefined {
+  if (typeof value === 'string') {
+    return new TextEncoder().encode(value)
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return new Uint8Array(value)
+  }
+
+  if (value instanceof Uint8Array) {
+    return new Uint8Array(value)
+  }
+
+  if (value instanceof ArrayBuffer) {
+    return new Uint8Array(value.slice(0))
+  }
+
+  return undefined
+}
+
+function extractIngressBytes(req: Request): Uint8Array | undefined {
+  const rawBody = Reflect.get(req, 'rawBody')
+  const rawIngress = toIngressBytes(rawBody)
+  if (rawIngress) {
+    return rawIngress
+  }
+
+  return toIngressBytes(req.body)
+}
+
 /**
  * Default scent extraction from Express request.
  */
@@ -69,6 +100,7 @@ function defaultExtractScent(req: Request): Scent {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
   const query = safeClone(req.query) ?? {};
   const body = safeClone(req.body);
+  const ingressBytes = extractIngressBytes(req)
   const payload: Record<string, JsonSerializable> = {
     method: req.method,
     path: req.path,
@@ -88,6 +120,7 @@ function defaultExtractScent(req: Request): Scent {
     timestamp: Date.now(),
     source: ip,
     payload,
+    ...(ingressBytes ? { ingressBytes } : {}),
   };
 }
 

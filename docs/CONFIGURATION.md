@@ -19,6 +19,36 @@ For complete option schemas and adapter-specific behavior flags, see:
 2. Adapter behavior flags (Express/Fastify)
 3. Safety and fail-open configuration expectations
 
+## Quarantine Decay Configuration
+
+`TracehoundOptions.quarantine` now covers active-surface expiry and background archival:
+
+```ts
+createTracehound({
+  quarantine: {
+    maxCount: 10_000,
+    maxBytes: 100_000_000,
+    ttlMs: 86_400_000,
+    decayIntervalMs: 1000,
+    decayBatchSize: 128,
+    archiveOnDecay: true,
+    archiveFailureMode: 'drop',
+  },
+})
+```
+
+Operational meaning:
+
+1. `ttlMs`: how long evidence stays in active quarantine before background decay is eligible.
+2. `decayIntervalMs`: cadence for background expiry checks.
+3. `decayBatchSize`: upper bound for expired items processed per decay run.
+4. `archiveOnDecay`: whether expired evidence should be written to cold storage before removal.
+5. `archiveFailureMode`:
+   - `drop`: prefer bounded active state over forensic completeness.
+   - `retain`: keep expired evidence resident until archival succeeds.
+
+If TTL decay is enabled and no custom cold storage adapter is supplied, Tracehound provisions the built-in memory-first adapter automatically.
+
 ## Canonical Rule
 
 `API.md` remains the canonical technical definition for option shapes.

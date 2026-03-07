@@ -9,6 +9,7 @@
  */
 
 import type { TracehoundError } from '../types/errors.js'
+import { Errors } from '../types/errors.js'
 import type { Scent, ThreatSignal } from '../types/scent.js'
 import type { HotPathCodec } from '../utils/binary-codec.js'
 import { encodePayload } from '../utils/encode.js'
@@ -87,8 +88,12 @@ export class EvidenceFactory implements IEvidenceFactory {
 
   create(scent: Scent, threat: ThreatSignal, maxPayloadSize: number): EvidenceCreationResult {
     try {
-      // Step 1: Encode payload with validation
-      const encoded = encodePayload(scent.payload, maxPayloadSize)
+      // Step 1: Prefer raw ingress bytes when provided; otherwise fall back to
+      // canonical payload encoding.
+      const rawIngress = normalizeIngressBytes(scent.ingressBytes)
+      const encoded = rawIngress
+        ? encodeIngressBytes(rawIngress, maxPayloadSize)
+        : encodePayload(scent.payload, maxPayloadSize)
 
       // Step 2: Compute hash of canonical bytes (BEFORE compression)
       // This ensures signature determinism
@@ -157,6 +162,32 @@ export class EvidenceFactory implements IEvidenceFactory {
       'code' in error &&
       'message' in error
     )
+  }
+}
+
+function normalizeIngressBytes(input: Scent['ingressBytes']): Uint8Array | null {
+  if (input instanceof Uint8Array) {
+    return new Uint8Array(input)
+  }
+
+  if (input instanceof ArrayBuffer) {
+    return new Uint8Array(input.slice(0))
+  }
+
+  return null
+}
+
+function encodeIngressBytes(
+  bytes: Uint8Array,
+  maxPayloadSize: number,
+): { bytes: Uint8Array; size: number } {
+  if (bytes.byteLength > maxPayloadSize) {
+    throw Errors.payloadTooLarge(bytes.byteLength, maxPayloadSize)
+  }
+
+  return {
+    bytes,
+    size: bytes.byteLength,
   }
 }
 

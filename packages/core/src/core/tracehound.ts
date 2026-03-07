@@ -17,7 +17,9 @@ import {
 import { createNotificationEmitter, type INotificationEmitter } from './notification-emitter.js'
 import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
+import { createScheduler, type IScheduler } from './scheduler.js'
 import { createWatcher, type IWatcher } from './watcher.js'
+import { createMemoryColdStorage, type IColdStorageAdapter } from './cold-storage.js'
 import { Errors } from '../types/errors.js'
 import { existsSync, unlinkSync } from 'node:fs'
 import {
@@ -53,7 +55,17 @@ export interface TracehoundOptions {
   quarantine?: {
     maxCount?: number
     maxBytes?: number
+    ttlMs?: number
+    decayIntervalMs?: number
+    decayBatchSize?: number
+    archiveOnDecay?: boolean
+    archiveFailureMode?: 'drop' | 'retain'
   }
+
+  /**
+   * Optional cold storage adapter for background quarantine decay archival.
+   */
+  coldStorage?: IColdStorageAdapter
 
   /**
    * Rate limiter configuration.
@@ -109,6 +121,8 @@ export interface ITracehound {
   readonly notifications: INotificationEmitter
   /** The Hound Pool */
   readonly houndPool: IHoundPool
+  /** Background cold storage used for TTL archival */
+  readonly coldStorage: IColdStorageAdapter | null
 
   /**
    * Return immutable runtime snapshot.
@@ -147,8 +161,10 @@ class Tracehound implements ITracehound {
   readonly auditChain: AuditChain
   readonly notifications: INotificationEmitter
   readonly houndPool: IHoundPool
+  readonly coldStorage: IColdStorageAdapter | null
 
   private readonly evidenceFactory: IEvidenceFactory
+  private readonly scheduler: IScheduler | null
   private readonly snapshotPath: string | null
   private readonly snapshotSecret: string | null
   private readonly snapshotIntervalMs: number | null
@@ -158,14 +174,31 @@ class Tracehound implements ITracehound {
     // Initialize components
     this.auditChain = new AuditChain()
     this.notifications = createNotificationEmitter()
+    this.coldStorage =
+      typeof options.quarantine?.ttlMs === 'number' && options.quarantine.ttlMs > 0
+        ? options.coldStorage ?? createMemoryColdStorage()
+        : options.coldStorage ?? null
+
+    const quarantineDependencies =
+      this.coldStorage === null
+        ? {}
+        : {
+            coldStorage: this.coldStorage,
+          }
 
     this.quarantine = new Quarantine(
       {
         maxCount: options.quarantine?.maxCount ?? 10_000,
         maxBytes: options.quarantine?.maxBytes ?? 100_000_000,
         evictionPolicy: 'priority',
+        ttlMs: options.quarantine?.ttlMs ?? 0,
+        decayIntervalMs: options.quarantine?.decayIntervalMs ?? 1_000,
+        decayBatchSize: options.quarantine?.decayBatchSize ?? 128,
+        archiveOnDecay: options.quarantine?.archiveOnDecay ?? true,
+        archiveFailureMode: options.quarantine?.archiveFailureMode ?? 'drop',
       },
       this.auditChain,
+      quarantineDependencies,
     )
 
     this.rateLimiter = createRateLimiter({
@@ -181,6 +214,7 @@ class Tracehound implements ITracehound {
     })
 
     this.evidenceFactory = new EvidenceFactory()
+    this.scheduler = this.createQuarantineDecayScheduler(options.quarantine)
 
     // Create HoundPool first — Agent depends on it for auto-activation
     const poolConfig: HoundPoolConfig = {
@@ -264,8 +298,10 @@ class Tracehound implements ITracehound {
   }
 
   shutdown(): void {
+    this.scheduler?.stop()
     this.stopSnapshotLoop()
     this.cleanupSnapshotFile()
+    this.auditChain.flushPending()
     this.houndPool.shutdown()
   }
 
@@ -373,6 +409,35 @@ class Tracehound implements ITracehound {
     }
 
     return isHoundPressureError(result.error)
+  }
+
+  private createQuarantineDecayScheduler(
+    quarantineOptions: TracehoundOptions['quarantine'],
+  ): IScheduler | null {
+    const ttlMs = quarantineOptions?.ttlMs ?? 0
+    if (ttlMs <= 0) {
+      return null
+    }
+
+    const intervalMs = quarantineOptions?.decayIntervalMs ?? 1_000
+    const scheduler = createScheduler({
+      tickInterval: intervalMs,
+      jitterMs: Math.min(intervalMs, 250),
+      skipIfBusy: true,
+      maxTasksPerTick: 1,
+    })
+
+    scheduler.schedule({
+      id: 'quarantine-decay',
+      intervalMs,
+      priority: 10,
+      execute: async (): Promise<void> => {
+        await this.quarantine.decayExpired()
+      },
+    })
+    scheduler.start()
+
+    return scheduler
   }
 }
 

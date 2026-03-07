@@ -40,29 +40,28 @@ describe('AuditChain', () => {
     it('appends neutralization record', () => {
       const record = createRecord('test-1')
       chain.append(record)
+      const exported = chain.export()
 
       expect(chain.length).toBe(1)
       expect(chain.lastHash).not.toBe(GENESIS_HASH)
+      expect(exported[0]!.batchRoot).toHaveLength(64)
     })
 
     it('chains multiple records', () => {
       chain.append(createRecord('1'))
-      const hash1 = chain.lastHash
-
       chain.append(createRecord('2'))
-      const hash2 = chain.lastHash
-
       chain.append(createRecord('3'))
-      const hash3 = chain.lastHash
+      const exported = chain.export()
 
-      expect(hash1).not.toBe(hash2)
-      expect(hash2).not.toBe(hash3)
       expect(chain.length).toBe(3)
+      expect(new Set(exported.map((record) => record.batchId)).size).toBe(1)
+      expect(new Set(exported.map((record) => record.hash)).size).toBe(1)
     })
 
     it('updates lastHash after each append', () => {
       const before = chain.lastHash
       chain.append(createRecord('test'))
+      chain.flushPending()
       const after = chain.lastHash
 
       expect(after).not.toBe(before)
@@ -136,9 +135,11 @@ describe('AuditChain', () => {
 
       const chain1 = new AuditChain()
       chain1.append(record)
+      chain1.flushPending()
 
       const chain2 = new AuditChain()
       chain2.append({ ...record })
+      chain2.flushPending()
 
       expect(chain1.lastHash).toBe(chain2.lastHash)
     })
@@ -146,9 +147,11 @@ describe('AuditChain', () => {
     it('generates different hash for different records', () => {
       const chain1 = new AuditChain()
       chain1.append(createRecord('id1', { timestamp: 12345 }))
+      chain1.flushPending()
 
       const chain2 = new AuditChain()
       chain2.append(createRecord('id2', { timestamp: 12345 }))
+      chain2.flushPending()
 
       expect(chain1.lastHash).not.toBe(chain2.lastHash)
     })
@@ -157,7 +160,9 @@ describe('AuditChain', () => {
   describe('chain linking', () => {
     it('each record links to previous', () => {
       chain.append(createRecord('1'))
+      chain.flushPending()
       chain.append(createRecord('2'))
+      chain.flushPending()
       chain.append(createRecord('3'))
 
       const exported = chain.export()
@@ -174,9 +179,11 @@ describe('AuditChain', () => {
 
       const plain = new AuditChain()
       plain.append(record)
+      plain.flushPending()
 
       const hmac = new AuditChain('my-secret-hmac-key')
       hmac.append({ ...record })
+      hmac.flushPending()
 
       expect(plain.lastHash).not.toBe(hmac.lastHash)
     })
@@ -195,9 +202,11 @@ describe('AuditChain', () => {
 
       const chain1 = new AuditChain('secret-a')
       chain1.append(record)
+      chain1.flushPending()
 
       const chain2 = new AuditChain('secret-b')
       chain2.append({ ...record })
+      chain2.flushPending()
 
       expect(chain1.lastHash).not.toBe(chain2.lastHash)
     })

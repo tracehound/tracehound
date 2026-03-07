@@ -4,6 +4,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import { AuditChain } from '../src/core/audit-chain.js'
+import { MemoryColdStorage } from '../src/core/cold-storage.js'
 import { Evidence } from '../src/core/evidence.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import type { QuarantineConfig } from '../src/types/config.js'
@@ -17,7 +18,8 @@ describe('Quarantine', () => {
   function createEvidence(
     signature: string,
     severity: 'low' | 'medium' | 'high' | 'critical',
-    size: number = 1024
+    size: number = 1024,
+    captured: number = Date.now(),
   ): Evidence {
     const bytes = new ArrayBuffer(size)
     const view = new Uint8Array(bytes)
@@ -26,7 +28,7 @@ describe('Quarantine', () => {
       view[i] = signature.charCodeAt(i % signature.length)
     }
     const contentHash = hashBuffer(bytes)
-    return new Evidence(bytes, signature, contentHash, severity, Date.now())
+    return new Evidence(bytes, signature, contentHash, severity, captured)
   }
 
   beforeEach(() => {
@@ -261,6 +263,85 @@ describe('Quarantine', () => {
     it('handles empty quarantine', () => {
       const records = quarantine.flush()
       expect(records).toEqual([])
+    })
+  })
+
+  describe('purge', () => {
+    it('appends purge events to the audit chain', () => {
+      quarantine.insert(createEvidence('sig1', 'high'))
+
+      const record = quarantine.purge('sig1', 'timeout')
+
+      expect(record?.status).toBe('purged')
+      expect(auditChain.length).toBe(1)
+      expect(auditChain.export()[0]!.type).toBe('purge')
+    })
+  })
+
+  describe('decay', () => {
+    it('decays expired evidence and archives it to cold storage', async () => {
+      const coldStorage = new MemoryColdStorage()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          decayBatchSize: 10,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        auditChain,
+        {
+          coldStorage,
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-expired', 'high', 256, 1_000))
+
+      const result = await expiringQuarantine.decayExpired()
+      const archived = await coldStorage.read('sig-expired')
+
+      expect(result.decayedCount).toBe(1)
+      expect(result.archivedCount).toBe(1)
+      expect(expiringQuarantine.stats.count).toBe(0)
+      expect(expiringQuarantine.stats.decayedCount).toBe(1)
+      expect(archived.success).toBe(true)
+      expect(auditChain.export().at(-1)?.type).toBe('decay')
+    })
+
+    it('retains expired evidence when archival fails under retain mode', async () => {
+      const unavailableStorage = {
+        write: async () => ({ success: false, error: 'offline' }),
+        read: async () => ({ success: false, error: 'offline' }),
+        delete: async () => false,
+        isAvailable: async () => false,
+      }
+      const retainingQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          decayBatchSize: 10,
+          archiveOnDecay: true,
+          archiveFailureMode: 'retain',
+        },
+        auditChain,
+        {
+          coldStorage: unavailableStorage,
+          now: () => 1_500,
+        },
+      )
+
+      retainingQuarantine.insert(createEvidence('sig-retain', 'high', 256, 1_000))
+
+      const result = await retainingQuarantine.decayExpired()
+
+      expect(result.retainedCount).toBe(1)
+      expect(result.decayedCount).toBe(0)
+      expect(retainingQuarantine.has('sig-retain')).toBe(true)
     })
   })
 

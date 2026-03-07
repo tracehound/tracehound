@@ -6,6 +6,7 @@
 > **Execution Mode:** Governance-first
 > **Authoritative Roadmap:** [TRACEHOUND-UNIFIED-ROADMAP.md](./TRACEHOUND-UNIFIED-ROADMAP.md)
 > **Completed On:** 2026-03-04
+> **Use:** Historical governance evidence only. Not an active execution plan.
 
 ## 1. Charter
 

@@ -319,13 +319,22 @@ export function verify(encoded: EncodedPayload): boolean {
 /**
  * Decode payload from cold storage.
  *
- * CRITICAL: Call verify() first. Decoding untrusted data wastes CPU.
+ * Internally enforces integrity verification before decompression.
+ * Throws CodecError with INTEGRITY_VIOLATION if hash does not match —
+ * caller must not catch and suppress this error.
  *
- * @param encoded - Verified encoded payload
+ * @param encoded - Encoded payload to decode
  * @returns Original uncompressed bytes
- * @throws CodecError if decompression fails (storage corruption)
+ * @throws CodecError if integrity check fails or decompression fails
  */
 export function decodeWithIntegrity(encoded: EncodedPayload): Uint8Array {
+  if (!verify(encoded)) {
+    throw new CodecError(
+      'Integrity check failed — payload may have been tampered with',
+      'INTEGRITY_VIOLATION',
+    )
+  }
+
   try {
     const decompressed = gunzipSync(encoded.compressed);
     const result = new Uint8Array(decompressed);
@@ -385,15 +394,24 @@ export async function encodeWithIntegrityAsync(
  * Async decode payload from cold storage.
  * Non-blocking version of decodeWithIntegrity().
  *
- * CRITICAL: Call verify() first. Decoding untrusted data wastes CPU.
+ * Internally enforces integrity verification before decompression.
+ * Throws CodecError with INTEGRITY_VIOLATION if hash does not match —
+ * caller must not catch and suppress this error.
  *
- * @param encoded - Verified encoded payload
+ * @param encoded - Encoded payload to decode
  * @returns Original uncompressed bytes
- * @throws CodecError if decompression fails (storage corruption)
+ * @throws CodecError if integrity check fails or decompression fails
  */
 export async function decodeWithIntegrityAsync(
   encoded: EncodedPayload,
 ): Promise<Uint8Array> {
+  if (!verify(encoded)) {
+    throw new CodecError(
+      'Integrity check failed — payload may have been tampered with',
+      'INTEGRITY_VIOLATION',
+    )
+  }
+
   try {
     const decompressed = await gunzipAsync(encoded.compressed);
     const result = new Uint8Array(decompressed);

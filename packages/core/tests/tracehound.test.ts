@@ -65,6 +65,18 @@ describe('Tracehound Factory', () => {
       expect(tracehound.quarantine.stats.count).toBe(0)
     })
 
+    it('provisions cold storage when TTL decay is enabled', () => {
+      const tracehound = createTracehound({
+        quarantine: {
+          ttlMs: 100,
+          decayIntervalMs: 25,
+        },
+      })
+
+      expect(tracehound.coldStorage).not.toBeNull()
+      tracehound.shutdown()
+    })
+
     it('should accept custom rate limit config', () => {
       const tracehound = createTracehound({
         rateLimit: {
@@ -120,6 +132,44 @@ describe('Tracehound Factory', () => {
   })
 
   describe('Internal Wiring', () => {
+    it('decays expired quarantine entries in the background when TTL is enabled', async () => {
+      vi.useFakeTimers()
+      const tracehound = createTracehound({
+        quarantine: {
+          ttlMs: 10,
+          decayIntervalMs: 5,
+        },
+      })
+
+      try {
+        const result = tracehound.agent.intercept({
+          id: 'ttl-1',
+          timestamp: Date.now(),
+          source: 'ttl-source',
+          threat: { category: 'injection', severity: 'high' },
+          payload: { attack: true },
+        })
+
+        expect(result.status).toBe('quarantined')
+        if (result.status !== 'quarantined' || !tracehound.coldStorage) {
+          return
+        }
+
+        // The first jittered decay tick can land before TTL expiry and become a
+        // no-op, so advance past a full second tick window before asserting.
+        await vi.advanceTimersByTimeAsync(30)
+        await flushMicrotasks()
+
+        const archived = await tracehound.coldStorage.read(result.handle.signature)
+        expect(tracehound.quarantine.stats.count).toBe(0)
+        expect(tracehound.quarantine.stats.decayedCount).toBe(1)
+        expect(archived.success).toBe(true)
+      } finally {
+        tracehound.shutdown()
+        vi.useRealTimers()
+      }
+    })
+
     it('watcher.snapshot() reflects real threats intercepted by agent', () => {
       const tracehound = createTracehound()
       tracehound.agent.intercept({

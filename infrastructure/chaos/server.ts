@@ -1,4 +1,4 @@
-import { createTracehound } from "@tracehound/core";
+import { createTracehound, generateSecureId } from "@tracehound/core";
 import { tracehound } from "@tracehound/express";
 import express from "express";
 import { dirname, resolve } from "node:path";
@@ -47,7 +47,7 @@ app.use(
       return {
         id:
           (req.headers["x-request-id"] as string) ||
-          `chaos-${Date.now()}-${Math.random()}`,
+          `chaos-${generateSecureId()}`,
         timestamp: Date.now(),
         source: req.ip || "127.0.0.1",
         threat: req.headers["x-chaos-threat"]

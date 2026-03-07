@@ -466,7 +466,9 @@ describe("Quarantine", () => {
         },
       );
 
-      retainingQuarantine.insert(createEvidence("sig-race", "high", 256, 1_000));
+      retainingQuarantine.insert(
+        createEvidence("sig-race", "high", 256, 1_000),
+      );
 
       const decayPromise = retainingQuarantine.decayExpired();
       await writeStarted;
@@ -724,7 +726,6 @@ describe("Quarantine", () => {
         write: async () => ({
           success: false,
           error: `https://s3.internal.example/upload arn:aws:s3:::tracehound ${mockedAccessKeyFragment} extra-detail`,
-          // gitleaks:allow: test credentials
         }),
         read: async () => ({ success: false }),
         delete: async () => false,

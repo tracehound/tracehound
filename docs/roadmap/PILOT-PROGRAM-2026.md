@@ -2,7 +2,7 @@
 
 > **Status:** Archived Reference
 > **Use:** Historical field-validation strategy input only. Not an active execution plan.
-
+>
 > [!NOTE]
 > Archived reference document. The active technical roadmap is
 > [TRACEHOUND-UNIFIED-ROADMAP.md](./TRACEHOUND-UNIFIED-ROADMAP.md).

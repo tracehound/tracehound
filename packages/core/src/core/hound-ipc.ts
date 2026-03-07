@@ -95,7 +95,7 @@ export function encodeMessage(payload: ArrayBuffer): Buffer {
     throw Errors.processIpcMessageTooLarge(length, MAX_MESSAGE_SIZE)
   }
 
-  const result = Buffer.allocUnsafe(LENGTH_PREFIX_SIZE + length)
+  const result = Buffer.alloc(LENGTH_PREFIX_SIZE + length)
 
   // Write length as 32-bit BE
   result.writeUInt32BE(length, 0)
@@ -119,7 +119,7 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
     const stateCode = encodeStatusState(message.state)
     const errorBytes = message.error ? Buffer.from(message.error, 'utf8') : Buffer.alloc(0)
 
-    const payload = Buffer.allocUnsafe(2 + errorBytes.length)
+    const payload = Buffer.alloc(2 + errorBytes.length)
     payload[0] = 0x01 // type: status
     payload[1] = stateCode
     errorBytes.copy(payload, 2)
@@ -132,7 +132,7 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
   if (message.type === 'metrics') {
     // Type 0x02 = metrics
     // [1 byte type][8 bytes processingTime][8 bytes memoryUsed]
-    const payload = Buffer.allocUnsafe(17)
+    const payload = Buffer.alloc(17)
     payload[0] = 0x02 // type: metrics
     payload.writeDoubleBE(message.processingTime, 1)
     payload.writeDoubleBE(message.memoryUsed, 9)
@@ -161,7 +161,7 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
     throw Errors.processIpcInvalidAnalysisMessage()
   }
 
-  const payload = Buffer.allocUnsafe(1 + 2 + hashBytes.length + 8 + 1 + 4)
+  const payload = Buffer.alloc(1 + 2 + hashBytes.length + 8 + 1 + 4)
   payload[0] = 0x03
   payload.writeUInt16BE(hashBytes.length, 1)
   hashBytes.copy(payload, 3)

@@ -106,9 +106,21 @@ jobs:
         if: needs.affected.outputs.has_packages == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Build @tracehound/core
+        if: needs.affected.outputs.has_packages == 'true'
+        run: pnpm --filter @tracehound/core build
+
       - name: Lint affected workspaces
         if: needs.affected.outputs.has_packages == 'true'
         run: pnpm -r ${{ needs.affected.outputs.filters }} lint
+
+      - name: Reject forbidden memory patterns in core
+        if: needs.affected.outputs.has_packages == 'true'
+        run: |
+          if grep -rn --include='*.ts' 'Buffer\.allocUnsafe' packages/core/src/; then
+            echo "ERROR: Buffer.allocUnsafe is forbidden in packages/core/src/ — use Buffer.alloc"
+            exit 1
+          fi
 
       - name: Build affected workspaces
         if: needs.affected.outputs.has_packages == 'true'
@@ -150,11 +162,15 @@ jobs:
 
   secrets_pr_safe:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - uses: gitleaks/gitleaks-action@v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

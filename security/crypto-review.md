@@ -21,7 +21,38 @@ Validate cryptographic usage for forensic integrity claims.
 | Constant-time compare   | `timingSafeEqual` wrappers present                 | Baseline set |
 | Canonical serialization | deterministic key-sorted serialization path exists | Baseline set |
 | Hash truncation         | full SHA-256 hex used in signature/hash paths      | Baseline set |
-| Key rotation model      | Not documented yet for webhook secret lifecycle    | Open         |
+| Key rotation model      | Policy documented — see section below              | Documented   |
+
+## Webhook Secret Key Rotation Policy
+
+Enforcement point: `notification-emitter.ts` — HMAC-SHA256 signing; when a secret is configured, a minimum 16-char secret is enforced (secret is optional in `WebhookConfig`).
+
+### Secret requirements
+
+- When a secret is set, a minimum of 16 characters is enforced; recommended minimum is 32 random bytes (256-bit).
+- Generate with `crypto.randomBytes(32).toString('hex')` — never a passphrase or human-readable string.
+- Store in an environment variable or secrets manager (Vault, AWS SSM); never hardcode in source or config.
+
+### Rotation triggers
+
+- Suspected compromise or accidental exposure.
+- Personnel change for anyone with secret access.
+- Scheduled 90-day maximum rotation window.
+
+### Rotation procedure
+
+1. Generate new secret.
+2. Update the consumer webhook endpoint configuration.
+3. Update the secret in the environment / secrets manager.
+4. Verify the next delivery signature against the new key.
+5. Revoke the old secret.
+
+Zero-downtime window: a brief dual-accept window is acceptable if needed; revoke the old key within 1 hour.
+
+Audit trail: log rotation events with a key identifier or creation timestamp — never the secret value itself.
+
+SSRF guard: `isAllowedWebhookUrl` blocks loopback, link-local, and RFC-1918 ranges.
+Review SSRF coverage whenever a new endpoint type is added.
 
 ## Required Artifacts
 

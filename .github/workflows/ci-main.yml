@@ -36,6 +36,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - name: Reject forbidden memory patterns in core
+        run: |
+          if grep -rn --include='*.ts' 'Buffer\.allocUnsafe' packages/core/src/; then
+            echo "ERROR: Buffer.allocUnsafe is forbidden in packages/core/src/ — use Buffer.alloc"
+            exit 1
+          fi
       - run: pnpm build
       - run: pnpm test
 

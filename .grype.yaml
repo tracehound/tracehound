@@ -1,0 +1,13 @@
+# Grype vulnerability scanner configuration
+# https://github.com/anchore/grype#configuration
+
+ignore:
+  # rollup and minimatch are transitive dev-only dependencies via vitest.
+  # They are NOT present in production builds — pnpm audit --prod returns 0 vulnerabilities.
+  # Paths: vitest > vite > rollup  and  @vitest/coverage-v8 > test-exclude > minimatch
+  - package:
+      name: rollup
+      type: npm
+  - package:
+      name: minimatch
+      type: npm

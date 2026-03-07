@@ -1,0 +1,92 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-03-07T12:18:58.257Z",
+    "tools": [
+      {
+        "vendor": "tracehound",
+        "name": "local-sbom-gen",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "tracehound",
+      "version": "1.6.0"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "@tracehound/core@1.6.0",
+      "name": "@tracehound/core",
+      "version": "1.6.0",
+      "purl": "pkg:npm/%40tracehound/core@1.6.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "@tracehound/cli@1.6.0",
+      "name": "@tracehound/cli",
+      "version": "1.6.0",
+      "purl": "pkg:npm/%40tracehound/cli@1.6.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "@tracehound/express@1.6.0",
+      "name": "@tracehound/express",
+      "version": "1.6.0",
+      "purl": "pkg:npm/%40tracehound/express@1.6.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "@tracehound/fastify@1.6.0",
+      "name": "@tracehound/fastify",
+      "version": "1.6.0",
+      "purl": "pkg:npm/%40tracehound/fastify@1.6.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "uuid@10.0.0",
+      "name": "uuid",
+      "version": "10.0.0",
+      "purl": "pkg:npm/uuid@10.0.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "commander@12.1.0",
+      "name": "commander",
+      "version": "12.1.0",
+      "purl": "pkg:npm/commander@12.1.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "cli-table3@0.6.5",
+      "name": "cli-table3",
+      "version": "0.6.5",
+      "purl": "pkg:npm/cli-table3@0.6.5"
+    },
+    {
+      "type": "library",
+      "bom-ref": "string-width@4.2.3",
+      "name": "string-width",
+      "version": "4.2.3",
+      "purl": "pkg:npm/string-width@4.2.3"
+    },
+    {
+      "type": "library",
+      "bom-ref": "@colors/colors@1.5.0",
+      "name": "@colors/colors",
+      "version": "1.5.0",
+      "purl": "pkg:npm/%40colors/colors@1.5.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "typescript@5.9.3",
+      "name": "typescript",
+      "version": "5.9.3",
+      "purl": "pkg:npm/typescript@5.9.3"
+    }
+  ]
+}

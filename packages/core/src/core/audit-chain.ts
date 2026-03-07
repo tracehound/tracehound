@@ -4,6 +4,7 @@
 
 import { createHash, createHmac } from 'node:crypto'
 import type { AuditLifecycleRecord, AuditRecord, IAuditChain } from '../types/audit.js'
+import { constantTimeEqual } from '../utils/compare.js'
 
 /** Genesis hash (anchor for chain) */
 export const GENESIS_HASH = '0'.repeat(64)
@@ -102,7 +103,7 @@ export class AuditChain implements IAuditChain {
       const eventHashes: string[] = []
       for (const record of batch) {
         const recomputedEventHash = this.digest(record.eventData)
-        if (recomputedEventHash !== record.eventHash) {
+        if (!constantTimeEqual(recomputedEventHash, record.eventHash)) {
           return false
         }
         eventHashes.push(recomputedEventHash)
@@ -110,7 +111,7 @@ export class AuditChain implements IAuditChain {
 
       const expectedBatchRoot = buildMerkleRoot(eventHashes, (data) => this.digest(data))
 
-      if (expectedBatchRoot !== head.batchRoot) {
+      if (!constantTimeEqual(expectedBatchRoot, head.batchRoot)) {
         return false
       }
 
@@ -130,9 +131,9 @@ export class AuditChain implements IAuditChain {
         }
 
         if (
-          record.previousHash !== expectedPreviousHash ||
-          record.hash !== expectedChainHash ||
-          record.batchRoot !== head.batchRoot ||
+          !constantTimeEqual(record.previousHash, expectedPreviousHash) ||
+          !constantTimeEqual(record.hash, expectedChainHash) ||
+          !constantTimeEqual(record.batchRoot, head.batchRoot) ||
           record.batchSize !== batch.length ||
           record.batchIndex !== batchIndex
         ) {
@@ -355,7 +356,6 @@ function normalizeLifecycleRecord(record: AuditLifecycleRecord): {
         hash: record.hash,
         size: record.size,
         reason: record.reason,
-        source: record.scent.source,
         previousHash: record.previousHash,
       },
     }

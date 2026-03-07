@@ -30,6 +30,7 @@ export interface QuarantineStats {
   bytes: number;
   droppedCount: number;
   droppedBytes: number;
+  evictedCount: number;
   decayedCount: number;
   archivedCount: number;
   archiveFailureCount: number;
@@ -77,6 +78,7 @@ export class Quarantine {
   private totalBytes = 0;
   private droppedCount = 0;
   private droppedBytes = 0;
+  private evictedCount = 0;
   private decayedCount = 0;
   private archivedCount = 0;
   private archiveFailureCount = 0;
@@ -346,6 +348,7 @@ export class Quarantine {
       bytes: this.totalBytes,
       droppedCount: this.droppedCount,
       droppedBytes: this.droppedBytes,
+      evictedCount: this.evictedCount,
       decayedCount: this.decayedCount,
       archivedCount: this.archivedCount,
       archiveFailureCount: this.archiveFailureCount,
@@ -475,6 +478,8 @@ export class Quarantine {
     if (disposition === "drop") {
       this.droppedCount++;
       this.droppedBytes += size;
+    } else {
+      this.evictedCount++;
     }
   }
 
@@ -691,57 +696,56 @@ export class Quarantine {
     }
 
     const timeoutMs = normalizeArchiveTimeout(this.config.archiveTimeoutMs);
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
 
-    const archivePromise = this.runArchive(signature, bytes);
-    return await new Promise<{
+    const archivePromise = this.runArchive(signature, bytes, controller.signal);
+
+    const timeoutPromise = new Promise<{
       archived: boolean;
-      storageId?: string;
-      storageError?: string;
+      storageError: string;
     }>((resolve) => {
-      timeoutId = setTimeout(() => {
-        // Timeout fired before archive completed.
+      const tid = setTimeout(() => {
+        controller.abort();
         resolve({
           archived: false,
           storageError: `archive timed out after ${timeoutMs}ms`,
         });
       }, timeoutMs);
-      // Prevent the timer from keeping the Node.js event loop alive after archive completes.
-      if (
-        typeof (timeoutId as unknown as { unref?: () => void }).unref ===
-        "function"
-      ) {
-        (timeoutId as unknown as { unref: () => void }).unref();
+      // Prevent the timer from keeping the Node.js event loop alive.
+      if (typeof (tid as unknown as { unref?: () => void }).unref === "function") {
+        (tid as unknown as { unref: () => void }).unref();
       }
-      archivePromise
-        .then((result) => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = undefined;
-          }
-          resolve(result);
-        })
-        .catch((err) => {
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = undefined;
-          }
-          // Real adapter/encode error — sanitize before returning.
-          resolve({
-            archived: false,
-            storageError: sanitizeStorageError(
-              err instanceof Error ? err.message : "unknown",
-            ),
-          });
-        });
+      // Cancel the timeout once the archive promise settles first.
+      archivePromise.then(() => clearTimeout(tid)).catch(() => clearTimeout(tid));
     });
+
+    try {
+      return await Promise.race([archivePromise, timeoutPromise]);
+    } catch (err) {
+      // Real adapter/encode error — sanitize before returning.
+      return {
+        archived: false,
+        storageError: sanitizeStorageError(
+          err instanceof Error ? err.message : "unknown",
+        ),
+      };
+    }
   }
 
   private async runArchive(
     signature: string,
     bytes: Uint8Array,
+    signal: AbortSignal,
   ): Promise<{ archived: boolean; storageId?: string; storageError?: string }> {
+    if (signal.aborted) {
+      return { archived: false, storageError: "archive cancelled" };
+    }
+
     const availability = await this.coldStorage!.isAvailable();
+    if (signal.aborted) {
+      return { archived: false, storageError: "archive cancelled" };
+    }
+
     if (!availability) {
       return {
         archived: false,
@@ -750,6 +754,10 @@ export class Quarantine {
     }
 
     const encoded = await encodeWithIntegrityAsync(bytes);
+    if (signal.aborted) {
+      return { archived: false, storageError: "archive cancelled" };
+    }
+
     const result = await this.coldStorage!.write(signature, encoded);
     const archiveResult: {
       archived: boolean;

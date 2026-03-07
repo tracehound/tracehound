@@ -89,13 +89,11 @@ function toIngressBytes(value: unknown): Uint8Array | undefined {
 }
 
 function extractIngressBytes(req: Request): Uint8Array | undefined {
+  // Only use rawBody — set explicitly by body-parser middleware (e.g. verify callback).
+  // Falling back to req.body would create signature non-determinism: the same logical
+  // payload would produce different signatures depending on middleware configuration.
   const rawBody = Reflect.get(req, 'rawBody')
-  const rawIngress = toIngressBytes(rawBody)
-  if (rawIngress) {
-    return rawIngress
-  }
-
-  return toIngressBytes(req.body)
+  return toIngressBytes(rawBody)
 }
 
 /**

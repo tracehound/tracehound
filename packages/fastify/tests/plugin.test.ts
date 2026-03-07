@@ -328,7 +328,9 @@ describe('tracehoundPlugin', () => {
       expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
     })
 
-    it('captures string request bodies into ingressBytes when rawBody is absent', () => {
+    it('does not populate ingressBytes from string body when rawBody is absent', () => {
+      // ingressBytes is only populated from rawBody to preserve signature determinism.
+      // Falling back to req.body would produce different signatures across middleware configs.
       const agent = createMockAgent({ status: 'clean' })
       const fastify = createMockFastify()
 
@@ -344,10 +346,10 @@ describe('tracehoundPlugin', () => {
       hookHandler(req, reply, next)
 
       const scent = (agent.intercept as any).mock.calls[0][0]
-      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('plain-text-body')
+      expect(scent.ingressBytes).toBeUndefined()
     })
 
-    it('captures Uint8Array request bodies into ingressBytes when rawBody is absent', () => {
+    it('does not populate ingressBytes from Uint8Array body when rawBody is absent', () => {
       const agent = createMockAgent({ status: 'clean' })
       const fastify = createMockFastify()
 
@@ -363,10 +365,10 @@ describe('tracehoundPlugin', () => {
       hookHandler(req, reply, next)
 
       const scent = (agent.intercept as any).mock.calls[0][0]
-      expect(Array.from(scent.ingressBytes as Uint8Array)).toEqual([1, 2, 3])
+      expect(scent.ingressBytes).toBeUndefined()
     })
 
-    it('captures ArrayBuffer request bodies into ingressBytes when rawBody is absent', () => {
+    it('does not populate ingressBytes from ArrayBuffer body when rawBody is absent', () => {
       const agent = createMockAgent({ status: 'clean' })
       const fastify = createMockFastify()
       const bytes = new Uint8Array([4, 5, 6])
@@ -383,7 +385,7 @@ describe('tracehoundPlugin', () => {
       hookHandler(req, reply, next)
 
       const scent = (agent.intercept as any).mock.calls[0][0]
-      expect(Array.from(scent.ingressBytes as Uint8Array)).toEqual([4, 5, 6])
+      expect(scent.ingressBytes).toBeUndefined()
     })
   })
 

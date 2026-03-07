@@ -186,14 +186,20 @@ describe("Tracehound Factory", () => {
           return;
         }
 
-        // The first jittered decay tick can land before TTL expiry and become a
-        // no-op, so advance past a full second tick window before asserting.
-        await vi.advanceTimersByTimeAsync(30);
-        await flushMicrotasks();
-        // Yield to the real event loop so the libuv gzip thread-pool callback
-        // (from encodeWithIntegrityAsync) can fire in the poll phase.
-        await new Promise<void>((resolve) => setImmediate(resolve));
-        await flushMicrotasks();
+        // Jittered ticks and async archival can complete at different points
+        // under fake timers, so poll deterministically until decay settles.
+        for (
+          let attempt = 0;
+          attempt < 20 && tracehound.quarantine.stats.count > 0;
+          attempt++
+        ) {
+          await vi.advanceTimersByTimeAsync(20);
+          await flushMicrotasks();
+          // Yield to the real event loop so the libuv gzip thread-pool callback
+          // (from encodeWithIntegrityAsync) can fire in the poll phase.
+          await new Promise<void>((resolve) => setImmediate(resolve));
+          await flushMicrotasks();
+        }
 
         const archived = await tracehound.coldStorage.read(
           result.handle.signature,

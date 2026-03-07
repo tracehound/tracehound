@@ -21,7 +21,7 @@ export interface NeutralizationRecord {
   status: 'neutralized'
   /** Timestamp of neutralization */
   timestamp: number
-  /** Previous record hash in audit chain */
+  /** Sealed chain anchor observed when this lifecycle record was captured */
   previousHash: string
 }
 
@@ -71,7 +71,7 @@ export interface PurgeRecord {
   }
   /** Timestamp of purge */
   timestamp: number
-  /** Previous record hash in audit chain */
+  /** Sealed chain anchor observed when this lifecycle record was captured */
   previousHash: string
 }
 
@@ -95,7 +95,7 @@ export interface EvictionRecord {
   reason: 'capacity' | 'pressure'
   /** Timestamp of eviction */
   timestamp: number
-  /** Previous record hash in audit chain */
+  /** Sealed chain anchor observed when this lifecycle record was captured */
   previousHash: string
 }
 
@@ -119,7 +119,7 @@ export interface DropRecord {
   reason: 'oversized' | 'capacity' | 'pressure'
   /** Timestamp of drop */
   timestamp: number
-  /** Previous record hash in audit chain */
+  /** Sealed chain anchor observed when this lifecycle record was captured */
   previousHash: string
 }
 
@@ -142,7 +142,7 @@ export interface DecayRecord {
   reason: 'ttl_expired'
   /** Timestamp of decay */
   timestamp: number
-  /** Previous record hash in audit chain */
+  /** Sealed chain anchor observed when this lifecycle record was captured */
   previousHash: string
   /** Whether decay archived bytes to cold storage */
   archived: boolean
@@ -184,7 +184,7 @@ export interface EvidenceHandle {
    * Atomically snapshot and destroy evidence.
    * Returns neutralization record.
    *
-   * @param previousHash - Last hash in audit chain
+   * @param previousHash - Current sealed chain anchor at capture time
    */
   neutralize(previousHash: string): NeutralizationRecord
 

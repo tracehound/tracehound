@@ -320,6 +320,7 @@ function normalizeLifecycleRecord(record: AuditLifecycleRecord): {
       details: {
         hash: record.hash,
         size: record.size,
+        previousHash: record.previousHash,
       },
     }
   }
@@ -349,6 +350,7 @@ function normalizeLifecycleRecord(record: AuditLifecycleRecord): {
         size: record.size,
         reason: record.reason,
         source: record.scent.source,
+        previousHash: record.previousHash,
       },
     }
   }
@@ -363,6 +365,7 @@ function normalizeLifecycleRecord(record: AuditLifecycleRecord): {
         hash: record.hash,
         size: record.size,
         reason: record.reason,
+        previousHash: record.previousHash,
       },
     }
   }
@@ -377,6 +380,7 @@ function normalizeLifecycleRecord(record: AuditLifecycleRecord): {
         hash: record.hash,
         size: record.size,
         reason: record.reason,
+        previousHash: record.previousHash,
       },
     }
   }
@@ -393,6 +397,7 @@ function normalizeLifecycleRecord(record: AuditLifecycleRecord): {
       reason: record.reason,
       storageId: record.storageId ?? null,
       storageError: record.storageError ?? null,
+      previousHash: record.previousHash,
     },
   }
 }

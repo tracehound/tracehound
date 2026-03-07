@@ -305,7 +305,7 @@ describe('tracehound middleware', () => {
       expect(res.set).toHaveBeenCalledWith('Retry-After', '2')
     })
 
-    it('falls through unexpected intercept statuses without mutating the response', () => {
+    it('fails open for unexpected intercept statuses by continuing the middleware chain', () => {
       const agent = createMockAgent({ status: 'unexpected' } as unknown as InterceptResult)
       const middleware = tracehound({ agent })
       const res = createMockRes()
@@ -313,7 +313,7 @@ describe('tracehound middleware', () => {
       middleware(createMockReq(), res, next)
 
       expect(res.status).not.toHaveBeenCalled()
-      expect(next).not.toHaveBeenCalled()
+      expect(next).toHaveBeenCalled()
     })
   })
 
@@ -345,6 +345,7 @@ describe('tracehound middleware', () => {
     middleware(req, res, next)
 
     expect(onIntercept).toHaveBeenCalledWith({ status: 'rate_limited', retryAfter: 1000 }, req, res)
+    expect(next).toHaveBeenCalled()
   })
 
   it('should propagate error when custom onIntercept throws after headers are sent', () => {

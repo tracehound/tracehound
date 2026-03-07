@@ -112,7 +112,7 @@ export class Evidence implements EvidenceHandle {
    * Atomically snapshot and destroy evidence.
    * Returns neutralization record for audit chain.
    *
-   * @param previousHash - Last hash in audit chain
+   * @param previousHash - Current sealed chain anchor at capture time
    */
   neutralize(previousHash: string): NeutralizationRecord {
     if (this._disposed) {

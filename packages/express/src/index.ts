@@ -237,7 +237,27 @@ export function tracehound(
         return;
       }
 
+      const isDefaultTerminalStatus =
+        result.status === "rate_limited" ||
+        result.status === "payload_too_large" ||
+        result.status === "quarantined" ||
+        result.status === "error";
+
       interceptHandler(result, req, res);
+
+      // Forward-compat fail-open:
+      // - default handler: pass through unknown statuses
+      // - custom handler: pass through when no response was sent
+      if (onIntercept) {
+        if (!res.headersSent) {
+          next();
+        }
+        return;
+      }
+
+      if (!isDefaultTerminalStatus) {
+        next();
+      }
     } catch (error: unknown) {
       // Preserve Express error pipeline after partial writes from custom handlers.
       if (res.headersSent) {

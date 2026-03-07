@@ -410,7 +410,7 @@ describe('tracehoundPlugin', () => {
     expect(agent.intercept).toHaveBeenCalledWith(customScent)
   })
 
-  it('should use custom onIntercept handler', () => {
+  it('should use custom onIntercept handler and fail open when no reply is sent', () => {
     const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
     const onIntercept = vi.fn()
     const fastify = createMockFastify()
@@ -425,7 +425,7 @@ describe('tracehoundPlugin', () => {
     hookHandler(req, reply, next)
 
     expect(onIntercept).toHaveBeenCalledWith({ status: 'rate_limited', retryAfter: 1000 }, req, reply)
-    expect(next).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalled()
   })
 
   it('should propagate error when custom onIntercept throws after reply is sent', () => {
@@ -473,7 +473,7 @@ describe('tracehoundPlugin', () => {
     expect(reply.status).not.toHaveBeenCalled()
   })
 
-  it('falls through unexpected intercept statuses without mutating the reply', () => {
+  it('fails open for unexpected intercept statuses by calling hookDone', () => {
     const agent = createMockAgent({ status: 'unexpected' } as unknown as InterceptResult)
     const fastify = createMockFastify()
     const next = vi.fn()
@@ -487,6 +487,6 @@ describe('tracehoundPlugin', () => {
     hookHandler(req, reply, next)
 
     expect(reply.status).not.toHaveBeenCalled()
-    expect(next).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalled()
   })
 })

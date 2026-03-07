@@ -234,7 +234,10 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
 
         defaultOnIntercept(result, req, reply, interceptOptions)
       }
-      // Don't call hookDone() - response is already sent
+      // Forward-compat fail-open: continue if no response was sent.
+      if (!reply.sent) {
+        hookDone()
+      }
     } catch (error: unknown) {
       // Preserve Fastify error pipeline after partial writes from custom handlers.
       if (reply.sent) {

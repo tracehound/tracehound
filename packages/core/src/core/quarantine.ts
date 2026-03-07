@@ -133,9 +133,8 @@ export class Quarantine {
         break
       }
 
-      const dropReason: 'capacity' | 'pressure' =
-        victim.signature === evidence.signature ? 'pressure' : 'capacity'
-      this.dropStored(victim, dropReason)
+      const disposition = victim.signature === evidence.signature ? 'drop' : 'eviction'
+      this.dropStored(victim, disposition, 'pressure')
     }
 
     if (!this.store.has(evidence.signature)) {
@@ -413,18 +412,22 @@ export class Quarantine {
     }
   }
 
-  private dropStored(evidence: EvidenceHandle, reason: 'capacity' | 'pressure'): void {
+  private dropStored(
+    evidence: EvidenceHandle,
+    disposition: 'drop' | 'eviction',
+    reason: 'capacity' | 'pressure',
+  ): void {
     const size = evidence.size
     const signature = evidence.signature
 
-    if (reason === 'pressure') {
+    if (disposition === 'drop') {
       const record: DropRecord = {
         id: `drp-${generateSecureId()}`,
         signature,
         hash: evidence.hash,
         size,
         status: 'dropped',
-        reason: 'pressure',
+        reason,
         timestamp: this.now(),
         previousHash: this.auditChain.lastHash,
       }
@@ -437,7 +440,7 @@ export class Quarantine {
         hash: evidence.hash,
         size,
         status: 'evicted',
-        reason: 'capacity',
+        reason,
         timestamp: this.now(),
         previousHash: this.auditChain.lastHash,
       }

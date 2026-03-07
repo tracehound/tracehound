@@ -2,6 +2,7 @@
  * Quarantine - priority-based evidence storage with eviction.
  */
 
+import { generateSecureId } from '../utils/id.js'
 import type { Severity } from '../types/common.js'
 import type { QuarantineConfig } from '../types/config.js'
 import type { EvidenceHandle, NeutralizationRecord, PurgeRecord } from '../types/evidence.js'
@@ -185,7 +186,7 @@ export class Quarantine {
 
     // Create purge record before disposing
     const record: PurgeRecord = {
-      id: `prg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `prg-${generateSecureId()}`,
       reason,
       scent: {
         id: evidence.signature, // Using signature as proxy for scent ID

@@ -110,6 +110,14 @@ jobs:
         if: needs.affected.outputs.has_packages == 'true'
         run: pnpm -r ${{ needs.affected.outputs.filters }} lint
 
+      - name: Reject forbidden memory patterns in core
+        if: needs.affected.outputs.has_packages == 'true'
+        run: |
+          if grep -rn --include='*.ts' 'Buffer\.allocUnsafe' packages/core/src/; then
+            echo "ERROR: Buffer.allocUnsafe is forbidden in packages/core/src/ — use Buffer.alloc"
+            exit 1
+          fi
+
       - name: Build affected workspaces
         if: needs.affected.outputs.has_packages == 'true'
         run: pnpm -r ${{ needs.affected.outputs.filters }} build

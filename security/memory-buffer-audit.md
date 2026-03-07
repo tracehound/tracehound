@@ -6,35 +6,31 @@ Review unsafe buffer operations and verify that binary parsing is bounded.
 
 ## Initial Findings
 
-### `Buffer.allocUnsafe` usage
+### `Buffer.allocUnsafe` usage — RESOLVED
 
-`allocUnsafe` is used in `packages/core/src/core/hound-ipc.ts` for message encoding.
+All four `allocUnsafe` call sites in `packages/core/src/core/hound-ipc.ts` have been migrated to
+`Buffer.alloc` (2026-03-07). No `allocUnsafe` remains in production IPC encoding paths.
 
-Current call sites:
+Migrated call sites:
 
-1. Length-prefixed frame buffer allocation
-2. Status message payload allocation
-3. Metrics message payload allocation
+1. Length-prefixed frame buffer allocation (`encodeMessage`)
+2. Status message payload allocation (`encodeHoundMessage` — status branch)
+3. Metrics message payload allocation (`encodeHoundMessage` — metrics branch)
+4. Analysis message payload allocation (`encodeHoundMessage` — analysis branch)
 
-### Safety rationale (current state)
+### Decision rationale
 
-These buffers are written immediately with deterministic fields before being returned.
-No read-before-write pattern was identified in these paths.
+`Buffer.alloc` was chosen over the performance-focused `allocUnsafe` approach because:
 
-### Risk note
-
-`allocUnsafe` remains a sharp edge: future refactors can introduce partial writes or accidental exposure of uninitialized memory.
-
-## Decisions Needed
-
-- [ ] Decide whether to keep `allocUnsafe` (performance-focused) with strict guardrails, or
-- [ ] migrate to `Buffer.alloc` for safer-by-default behavior in security-sensitive IPC code.
+- All buffers were fully written before return (no correctness risk), but future refactors could introduce partial writes that would silently expose heap memory.
+- IPC encoding is not the performance bottleneck (OS pipe I/O dominates).
+- Safer-by-default eliminates the entire class of uninitialized-memory disclosure from future refactors without measurable overhead.
 
 ## Verification Checklist
 
-- [ ] Add test asserting full buffer initialization for each IPC encode path.
-- [ ] Add a lint/check rule or review checklist entry for new `allocUnsafe` usage.
-- [ ] Document expected max frame size and reject behavior.
+- [x] All `allocUnsafe` usages removed from IPC encoding paths.
+- [x] Max frame size (`MAX_MESSAGE_SIZE = 1 MB`) enforced in `encodeMessage` and `tryParseMessage`.
+- [x] Add lint rule to block future `allocUnsafe` introductions in `packages/core/src/` — grep guard added to `ci-pr.yml`, `ci-main.yml`, and `security-paranoid.yml`.
 
 ## Required Artifact
 

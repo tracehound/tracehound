@@ -474,7 +474,9 @@ describe("Quarantine", () => {
       await writeStarted;
 
       const neutralized = retainingQuarantine.neutralize("sig-race");
-      releaseWrite?.();
+      // After awaiting writeStarted, the write callback has captured resolve into
+      // releaseWrite — non-null assertion is safe here.
+      releaseWrite!();
 
       const result = await decayPromise;
       const internals = retainingQuarantine as unknown as {
@@ -540,7 +542,9 @@ describe("Quarantine", () => {
       await writeStarted;
 
       const neutralized = expiringQuarantine.neutralize("sig-neutralize-race");
-      releaseWrite?.();
+      // After awaiting writeStarted, the write callback has captured resolve into
+      // releaseWrite — non-null assertion is safe here.
+      releaseWrite!();
 
       const result = await decayPromise;
       const events = localAuditChain
@@ -717,6 +721,55 @@ describe("Quarantine", () => {
       expect(decay.details.storageError).toContain(
         "archive timed out after 5ms",
       );
+    });
+
+    it("skips archive and returns circuit-open error after a storage timeout", async () => {
+      let writeCallCount = 0;
+      const hangingStorage = {
+        isAvailable: async () => true,
+        write: async (): Promise<never> => {
+          writeCallCount++;
+          return new Promise<never>(() => {});
+        },
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      };
+
+      let currentTime = 1_000;
+      const localAuditChain = new AuditChain();
+      const q = new Quarantine(
+        {
+          maxCount: 10,
+          maxBytes: 100_000,
+          evictionPolicy: "priority",
+          ttlMs: 50,
+          archiveOnDecay: true,
+          archiveFailureMode: "drop",
+          archiveTimeoutMs: 5,
+        },
+        localAuditChain,
+        { coldStorage: hangingStorage, now: () => currentTime },
+      );
+
+      // First decay: write() hangs → timeout fires → circuit opens.
+      q.insert(createEvidence("cb-sig-1", "high", 64, 900));
+      currentTime = 1_100; // past TTL
+      await q.decayExpired();
+      expect(writeCallCount).toBe(1);
+
+      // Second decay within backoff window: circuit is open → write() must NOT be called.
+      currentTime = 1_200; // still within the 30 s backoff window
+      q.insert(createEvidence("cb-sig-2", "high", 64, 900));
+      currentTime = 1_400; // past TTL again
+      const result2 = await q.decayExpired();
+
+      expect(writeCallCount).toBe(1); // no new write initiated
+      expect(result2.archiveFailureCount).toBe(1);
+
+      const lastRecord = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+        details: { storageError: string };
+      };
+      expect(lastRecord.details.storageError).toContain("circuit open");
     });
 
     it("treats adapter errors named archive timeout as regular storage errors", async () => {

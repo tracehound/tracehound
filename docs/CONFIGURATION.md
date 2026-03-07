@@ -33,6 +33,7 @@ createTracehound({
     decayBatchSize: 128,
     archiveOnDecay: true,
     archiveFailureMode: 'drop',
+    archiveTimeoutMs: 5_000,
   },
 })
 ```
@@ -46,6 +47,7 @@ Operational meaning:
 5. `archiveFailureMode`:
    - `drop`: prefer bounded active state over forensic completeness.
    - `retain`: keep expired evidence resident until archival succeeds.
+6. `archiveTimeoutMs`: deadline for a single cold storage write; prevents a slow adapter from blocking decay indefinitely.
 
 If TTL decay is enabled and no custom cold storage adapter is supplied, Tracehound provisions the built-in memory-first adapter automatically.
 

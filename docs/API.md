@@ -82,6 +82,8 @@ interface TracehoundOptions {
     archiveOnDecay?: boolean
     /** If archival fails, drop or retain expired evidence. Default: 'drop' */
     archiveFailureMode?: 'drop' | 'retain'
+    /** Timeout for a single cold storage archive write in ms. Default: 5000 */
+    archiveTimeoutMs?: number
   }
 
   /** Optional cold storage adapter used by TTL decay archival. */

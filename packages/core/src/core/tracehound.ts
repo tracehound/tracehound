@@ -60,6 +60,8 @@ export interface TracehoundOptions {
     decayBatchSize?: number
     archiveOnDecay?: boolean
     archiveFailureMode?: 'drop' | 'retain'
+    /** Timeout for a single cold storage archive write in ms. Default: 5000 */
+    archiveTimeoutMs?: number
   }
 
   /**
@@ -174,10 +176,11 @@ class Tracehound implements ITracehound {
     // Initialize components
     this.auditChain = new AuditChain()
     this.notifications = createNotificationEmitter()
-    this.coldStorage =
-      typeof options.quarantine?.ttlMs === 'number' && options.quarantine.ttlMs > 0
-        ? options.coldStorage ?? createMemoryColdStorage()
-        : options.coldStorage ?? null
+    const shouldProvisionDefaultColdStorage =
+      typeof options.quarantine?.ttlMs === 'number' &&
+      options.quarantine.ttlMs > 0 &&
+      options.quarantine.archiveOnDecay !== false
+    this.coldStorage = options.coldStorage ?? (shouldProvisionDefaultColdStorage ? createMemoryColdStorage() : null)
 
     const quarantineDependencies =
       this.coldStorage === null
@@ -196,6 +199,7 @@ class Tracehound implements ITracehound {
         decayBatchSize: options.quarantine?.decayBatchSize ?? 128,
         archiveOnDecay: options.quarantine?.archiveOnDecay ?? true,
         archiveFailureMode: options.quarantine?.archiveFailureMode ?? 'drop',
+        archiveTimeoutMs: options.quarantine?.archiveTimeoutMs ?? 5_000,
       },
       this.auditChain,
       quarantineDependencies,
@@ -419,7 +423,11 @@ class Tracehound implements ITracehound {
       return null
     }
 
-    const intervalMs = quarantineOptions?.decayIntervalMs ?? 1_000
+    const intervalMs = normalizeDecayInterval(quarantineOptions?.decayIntervalMs)
+    if (intervalMs <= 0) {
+      return null
+    }
+
     const scheduler = createScheduler({
       tickInterval: intervalMs,
       jitterMs: Math.min(intervalMs, 250),
@@ -439,6 +447,18 @@ class Tracehound implements ITracehound {
 
     return scheduler
   }
+}
+
+function normalizeDecayInterval(intervalMs: number | undefined): number {
+  if (intervalMs === undefined) {
+    return 1_000
+  }
+
+  if (!Number.isFinite(intervalMs) || intervalMs <= 0) {
+    return 0
+  }
+
+  return Math.floor(intervalMs)
 }
 
 function normalizeSnapshotInterval(intervalMs: number | undefined): number {

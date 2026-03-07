@@ -421,7 +421,7 @@ export class Quarantine {
       hash: evidence.hash,
       size,
       status: 'evicted',
-      reason: 'pressure',
+      reason: 'capacity',
       timestamp: this.now(),
       previousHash: this.auditChain.lastHash,
     }
@@ -507,6 +507,11 @@ export class Quarantine {
     evidence: EvidenceHandle,
     now: number,
   ): Promise<DecayResult> {
+    // Remove from expirations synchronously before the first await so that
+    // concurrent decayExpired() calls (e.g. from back-to-back scheduler ticks)
+    // cannot re-select this entry while archival is in flight.
+    this.expirations.delete(evidence.signature)
+
     const archiveAttempted = this.config.archiveOnDecay !== false
     let archived = false
     let storageId: string | undefined
@@ -520,6 +525,8 @@ export class Quarantine {
     }
 
     if (archiveAttempted && !archived && this.config.archiveFailureMode === 'retain') {
+      // Re-track expiry so the entry is retried on the next decay cycle.
+      this.trackExpiry(evidence)
       this.archiveFailureCount++
       return {
         decayedCount: 0,
@@ -581,17 +588,32 @@ export class Quarantine {
     }
 
     const timeoutMs = normalizeArchiveTimeout(this.config.archiveTimeoutMs)
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error('archive timeout')), timeoutMs)
+      // Prevent the timer from keeping the Node.js event loop alive after archive completes.
+      if (typeof (timeoutId as unknown as { unref?: () => void }).unref === 'function') {
+        ;(timeoutId as unknown as { unref: () => void }).unref()
+      }
+    })
 
     try {
-      return await Promise.race([
-        this.runArchive(evidence),
-        archiveTimeout(timeoutMs),
-      ])
-    } catch {
+      return await Promise.race([this.runArchive(evidence), timeoutPromise])
+    } catch (err) {
+      if (err instanceof Error && err.message === 'archive timeout') {
+        return {
+          archived: false,
+          storageError: `archive timed out after ${timeoutMs}ms`,
+        }
+      }
+      // Real adapter/encode error — sanitize before returning.
       return {
         archived: false,
-        storageError: `archive timed out after ${timeoutMs}ms`,
+        storageError: sanitizeStorageError(err instanceof Error ? err.message : 'unknown'),
       }
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
@@ -638,12 +660,6 @@ function normalizeArchiveTimeout(value: number | undefined): number {
   }
 
   return Math.floor(value)
-}
-
-function archiveTimeout(ms: number): Promise<never> {
-  return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('archive timeout')), ms),
-  )
 }
 
 /**

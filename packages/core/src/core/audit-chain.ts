@@ -82,7 +82,10 @@ export class AuditChain implements IAuditChain {
   verify(): boolean {
     this.sealPending()
 
-    let expectedPreviousHash = GENESIS_HASH
+    // After FIFO rotation, records no longer start from GENESIS_HASH.
+    // Use the first retained record's previousHash as the segment anchor
+    // so the retained chain verifies correctly even after eviction.
+    let expectedPreviousHash = this.records[0]?.previousHash ?? GENESIS_HASH
     let index = 0
 
     while (index < this.records.length) {

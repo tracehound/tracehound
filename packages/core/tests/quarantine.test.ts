@@ -723,53 +723,52 @@ describe("Quarantine", () => {
       );
     });
 
-    it("skips archive and returns circuit-open error after a storage timeout", async () => {
-      let writeCallCount = 0;
-      const hangingStorage = {
+    it("cancels write via AbortSignal when archive timeout fires", async () => {
+      let receivedSignal: AbortSignal | undefined;
+      const signalAwareStorage = {
         isAvailable: async () => true,
-        write: async (): Promise<never> => {
-          writeCallCount++;
-          return new Promise<never>(() => {});
+        write: async (_id: string, _payload: unknown, signal?: AbortSignal) => {
+          receivedSignal = signal;
+          // Simulate slow write that respects cancellation.
+          await new Promise<void>((resolve, reject) => {
+            const tid = setTimeout(resolve, 10_000);
+            signal?.addEventListener("abort", () => {
+              clearTimeout(tid);
+              reject(new Error("aborted"));
+            });
+          });
+          return { success: true };
         },
         read: async () => ({ success: false }),
         delete: async () => false,
       };
 
-      let currentTime = 1_000;
       const localAuditChain = new AuditChain();
       const q = new Quarantine(
         {
-          maxCount: 10,
-          maxBytes: 100_000,
+          maxCount: 5,
+          maxBytes: 10_000,
           evictionPolicy: "priority",
-          ttlMs: 50,
+          ttlMs: 100,
           archiveOnDecay: true,
           archiveFailureMode: "drop",
           archiveTimeoutMs: 5,
         },
         localAuditChain,
-        { coldStorage: hangingStorage, now: () => currentTime },
+        { coldStorage: signalAwareStorage, now: () => 1_500 },
       );
 
-      // First decay: write() hangs → timeout fires → circuit opens.
-      q.insert(createEvidence("cb-sig-1", "high", 64, 900));
-      currentTime = 1_100; // past TTL
-      await q.decayExpired();
-      expect(writeCallCount).toBe(1);
+      q.insert(createEvidence("sig-abort", "high", 64, 1_000));
+      const result = await q.decayExpired();
 
-      // Second decay within backoff window: circuit is open → write() must NOT be called.
-      currentTime = 1_200; // still within the 30 s backoff window
-      q.insert(createEvidence("cb-sig-2", "high", 64, 900));
-      currentTime = 1_400; // past TTL again
-      const result2 = await q.decayExpired();
+      expect(receivedSignal).toBeDefined();
+      expect(receivedSignal!.aborted).toBe(true);
+      expect(result.archiveFailureCount).toBe(1);
 
-      expect(writeCallCount).toBe(1); // no new write initiated
-      expect(result2.archiveFailureCount).toBe(1);
-
-      const lastRecord = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+      const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
         details: { storageError: string };
       };
-      expect(lastRecord.details.storageError).toContain("circuit open");
+      expect(decay.details.storageError).toContain("archive timed out after 5ms");
     });
 
     it("treats adapter errors named archive timeout as regular storage errors", async () => {

@@ -92,12 +92,14 @@ export interface MemoryColdStorageOptions {
 export interface IColdStorageAdapter {
   /**
    * Write encoded evidence to cold storage.
-   * Fire-and-forget semantics - caller does not wait.
    *
    * @param id - Unique evidence ID (signature)
    * @param payload - Encoded and hashed payload
+   * @param signal - Optional AbortSignal. Implementations MUST check this before
+   *   initiating any I/O and return `{ success: false, error: 'aborted' }` immediately
+   *   if already aborted. Best-effort checking during in-flight I/O is encouraged.
    */
-  write(id: string, payload: EncodedPayload): Promise<ColdStorageWriteResult>
+  write(id: string, payload: EncodedPayload, signal?: AbortSignal): Promise<ColdStorageWriteResult>
 
   /**
    * Read evidence from cold storage.
@@ -204,7 +206,11 @@ export class MemoryColdStorage implements IColdStorageAdapter {
     }
   }
 
-  async write(id: string, payload: EncodedPayload): Promise<ColdStorageWriteResult> {
+  async write(id: string, payload: EncodedPayload, signal?: AbortSignal): Promise<ColdStorageWriteResult> {
+    if (signal?.aborted) {
+      return { success: false, error: 'aborted' }
+    }
+
     if (typeof id !== 'string' || id.length === 0) {
       return { success: false, error: 'id must be a non-empty string' }
     }

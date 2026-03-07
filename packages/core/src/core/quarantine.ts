@@ -59,11 +59,6 @@ export interface QuarantineDependencies {
   now?: () => number;
 }
 
-/** Base backoff after a storage timeout (ms). Doubles per consecutive timeout, capped at max. */
-const STORAGE_CIRCUIT_BACKOFF_MS = 30_000;
-/** Maximum backoff window the circuit will hold open (ms). */
-const STORAGE_CIRCUIT_MAX_BACKOFF_MS = 300_000;
-
 /** Severity ranking for eviction priority */
 const SEVERITY_RANK: Record<Severity, number> = {
   low: 0,
@@ -87,10 +82,6 @@ export class Quarantine {
   private decayedCount = 0;
   private archivedCount = 0;
   private archiveFailureCount = 0;
-  /** Timestamp (ms) until which no new archive writes are initiated. 0 = circuit closed. */
-  private storageCircuitOpenUntil = 0;
-  /** Number of consecutive archive timeouts used to compute exponential backoff. */
-  private storageConsecutiveTimeouts = 0;
   private readonly coldStorage: IColdStorageAdapter | undefined;
   private readonly now: () => number;
 
@@ -704,19 +695,8 @@ export class Quarantine {
       };
     }
 
-    // Circuit breaker: if storage timed out recently, skip initiating a new
-    // write. This bounds in-flight write() promises when the adapter hangs —
-    // AbortController can only cancel our own checkpoints, not a stuck write().
-    if (this.now() < this.storageCircuitOpenUntil) {
-      return {
-        archived: false,
-        storageError: "cold storage circuit open (recovering after timeout)",
-      };
-    }
-
     const timeoutMs = normalizeArchiveTimeout(this.config.archiveTimeoutMs);
     const controller = new AbortController();
-    let timedOut = false;
 
     const archivePromise = this.runArchive(signature, bytes, controller.signal);
 
@@ -725,7 +705,6 @@ export class Quarantine {
       storageError: string;
     }>((resolve) => {
       const tid = setTimeout(() => {
-        timedOut = true;
         controller.abort();
         resolve({
           archived: false,
@@ -741,23 +720,7 @@ export class Quarantine {
     });
 
     try {
-      const result = await Promise.race([archivePromise, timeoutPromise]);
-
-      if (timedOut) {
-        // Open the circuit with exponential backoff so the next decay cycle
-        // does not immediately start another write into a hung adapter.
-        this.storageConsecutiveTimeouts++;
-        const backoffMs =
-          STORAGE_CIRCUIT_BACKOFF_MS * this.storageConsecutiveTimeouts;
-        this.storageCircuitOpenUntil =
-          this.now() + Math.min(backoffMs, STORAGE_CIRCUIT_MAX_BACKOFF_MS);
-      } else if (result.archived) {
-        // Successful write — close the circuit and reset the backoff counter.
-        this.storageConsecutiveTimeouts = 0;
-        this.storageCircuitOpenUntil = 0;
-      }
-
-      return result;
+      return await Promise.race([archivePromise, timeoutPromise]);
     } catch (err) {
       // Real adapter/encode error — sanitize before returning.
       return {
@@ -795,7 +758,7 @@ export class Quarantine {
       return { archived: false, storageError: "archive cancelled" };
     }
 
-    const result = await this.coldStorage!.write(signature, encoded);
+    const result = await this.coldStorage!.write(signature, encoded, signal);
     const archiveResult: {
       archived: boolean;
       storageId?: string;

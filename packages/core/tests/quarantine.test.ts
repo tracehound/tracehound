@@ -490,6 +490,72 @@ describe("Quarantine", () => {
       expect(internals.expirations.has("sig-race")).toBe(false);
     });
 
+    it("does not emit decay or mutate bytes when evidence is neutralized during in-flight archival", async () => {
+      let releaseWrite: (() => void) | null = null;
+      let notifyWriteStarted: (() => void) | null = null;
+      const writeStarted = new Promise<void>((resolve) => {
+        notifyWriteStarted = resolve;
+      });
+
+      const delayedSuccessfulStorage = {
+        isAvailable: async () => true,
+        write: async () => {
+          notifyWriteStarted?.();
+          await new Promise<void>((resolve) => {
+            releaseWrite = resolve;
+          });
+          return {
+            success: true,
+            id: "archive-id",
+          };
+        },
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      };
+
+      const localAuditChain = new AuditChain();
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: "priority",
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: "drop",
+        },
+        localAuditChain,
+        {
+          coldStorage: delayedSuccessfulStorage,
+          now: () => 1_500,
+        },
+      );
+
+      expiringQuarantine.insert(
+        createEvidence("sig-neutralize-race", "high", 256, 1_000),
+      );
+
+      const decayPromise = expiringQuarantine.decayExpired();
+      await writeStarted;
+
+      const neutralized = expiringQuarantine.neutralize("sig-neutralize-race");
+      releaseWrite?.();
+
+      const result = await decayPromise;
+      const events = localAuditChain
+        .export()
+        .map((record) => JSON.parse(record.eventData) as { type: string });
+
+      expect(neutralized).not.toBeNull();
+      expect(result).toEqual({
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 0,
+        retainedCount: 0,
+      });
+      expect(expiringQuarantine.stats.bytes).toBe(0);
+      expect(events.some((event) => event.type === "decay")).toBe(false);
+    });
+
     it("decays in expiry order and floors the decay batch size", async () => {
       const localAuditChain = new AuditChain();
       const expiringQuarantine = new Quarantine(
@@ -827,6 +893,18 @@ describe("Quarantine", () => {
         signature: "low1",
         details: { reason: "pressure" },
       });
+    });
+
+    it("does not count evictions as dropped stats", () => {
+      quarantine.insert(createEvidence("low1", "low", 100));
+      quarantine.insert(createEvidence("med1", "medium", 100));
+      quarantine.insert(createEvidence("high1", "high", 100));
+      quarantine.insert(createEvidence("crit1", "critical", 100));
+      quarantine.insert(createEvidence("low2", "low", 100));
+      quarantine.insert(createEvidence("low3", "low", 100)); // triggers eviction
+
+      expect(quarantine.stats.droppedCount).toBe(0);
+      expect(quarantine.stats.droppedBytes).toBe(0);
     });
 
     it("respects count limit", () => {

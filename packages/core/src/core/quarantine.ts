@@ -459,8 +459,10 @@ export class Quarantine {
     this.expirations.delete(signature)
     this.totalBytes -= size
 
-    this.droppedCount++
-    this.droppedBytes += size
+    if (disposition === 'drop') {
+      this.droppedCount++
+      this.droppedBytes += size
+    }
   }
 
   private isTtlEnabled(): boolean {
@@ -551,6 +553,10 @@ export class Quarantine {
     // cannot re-select this entry while archival is in flight.
     this.expirations.delete(evidence.signature)
 
+    const signature = evidence.signature
+    const hash = evidence.hash
+    const size = evidence.size
+
     try {
       const archiveAttempted = this.config.archiveOnDecay !== false
       let archived = false
@@ -558,18 +564,24 @@ export class Quarantine {
       let storageError: string | undefined
 
       if (archiveAttempted) {
-        const archiveResult = await this.archiveEvidence(evidence)
-        archived = archiveResult.archived
-        storageId = archiveResult.storageId
-        storageError = archiveResult.storageError
+        try {
+          const archiveBytes = new Uint8Array(evidence.bytes.slice(0))
+          const archiveResult = await this.archiveEvidence(signature, archiveBytes)
+          archived = archiveResult.archived
+          storageId = archiveResult.storageId
+          storageError = archiveResult.storageError
+        } catch {
+          archived = false
+          storageError = 'evidence unavailable for archival'
+        }
       }
 
-      if (archiveAttempted && !archived && this.config.archiveFailureMode === 'retain') {
-        // Evidence may have been removed while archival was in-flight.
-        const current = this.store.get(evidence.signature)
-        const stillOwned = current === evidence && !evidence.disposed
+      // Evidence may have been removed while archival was in-flight.
+      const current = this.store.get(signature)
+      const stillOwned = current === evidence
 
-        if (stillOwned) {
+      if (archiveAttempted && !archived && this.config.archiveFailureMode === 'retain') {
+        if (stillOwned && !evidence.disposed) {
           // Re-track expiry so the entry is retried on the next decay cycle.
           this.trackExpiry(evidence)
           this.archiveFailureCount++
@@ -589,11 +601,20 @@ export class Quarantine {
         }
       }
 
+      if (!stillOwned) {
+        return {
+          decayedCount: 0,
+          archivedCount: 0,
+          archiveFailureCount: 0,
+          retainedCount: 0,
+        }
+      }
+
       const record: DecayRecord = {
         id: `dcy-${generateSecureId()}`,
-        signature: evidence.signature,
-        hash: evidence.hash,
-        size: evidence.size,
+        signature,
+        hash,
+        size,
         status: 'decayed',
         reason: 'ttl_expired',
         timestamp: now,
@@ -611,8 +632,8 @@ export class Quarantine {
         // Best-effort disposal only.
       }
 
-      this.store.delete(evidence.signature)
-      this.expirations.delete(evidence.signature)
+      this.store.delete(signature)
+      this.expirations.delete(signature)
       this.totalBytes -= record.size
       this.decayedCount++
 
@@ -634,7 +655,8 @@ export class Quarantine {
   }
 
   private async archiveEvidence(
-    evidence: EvidenceHandle,
+    signature: string,
+    bytes: Uint8Array,
   ): Promise<{ archived: boolean; storageId?: string; storageError?: string }> {
     if (!this.coldStorage) {
       return {
@@ -655,7 +677,7 @@ export class Quarantine {
     })
 
     try {
-      return await Promise.race([this.runArchive(evidence), timeoutPromise])
+      return await Promise.race([this.runArchive(signature, bytes), timeoutPromise])
     } catch (err) {
       if (err instanceof Error && err.message === 'archive timeout') {
         return {
@@ -674,7 +696,8 @@ export class Quarantine {
   }
 
   private async runArchive(
-    evidence: EvidenceHandle,
+    signature: string,
+    bytes: Uint8Array,
   ): Promise<{ archived: boolean; storageId?: string; storageError?: string }> {
     const availability = await this.coldStorage!.isAvailable()
     if (!availability) {
@@ -684,9 +707,8 @@ export class Quarantine {
       }
     }
 
-    const bytes = new Uint8Array(evidence.bytes.slice(0))
     const encoded = await encodeWithIntegrityAsync(bytes)
-    const result = await this.coldStorage!.write(evidence.signature, encoded)
+    const result = await this.coldStorage!.write(signature, encoded)
     const archiveResult: { archived: boolean; storageId?: string; storageError?: string } = {
       archived: result.success,
     }

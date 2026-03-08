@@ -390,6 +390,80 @@ describe('tracehoundPlugin', () => {
       const scent = (agent.intercept as any).mock.calls[0][0]
       expect(scent.ingressBytes).toBeUndefined()
     })
+
+    it('populates source.tls when TLS socket methods are available', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        socket: {
+          getCipher: () => ({ name: 'TLS_AES_256_GCM_SHA384' }),
+          getProtocol: () => 'TLSv1.3',
+          alpnProtocol: 'h2',
+        } as unknown as FastifyRequest['socket'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.tls).toEqual({
+        cipherSuite: 'TLS_AES_256_GCM_SHA384',
+        version: 'TLSv1.3',
+        alpn: 'h2',
+      })
+    })
+
+    it('omits alpn from source.tls when alpnProtocol is false', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        socket: {
+          getCipher: () => ({ name: 'TLS_AES_256_GCM_SHA384' }),
+          getProtocol: () => 'TLSv1.3',
+          alpnProtocol: false,
+        } as unknown as FastifyRequest['socket'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.tls?.cipherSuite).toBe('TLS_AES_256_GCM_SHA384')
+      expect(scent.source.tls?.alpn).toBeUndefined()
+    })
+
+    it('falls back to "unknown" version when getProtocol returns null', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        socket: {
+          getCipher: () => ({ name: 'TLS_AES_256_GCM_SHA384' }),
+          getProtocol: () => null,
+          alpnProtocol: null,
+        } as unknown as FastifyRequest['socket'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.tls?.version).toBe('unknown')
+    })
   })
 
   it('should use custom extractScent', () => {

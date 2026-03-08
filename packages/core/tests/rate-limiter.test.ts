@@ -223,6 +223,19 @@ describe('RateLimiter', () => {
       expect(limiter.check(createSource('A')).allowed).toBe(true) // Last check should be allowed if A was fresh
     })
 
+    it('evicts oldest IP ceiling entry when IP ceiling reaches capacity', () => {
+      const smallConfig = { ...config, maxSources: 2 }
+      const limiter = new RateLimiter(smallConfig)
+
+      // Fill both maps to capacity with 2 distinct IPs
+      limiter.check(createSource('ip-a'))
+      limiter.check(createSource('ip-b'))
+
+      // 3rd distinct IP triggers eviction from both composite and IP ceiling maps
+      expect(() => limiter.check(createSource('ip-c'))).not.toThrow()
+      expect(limiter.check(createSource('ip-c')).allowed).toBe(true)
+    })
+
     it('respects LRU order when evicting', () => {
       const smallConfig = { ...config, maxSources: 3 }
       const limiter = new RateLimiter(smallConfig)

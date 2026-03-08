@@ -30,9 +30,9 @@
 
 **Reason:** It's a simple bot bypass test.
 
-**Answer:** "It's not sufficient on its own. That's why we added optional trusted context binding (JWT claim, etc.). Stateless mode is the default, but identity-aware mode is optional. Entropy can be increased while maintaining determinism."
+**Answer:** "As of v1.7.0, the composite key includes IP + User-Agent + TLS metadata (cipher suite, protocol version, ALPN) when available over HTTPS connections. This significantly increases entropy since TLS handshake parameters are harder to spoof than HTTP headers. The rate limiter hashes these components with SHA-256 for deterministic, high-entropy source identification. Additionally, optional trusted context binding (JWT claim, etc.) is available. Stateless mode is the default, but identity-aware mode is optional. Entropy can be increased while maintaining determinism."
 
-**Conclusion:** Accept the design trade-off.
+**Conclusion:** Accept the design trade-off, but TLS enrichment narrows the spoofing surface.
 
 ---
 

@@ -3,6 +3,7 @@
  */
 
 import type { Severity } from './common.js'
+import type { EvidenceSourceMetadata } from './evidence.js'
 import type { TracehoundError } from './errors.js'
 
 /**
@@ -28,6 +29,8 @@ export interface RuntimeEvidenceHandle {
   readonly severity: Severity
   /** Whether underlying evidence has been disposed. */
   readonly disposed: boolean
+  /** Source metadata for forensic enrichment. */
+  readonly source: EvidenceSourceMetadata
 
   /**
    * Always rejected in runtime membrane path.

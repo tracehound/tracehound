@@ -327,6 +327,7 @@ export class Agent implements IAgent {
     readonly captured: number
     readonly severity: RuntimeEvidenceHandle['severity']
     readonly disposed: boolean
+    readonly source: RuntimeEvidenceHandle['source']
   }): RuntimeEvidenceHandle {
     const signature = evidence.signature
     const agent = this
@@ -360,6 +361,10 @@ export class Agent implements IAgent {
       },
       disposed: {
         get: (): boolean => evidence.disposed,
+        enumerable: true,
+      },
+      source: {
+        get: (): RuntimeEvidenceHandle['source'] => evidence.source,
         enumerable: true,
       },
       bytes: {

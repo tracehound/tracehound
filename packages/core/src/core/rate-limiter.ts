@@ -3,10 +3,13 @@
  *
  * SECURITY: Prevents pool exhaustion DoS by early rejection.
  * Memory Safety: TTL-based cleanup prevents memory leaks.
+ * TLS Enrichment: Uses IP + UserAgent + TLS info for entropy.
  */
 
 import type { RateLimitConfig } from '../types/config.js'
+import type { ScentSource } from '../types/scent.js'
 import { Errors } from '../types/errors.js'
+import { hash } from '../utils/hash.js'
 
 /**
  * Result of a rate limit check.
@@ -36,21 +39,38 @@ interface SourceEntry {
 }
 
 /**
+ * Generate composite key from ScentSource for rate limiting.
+ * Uses SHA-256 for deterministic entropy.
+ *
+ * SECURITY: Hash-based key prevents information leakage in logs.
+ */
+function generateSourceKey(source: ScentSource): string {
+  const components = [
+    source.ip,
+    source.userAgent || '',
+    source.tls?.cipherSuite || '',
+    source.tls?.version || '',
+    source.tls?.alpn || '',
+  ]
+  return hash(components.join('|'))
+}
+
+/**
  * Rate limiter interface per RFC-0000.
  */
 export interface IRateLimiter {
   /**
    * Check if source is allowed to proceed.
-   * @param source - Source identifier (IP, API key, etc.)
+   * @param source - Source identifier with extended entropy
    */
-  check(source: string): RateLimitResult
+  check(source: ScentSource): RateLimitResult
 
   /**
    * Reset rate limit for a specific source.
    * Used for manual unblocking.
    * @param source - Source identifier
    */
-  reset(source: string): void
+  reset(source: ScentSource): void
 
   /**
    * Clean up stale entries to prevent memory leaks.
@@ -125,16 +145,19 @@ export class RateLimiter implements IRateLimiter {
     }
   }
 
-  check(source: string): RateLimitResult {
+  check(source: ScentSource): RateLimitResult {
     this.totalChecks++
     const now = Date.now()
 
+    // Generate composite key from source with TLS entropy
+    const key = generateSourceKey(source)
+
     // Get or create source entry
-    let entry = this.sources.get(source)
+    let entry = this.sources.get(key)
     if (entry) {
       // LRU Eviction Logic: Push to the back of the Map (youngest)
-      this.sources.delete(source)
-      this.sources.set(source, entry)
+      this.sources.delete(key)
+      this.sources.set(key, entry)
     } else {
       // Capacity Bound check
       if (this.sources.size >= this.config.maxSources) {
@@ -151,7 +174,7 @@ export class RateLimiter implements IRateLimiter {
         blockedUntil: null,
         lastActivity: now,
       }
-      this.sources.set(source, entry)
+      this.sources.set(key, entry)
     }
 
     // Update last activity
@@ -215,8 +238,9 @@ export class RateLimiter implements IRateLimiter {
     return { allowed: true }
   }
 
-  reset(source: string): void {
-    this.sources.delete(source)
+  reset(source: ScentSource): void {
+    const key = generateSourceKey(source)
+    this.sources.delete(key)
   }
 
   cleanup(): number {

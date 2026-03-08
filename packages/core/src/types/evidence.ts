@@ -3,6 +3,19 @@
  */
 
 import type { Severity } from './common.js'
+import type { TLSConnectionInfo } from './scent.js'
+
+/**
+ * Source metadata for forensic enrichment.
+ */
+export interface EvidenceSourceMetadata {
+  /** Source IP address */
+  readonly ip: string
+  /** HTTP User-Agent header */
+  readonly userAgent?: string
+  /** TLS connection metadata if available */
+  readonly tls?: TLSConnectionInfo
+}
 
 /**
  * Record of a neutralized evidence.
@@ -173,6 +186,8 @@ export interface EvidenceHandle {
   readonly disposed: boolean
   /** Whether stored bytes are compressed */
   readonly compressed: boolean
+  /** Source metadata for forensic enrichment */
+  readonly source: EvidenceSourceMetadata
 
   /**
    * Transfer ownership of bytes.

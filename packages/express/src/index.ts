@@ -12,6 +12,7 @@ import {
   type InterceptResult,
   type JsonSerializable,
   type Scent,
+  type ScentSource,
 } from "@tracehound/core";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 
@@ -101,15 +102,23 @@ function extractIngressBytes(req: Request): Uint8Array | undefined {
  */
 function defaultExtractScent(req: Request): Scent {
   const ip = req.ip || req.socket.remoteAddress || "unknown";
+  const userAgentHeader = req.get("user-agent");
   const query = safeClone(req.query) ?? {};
   const body = safeClone(req.body);
   const ingressBytes = extractIngressBytes(req)
+
+  // Extract TLS information if available
+  const socket = req.socket as (typeof req.socket & { getCipher?: () => { name: string }, protocol?: string, alpn?: { protocol: string } }) | undefined;
+  const cipher = socket?.getCipher?.();
+  const tlsVersion = socket?.protocol;
+  const tlsAlpn = socket?.alpn?.protocol;
+
   const payload: Record<string, JsonSerializable> = {
     method: req.method,
     path: req.path,
     query,
     headers: {
-      "user-agent": req.get("user-agent") || "",
+      "user-agent": userAgentHeader || "",
       "content-type": req.get("content-type") || "",
     },
   };
@@ -118,10 +127,20 @@ function defaultExtractScent(req: Request): Scent {
     payload["body"] = body;
   }
 
+  const source: ScentSource = {
+    ip,
+    ...(userAgentHeader ? { userAgent: userAgentHeader } : {}),
+    ...(cipher ? { tls: {
+      cipherSuite: cipher.name,
+      version: tlsVersion || 'unknown',
+      ...(tlsAlpn ? { alpn: tlsAlpn } : {}),
+    } } : {}),
+  };
+
   return {
     id: generateSecureId(),
     timestamp: Date.now(),
-    source: ip,
+    source,
     payload,
     ...(ingressBytes ? { ingressBytes } : {}),
   };

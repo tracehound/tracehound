@@ -5,6 +5,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRateLimiter, RateLimiter } from '../src/core/rate-limiter.js'
 import type { RateLimitConfig } from '../src/types/config.js'
+import type { ScentSource } from '../src/types/scent.js'
+
+/**
+ * Helper to create ScentSource for testing
+ */
+function createSource(ip: string, userAgent?: string, tls?: { cipherSuite: string, version: string, alpn?: string }): ScentSource {
+  return {
+    ip,
+    ...(userAgent ? { userAgent } : {}),
+    ...(tls ? { tls } : {}),
+  }
+}
 
 describe('RateLimiter', () => {
   let config: RateLimitConfig
@@ -53,7 +65,7 @@ describe('RateLimiter', () => {
       const limiter = new RateLimiter(config)
 
       for (let i = 0; i < config.maxRequests; i++) {
-        const result = limiter.check('source-1')
+        const result = limiter.check(createSource('source-1'))
         expect(result.allowed).toBe(true)
       }
     })
@@ -63,11 +75,11 @@ describe('RateLimiter', () => {
 
       // Use up all requests
       for (let i = 0; i < config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
 
       // Next request should be rejected
-      const result = limiter.check('source-1')
+      const result = limiter.check(createSource('source-1'))
       expect(result.allowed).toBe(false)
       if (!result.allowed) {
         expect(result.blocked).toBe(true)
@@ -80,11 +92,11 @@ describe('RateLimiter', () => {
 
       // Exceed limit
       for (let i = 0; i <= config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
 
       // Subsequent requests during block
-      const result = limiter.check('source-1')
+      const result = limiter.check(createSource('source-1'))
       expect(result.allowed).toBe(false)
       if (!result.allowed) {
         expect(result.blocked).toBe(true)
@@ -96,10 +108,10 @@ describe('RateLimiter', () => {
 
       // Exceed limit
       for (let i = 0; i < config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
 
-      const result = limiter.check('source-1')
+      const result = limiter.check(createSource('source-1'))
       expect(result.allowed).toBe(false)
       if (!result.allowed) {
         expect(result.blocked).toBe(false)
@@ -111,12 +123,12 @@ describe('RateLimiter', () => {
 
       // Exhaust source-1
       for (let i = 0; i < config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
-      expect(limiter.check('source-1').allowed).toBe(false)
+      expect(limiter.check(createSource('source-1')).allowed).toBe(false)
 
       // source-2 should still be allowed
-      expect(limiter.check('source-2').allowed).toBe(true)
+      expect(limiter.check(createSource('source-2')).allowed).toBe(true)
     })
 
     it('returns correct retryAfter when blocked', () => {
@@ -124,14 +136,57 @@ describe('RateLimiter', () => {
 
       // Exceed limit to trigger block
       for (let i = 0; i <= config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
 
-      const result = limiter.check('source-1')
+      const result = limiter.check(createSource('source-1'))
       if (!result.allowed) {
         expect(result.retryAfter).toBeGreaterThan(0)
         expect(result.retryAfter).toBeLessThanOrEqual(config.blockDurationMs)
       }
+    })
+
+    it('uses TLS entropy for separate rate limiting', () => {
+      const limiter = new RateLimiter(config)
+
+      // Same IP, different TLS cipher - should be tracked separately
+      for (let i = 0; i < config.maxRequests; i++) {
+        limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3' }))
+      }
+
+      // Next request with same IP but different cipher - should be allowed (different rate limit)
+      const result1 = limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_CHACHA20_POLY1305_SHA256', version: 'TLSv1.3' }))
+      expect(result1.allowed).toBe(true)
+
+      // Next request with same IP and same cipher - should be blocked
+      const result2 = limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3' }))
+      expect(result2.allowed).toBe(false)
+    })
+
+    it('combines IP + UserAgent + TLS for entropy', () => {
+      const limiter = new RateLimiter(config)
+
+      // Same IP, different UserAgent - should be tracked separately
+      for (let i = 0; i < config.maxRequests; i++) {
+        limiter.check(createSource('192.168.1.1', 'Mozilla/5.0'))
+      }
+
+      // Same IP but different UserAgent - should be allowed
+      const result = limiter.check(createSource('192.168.1.1', 'curl/7.68.0'))
+      expect(result.allowed).toBe(true)
+    })
+
+    it('falls back gracefully when TLS unavailable', () => {
+      const limiter = new RateLimiter(config)
+
+      // Use up limit without TLS
+      for (let i = 0; i < config.maxRequests; i++) {
+        limiter.check(createSource('192.168.1.1', 'curl/7.68.0'))
+      }
+
+      // Next request without TLS - should be blocked
+      const result = limiter.check(createSource('192.168.1.1', 'curl/7.68.0'))
+      expect(result.allowed).toBe(false)
     })
   })
 
@@ -141,47 +196,47 @@ describe('RateLimiter', () => {
       const limiter = new RateLimiter(smallConfig)
 
       // Insert 3 sources
-      limiter.check('A')
-      limiter.check('B')
-      limiter.check('C')
+      limiter.check(createSource('A'))
+      limiter.check(createSource('B'))
+      limiter.check(createSource('C'))
 
       expect(limiter.stats.sources).toBe(3)
       expect(limiter.stats.totalEvictions).toBe(0)
 
       // Insert 4th source -> Evicts A
-      limiter.check('D')
+      limiter.check(createSource('D'))
 
       expect(limiter.stats.sources).toBe(3)
       expect(limiter.stats.totalEvictions).toBe(1)
 
       // Verify A is treated as a new entry. It shouldn't be blocked.
       for (let i = 0; i < smallConfig.maxRequests - 1; i++) {
-        expect(limiter.check('A').allowed).toBe(true)
+        expect(limiter.check(createSource('A')).allowed).toBe(true)
       }
-      expect(limiter.check('A').allowed).toBe(true) // Last check should be allowed if A was fresh
+      expect(limiter.check(createSource('A')).allowed).toBe(true) // Last check should be allowed if A was fresh
     })
 
     it('respects LRU order when evicting', () => {
       const smallConfig = { ...config, maxSources: 3 }
       const limiter = new RateLimiter(smallConfig)
 
-      limiter.check('A') // oldest
-      limiter.check('B')
-      limiter.check('C') // newest
+      limiter.check(createSource('A')) // oldest
+      limiter.check(createSource('B'))
+      limiter.check(createSource('C')) // newest
 
       // Re-check A -> B is now the oldest
-      limiter.check('A')
+      limiter.check(createSource('A'))
 
       // Insert D -> Evicts B
-      limiter.check('D')
+      limiter.check(createSource('D'))
 
       expect(limiter.stats.totalEvictions).toBe(1)
 
       // Verify B is evicted and treated as new
       for (let i = 0; i < smallConfig.maxRequests - 1; i++) {
-        expect(limiter.check('B').allowed).toBe(true)
+        expect(limiter.check(createSource('B')).allowed).toBe(true)
       }
-      expect(limiter.check('B').allowed).toBe(true)
+      expect(limiter.check(createSource('B')).allowed).toBe(true)
     })
   })
 
@@ -191,25 +246,25 @@ describe('RateLimiter', () => {
 
       // Exhaust and block source
       for (let i = 0; i <= config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
-      expect(limiter.check('source-1').allowed).toBe(false)
+      expect(limiter.check(createSource('source-1')).allowed).toBe(false)
 
       // Reset
-      limiter.reset('source-1')
+      limiter.reset(createSource('source-1'))
 
       // Should be allowed again
-      expect(limiter.check('source-1').allowed).toBe(true)
+      expect(limiter.check(createSource('source-1')).allowed).toBe(true)
     })
 
     it('does not affect other sources', () => {
       const limiter = new RateLimiter(config)
 
       // Use some requests for both sources
-      limiter.check('source-1')
-      limiter.check('source-2')
+      limiter.check(createSource('source-1'))
+      limiter.check(createSource('source-2'))
 
-      limiter.reset('source-1')
+      limiter.reset(createSource('source-1'))
 
       // source-2 should retain its count
       expect(limiter.stats.sources).toBe(1)
@@ -221,7 +276,7 @@ describe('RateLimiter', () => {
       const limiter = new RateLimiter(config)
 
       // Create an entry
-      limiter.check('source-1')
+      limiter.check(createSource('source-1'))
       expect(limiter.stats.sources).toBe(1)
 
       // Mock time passing
@@ -238,7 +293,7 @@ describe('RateLimiter', () => {
     it('does not remove active entries', () => {
       const limiter = new RateLimiter(config)
 
-      limiter.check('source-1')
+      limiter.check(createSource('source-1'))
 
       // Immediate cleanup should not remove
       const cleaned = limiter.cleanup()
@@ -251,7 +306,7 @@ describe('RateLimiter', () => {
 
       // Block source
       for (let i = 0; i <= config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
 
       vi.useFakeTimers()
@@ -269,9 +324,9 @@ describe('RateLimiter', () => {
     it('tracks total sources', () => {
       const limiter = new RateLimiter(config)
 
-      limiter.check('source-1')
-      limiter.check('source-2')
-      limiter.check('source-3')
+      limiter.check(createSource('source-1'))
+      limiter.check(createSource('source-2'))
+      limiter.check(createSource('source-3'))
 
       expect(limiter.stats.sources).toBe(3)
     })
@@ -281,7 +336,7 @@ describe('RateLimiter', () => {
 
       // Block source-1
       for (let i = 0; i <= config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
 
       expect(limiter.stats.blocked).toBe(1)
@@ -290,9 +345,9 @@ describe('RateLimiter', () => {
     it('tracks total checks', () => {
       const limiter = new RateLimiter(config)
 
-      limiter.check('source-1')
-      limiter.check('source-1')
-      limiter.check('source-2')
+      limiter.check(createSource('source-1'))
+      limiter.check(createSource('source-1'))
+      limiter.check(createSource('source-2'))
 
       expect(limiter.stats.totalChecks).toBe(3)
     })
@@ -302,12 +357,12 @@ describe('RateLimiter', () => {
 
       // Use up limit
       for (let i = 0; i < config.maxRequests; i++) {
-        limiter.check('source-1')
+        limiter.check(createSource('source-1'))
       }
 
       // These should be rejected
-      limiter.check('source-1')
-      limiter.check('source-1')
+      limiter.check(createSource('source-1'))
+      limiter.check(createSource('source-1'))
 
       expect(limiter.stats.totalRejections).toBe(2)
     })
@@ -316,7 +371,7 @@ describe('RateLimiter', () => {
   describe('createRateLimiter factory', () => {
     it('creates a rate limiter instance', () => {
       const limiter = createRateLimiter(config)
-      expect(limiter.check('test').allowed).toBe(true)
+      expect(limiter.check(createSource('test')).allowed).toBe(true)
     })
   })
 })

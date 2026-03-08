@@ -12,6 +12,7 @@ import {
   type InterceptResult,
   type JsonSerializable,
   type Scent,
+  type ScentSource,
 } from '@tracehound/core'
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from 'fastify'
 
@@ -101,15 +102,23 @@ function extractIngressBytes(req: FastifyRequest): Uint8Array | undefined {
  */
 function defaultExtractScent(req: FastifyRequest): Scent {
   const ip = req.ip || 'unknown'
+  const userAgentHeader = req.headers['user-agent'] as string | undefined
   const query = safeClone(req.query) ?? {}
   const body = safeClone(req.body)
   const ingressBytes = extractIngressBytes(req)
+
+  // Extract TLS information if available
+  const socket = req.socket as (typeof req.socket & { getCipher?: () => { name: string }, protocol?: string, alpn?: { protocol: string } }) | undefined
+  const cipher = socket?.getCipher?.()
+  const tlsVersion = socket?.protocol
+  const tlsAlpn = socket?.alpn?.protocol
+
   const payload: Record<string, JsonSerializable> = {
     method: req.method,
     path: req.url,
     query,
     headers: {
-      'user-agent': req.headers['user-agent'] || '',
+      'user-agent': userAgentHeader || '',
       'content-type': req.headers['content-type'] || '',
     },
   }
@@ -118,10 +127,20 @@ function defaultExtractScent(req: FastifyRequest): Scent {
     payload['body'] = body
   }
 
+  const source: ScentSource = {
+    ip,
+    ...(userAgentHeader ? { userAgent: userAgentHeader } : {}),
+    ...(cipher ? { tls: {
+      cipherSuite: cipher.name,
+      version: tlsVersion || 'unknown',
+      ...(tlsAlpn ? { alpn: tlsAlpn } : {}),
+    } } : {}),
+  }
+
   return {
     id: generateSecureId(),
     timestamp: Date.now(),
-    source: ip,
+    source,
     payload,
     ...(ingressBytes ? { ingressBytes } : {}),
   }

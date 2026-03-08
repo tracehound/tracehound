@@ -5,6 +5,13 @@
 For configuration defaults and adapter behavior flags, see [CONFIGURATION.md](./CONFIGURATION.md).
 For upgrade-impacting changes, see [BREAKING-CHANGES.md](./BREAKING-CHANGES.md).
 
+## Migration Note (v1.7.0)
+
+1. **Breaking:** `Scent.source` changed from `string` to `ScentSource` (structured object with `ip`, `userAgent?`, `tls?`). Update all custom scent extraction functions accordingly.
+2. **Breaking:** `IRateLimiter.check()` and `IRateLimiter.reset()` now accept `ScentSource` instead of `string`. The rate limiter generates a SHA-256 composite key internally from IP + User-Agent + TLS metadata for higher entropy.
+3. New public types exported: `ScentSource`, `TLSConnectionInfo`, `EvidenceSourceMetadata`.
+4. Express and Fastify adapters now automatically extract TLS cipher suite, protocol version, and ALPN from the socket when available.
+
 ## Migration Note (v1.6.0)
 
 1. `@tracehound/fastify` now uses named export only (`tracehoundPlugin`).
@@ -206,7 +213,7 @@ Token bucket rate limiter with source blocking.
 
 ```ts
 // Manually checking a source against the limits
-const check = th.rateLimiter.check('192.168.1.100')
+const check = th.rateLimiter.check({ ip: '192.168.1.100', userAgent: 'curl/8.0' })
 if (!check.allowed) {
   console.log(`Source limited. Retry after ${check.retryAfter} ms`)
 }
@@ -336,10 +343,34 @@ Input to the security pipeline.
 interface Scent {
   id: string // Unique ID (UUIDv7)
   timestamp: number // Capture time (ms)
-  source: string // Origin (IP, user agent)
+  source: ScentSource // Origin with extended entropy
   payload: JsonSerializable
   ingressBytes?: Uint8Array | ArrayBuffer // Optional raw ingress bytes for hashing preference
   threat?: ThreatSignal
+}
+```
+
+### ScentSource
+
+Source identification with extended entropy for rate limiting and forensic tracking.
+
+```ts
+interface ScentSource {
+  readonly ip: string // Source IP address
+  readonly userAgent?: string // HTTP User-Agent header
+  readonly tls?: TLSConnectionInfo // TLS metadata (HTTPS only)
+}
+```
+
+### TLSConnectionInfo
+
+TLS connection metadata extracted from the handshake when available.
+
+```ts
+interface TLSConnectionInfo {
+  readonly cipherSuite: string // e.g., "TLS_AES_256_GCM_SHA384"
+  readonly version: string // e.g., "TLSv1.3"
+  readonly alpn?: string // e.g., "h2", "http/1.1"
 }
 ```
 

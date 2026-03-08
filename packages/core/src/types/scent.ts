@@ -8,6 +8,32 @@ import type { Severity } from './common.js'
 export type ThreatCategory = 'injection' | 'ddos' | 'flood' | 'spam' | 'malware' | 'unknown'
 
 /**
+ * TLS connection metadata for forensic enrichment.
+ * Extracted from TLS handshake information when available.
+ */
+export interface TLSConnectionInfo {
+  /** TLS cipher suite name (e.g., "TLS_AES_256_GCM_SHA384") */
+  readonly cipherSuite: string
+  /** TLS protocol version (e.g., "TLSv1.3") */
+  readonly version: string
+  /** Application-Layer Protocol Negotiation (e.g., "h2", "http/1.1") */
+  readonly alpn?: string
+}
+
+/**
+ * Source identification with extended entropy.
+ * Used for rate limiting and forensic tracking.
+ */
+export interface ScentSource {
+  /** Source IP address */
+  readonly ip: string
+  /** HTTP User-Agent header */
+  readonly userAgent?: string
+  /** TLS connection metadata (available for HTTPS connections) */
+  readonly tls?: TLSConnectionInfo
+}
+
+/**
  * Threat signal from external detector.
  * This is provided by WAF, custom rules, ML models, etc.
  * Tracehound does NOT perform threat detection.
@@ -52,10 +78,10 @@ export interface Scent {
   readonly ingressBytes?: ArrayBuffer | Uint8Array
 
   /**
-   * Origin identifier (IP, user agent, service name).
-   * Used for rate limiting.
+   * Origin identifier with extended entropy.
+   * Used for rate limiting and forensic tracking.
    */
-  readonly source: string
+  readonly source: ScentSource
 
   /** Capture timestamp (milliseconds since epoch) */
   readonly timestamp: number

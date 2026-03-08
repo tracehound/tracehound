@@ -174,6 +174,37 @@ describe('Evidence', () => {
       expect(Object.isFrozen(evidence.source)).toBe(true)
       expect(Object.isFrozen(evidence.source.tls)).toBe(true)
     })
+
+    it('sanitizes malformed source metadata during capture snapshot', () => {
+      const malformedSource = {
+        ip: '',
+        userAgent: '',
+        tls: {
+          cipherSuite: '',
+          version: '',
+          alpn: '',
+        },
+      } as unknown as ScentSource
+
+      const evidence = new Evidence(
+        validBytes,
+        validSignature,
+        validHash,
+        'high',
+        Date.now(),
+        malformedSource,
+      )
+
+      expect(evidence.source).toEqual({
+        ip: 'unknown',
+        tls: {
+          cipherSuite: 'unknown',
+          version: 'unknown',
+        },
+      })
+      expect(Object.isFrozen(evidence.source)).toBe(true)
+      expect(Object.isFrozen(evidence.source.tls)).toBe(true)
+    })
   })
 
   describe('transfer', () => {

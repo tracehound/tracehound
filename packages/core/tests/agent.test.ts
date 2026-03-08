@@ -904,6 +904,49 @@ describe('Agent', () => {
       }
     })
 
+    it('falls back to unknown runtime source when evidence source shape is invalid', () => {
+      const evidence = createMockEvidence('invalid-runtime-source')
+      ;(evidence as unknown as { _source: unknown })._source = null
+
+      const evidenceFactory: IEvidenceFactory = {
+        create: vi.fn(
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
+            ok: true,
+            evidence,
+            signature: evidence.signature,
+            hash: evidence.hash,
+            size: evidence.size,
+            compressed: evidence.compressed,
+          }),
+        ),
+      }
+
+      const localAgent = new Agent(
+        agentConfig,
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        evidenceFactory,
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const result = localAgent.intercept(
+        createScent(
+          { attack: 'invalid-source-shape' },
+          { category: 'injection', severity: 'high' },
+        ),
+      )
+
+      expect(result.status).toBe('quarantined')
+      if (result.status !== 'quarantined') {
+        return
+      }
+
+      expect(result.handle.source).toEqual({ ip: 'unknown' })
+      expect(Object.isFrozen(result.handle.source)).toBe(true)
+    })
+
     it('throws runtime membrane violation even if panic telemetry emit fails', () => {
       const throwingNotifications = {
         ...mockNotifications,

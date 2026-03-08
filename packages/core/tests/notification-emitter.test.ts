@@ -113,6 +113,20 @@ describe('NotificationEmitter', () => {
 
       expect(emitter.stats.activeSubscribers).toBe(0)
     })
+
+    it('resolves pending next() when a new event is emitted', async () => {
+      const subscription = emitter.subscribe()
+      const iterator = subscription[Symbol.asyncIterator]()
+      const pending = iterator.next()
+
+      emitter.emit('threat.detected', { delayed: true })
+      const result = await pending
+
+      expect(result.done).toBe(false)
+      expect(result.value.type).toBe('threat.detected')
+      expect(result.value.payload).toEqual({ delayed: true })
+      await iterator.return?.()
+    })
   })
 
   describe('webhook registration', () => {
@@ -262,6 +276,20 @@ describe('NotificationEmitter', () => {
 
         emitter.registerWebhook({
           url: 'https://fail.me',
+          retry: { maxAttempts: 2, delayMs: 1 },
+        })
+
+        emitter.emit('threat.detected', {})
+        await new Promise((resolve) => setTimeout(resolve, 50))
+
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+      })
+
+      it('retries and gives up silently on repeated fetch exceptions', async () => {
+        mockFetch.mockRejectedValue(new Error('network down'))
+
+        emitter.registerWebhook({
+          url: 'https://throw.me',
           retry: { maxAttempts: 2, delayMs: 1 },
         })
 

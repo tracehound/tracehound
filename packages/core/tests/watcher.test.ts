@@ -198,6 +198,41 @@ describe('Watcher', () => {
 
       expect(result).toBe(false)
     })
+
+    it('trims oldest alerts when maxAlerts capacity is exceeded', () => {
+      const limitedWatcher = createWatcher({
+        maxAlertsPerWindow: 10,
+        alertWindowMs: 60_000,
+        quarantineHighWatermark: 0.8,
+        maxAlerts: 2,
+      })
+
+      expect(
+        limitedWatcher.alert({
+          type: 'threat_detected',
+          severity: 'info',
+          message: 'a1',
+        }),
+      ).toBe(true)
+      expect(
+        limitedWatcher.alert({
+          type: 'threat_detected',
+          severity: 'info',
+          message: 'a2',
+        }),
+      ).toBe(true)
+      expect(
+        limitedWatcher.alert({
+          type: 'threat_detected',
+          severity: 'info',
+          message: 'a3',
+        }),
+      ).toBe(true)
+
+      const snapshot = limitedWatcher.snapshot()
+      expect(snapshot.totalAlerts).toBe(2)
+      expect(snapshot.lastAlert?.message).toBe('a3')
+    })
   })
 
   describe('setOverloaded()', () => {

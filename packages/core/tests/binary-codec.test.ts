@@ -15,6 +15,7 @@ import {
   GzipCodec,
   verify,
 } from '../src/utils/binary-codec.js'
+import { hashBuffer } from '../src/utils/hash.js'
 
 describe('BinaryCodec', () => {
   describe('GzipCodec', () => {
@@ -317,6 +318,33 @@ describe('BinaryCodec', () => {
       }
 
       await expect(decodeWithIntegrityAsync(corrupted)).rejects.toThrow(CodecError)
+    })
+
+    it('should throw integrity violation when decompressed size mismatches metadata', async () => {
+      const original = new TextEncoder().encode('size-mismatch-check')
+      const encoded = encodeWithIntegrity(original)
+      const tamperedSize = {
+        ...encoded,
+        originalSize: encoded.originalSize + 1,
+      }
+
+      await expect(decodeWithIntegrityAsync(tamperedSize)).rejects.toMatchObject({
+        code: 'INTEGRITY_VIOLATION',
+      })
+    })
+
+    it('should wrap non-codec async decompression errors with DECODE_FAILED', async () => {
+      const invalidCompressed = new Uint8Array([0x1f, 0x8b, 0x00, 0x00, 0x00])
+      const payload = {
+        compressed: invalidCompressed,
+        hash: hashBuffer(invalidCompressed),
+        originalSize: 10,
+        compressedSize: invalidCompressed.byteLength,
+      }
+
+      await expect(decodeWithIntegrityAsync(payload)).rejects.toMatchObject({
+        code: 'DECODE_FAILED',
+      })
     })
   })
 })

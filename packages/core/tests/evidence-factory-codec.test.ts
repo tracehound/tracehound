@@ -167,6 +167,26 @@ describe('EvidenceFactory with Codec', () => {
       }
     })
 
+    it('preserves zero-length ingress via deterministic sentinel bytes', () => {
+      const factory = createEvidenceFactory()
+      const scent: Scent = {
+        id: 'empty-ingress',
+        payload: { normalized: true },
+        ingressBytes: new Uint8Array(0),
+        source: { ip: 'test' },
+        timestamp: Date.now(),
+      }
+
+      const result = factory.create(scent, { category: 'spam', severity: 'low' }, 1_000_000)
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const sentinelSize = new TextEncoder().encode('{"__th_empty_ingress":true}').byteLength
+        expect(result.size).toBe(sentinelSize)
+        expect(result.size).toBeGreaterThan(0)
+      }
+    })
+
     it('wraps unknown codec failures into Evidence creation errors', () => {
       const factory = createEvidenceFactory({
         codec: {

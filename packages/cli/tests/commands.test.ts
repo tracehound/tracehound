@@ -1,12 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, renameSync, writeFileSync } from 'node:fs'
-import { createHmac } from 'node:crypto'
-import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
 import {
   recordTraceInspectionEntry,
   SYSTEM_SNAPSHOT_ENV,
   type SystemSnapshot,
 } from '@tracehound/core'
+import { createHmac } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { diskCommand } from '../src/commands/disk.js'
 import { historyCommand } from '../src/commands/history.js'
@@ -50,6 +50,12 @@ function createFixtureSnapshot(): SystemSnapshot {
         medium: 1,
         low: 1,
       },
+      evictedCount: 0,
+      decayedCount: 0,
+      archivedCount: 0,
+      archiveFailureCount: 0,
+      ttlEnabled: false,
+      nextExpiryAt: null,
     },
     quarantineMaxBytes: 8192,
     watcher: {
@@ -408,6 +414,16 @@ describe('CLI Commands', () => {
       expect(inspectOutput).toContain('[]')
     })
 
+    it('history clear should print table output when json flag is not provided', () => {
+      historyCommand.commands[0]?.setOptionValue('json', undefined)
+      historyCommand.exitOverride()
+      historyCommand.parse(['clear'], { from: 'user' })
+
+      const output = readLogOutput(logSpy)
+      expect(output).toContain('HISTORY CLEAR')
+      expect(output).toContain('Removed Entries')
+    })
+
     it('disk clear should remove registry file explicitly', () => {
       const registryPath = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
       expect(registryPath).toBeTruthy()
@@ -424,6 +440,59 @@ describe('CLI Commands', () => {
         return
       }
       expect(existsSync(registryPath)).toBe(false)
+    })
+
+    it('disk clear should print table output when json flag is not provided', () => {
+      diskCommand.commands[0]?.setOptionValue('json', undefined)
+      diskCommand.exitOverride()
+      diskCommand.parse(['clear'], { from: 'user' })
+
+      const output = readLogOutput(logSpy)
+      expect(output).toContain('DISK CLEAR')
+      expect(output).toContain('Removed Bytes')
+    })
+  })
+
+  describe('Stats edge branches', () => {
+    it('stats command should emit fileUsagePct 0 when maxFileBytes is zero', async () => {
+      vi.resetModules()
+      vi.doMock('@tracehound/core', () => ({
+        getTraceRegistryStats: () => ({
+          path: '/tmp/trace-registry.ndjson',
+          fileExists: true,
+          retainedEntries: 1,
+          uniqueTraceIds: 1,
+          fileBytes: 256,
+          maxFileBytes: 0,
+          queueDepth: 0,
+          maxQueueEntries: 1024,
+          droppedCount: 0,
+          blocked: false,
+          ttlMs: 86_400_000,
+          maxEntries: 5000,
+        }),
+      }))
+      vi.doMock('../src/lib/system-snapshot.js', () => ({
+        loadSystemSnapshot: () => ({
+          ok: true,
+          snapshot: createFixtureSnapshot(),
+        }),
+      }))
+
+      const mockedLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      try {
+        const { statsCommand: isolatedStatsCommand } = await import('../src/commands/stats.js')
+        isolatedStatsCommand.exitOverride()
+        isolatedStatsCommand.parse(['stats', '--json'], { from: 'user' })
+
+        const output = readLogOutput(mockedLogSpy)
+        expect(output).toContain('"fileUsagePct": 0')
+      } finally {
+        mockedLogSpy.mockRestore()
+        vi.doUnmock('@tracehound/core')
+        vi.doUnmock('../src/lib/system-snapshot.js')
+        vi.resetModules()
+      }
     })
   })
 

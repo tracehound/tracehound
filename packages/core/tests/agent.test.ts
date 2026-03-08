@@ -947,6 +947,101 @@ describe('Agent', () => {
       expect(Object.isFrozen(result.handle.source)).toBe(true)
     })
 
+    it('falls back to unknown runtime source when tls version/cipher is malformed', () => {
+      const evidence = createMockEvidence('invalid-runtime-tls')
+      ;(evidence as unknown as { _source: unknown })._source = {
+        ip: '203.0.113.7',
+        tls: {
+          cipherSuite: '',
+          version: '',
+        },
+      }
+
+      const evidenceFactory: IEvidenceFactory = {
+        create: vi.fn(
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
+            ok: true,
+            evidence,
+            signature: evidence.signature,
+            hash: evidence.hash,
+            size: evidence.size,
+            compressed: evidence.compressed,
+          }),
+        ),
+      }
+
+      const localAgent = new Agent(
+        agentConfig,
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        evidenceFactory,
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const result = localAgent.intercept(
+        createScent(
+          { attack: 'invalid-tls-shape' },
+          { category: 'injection', severity: 'high' },
+        ),
+      )
+
+      expect(result.status).toBe('quarantined')
+      if (result.status !== 'quarantined') {
+        return
+      }
+      expect(result.handle.source).toEqual({ ip: 'unknown' })
+    })
+
+    it('falls back to unknown runtime source when tls alpn is not a string', () => {
+      const evidence = createMockEvidence('invalid-runtime-alpn')
+      ;(evidence as unknown as { _source: unknown })._source = {
+        ip: '203.0.113.9',
+        tls: {
+          cipherSuite: 'TLS_AES_256_GCM_SHA384',
+          version: 'TLSv1.3',
+          alpn: 7,
+        },
+      }
+
+      const evidenceFactory: IEvidenceFactory = {
+        create: vi.fn(
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
+            ok: true,
+            evidence,
+            signature: evidence.signature,
+            hash: evidence.hash,
+            size: evidence.size,
+            compressed: evidence.compressed,
+          }),
+        ),
+      }
+
+      const localAgent = new Agent(
+        agentConfig,
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        evidenceFactory,
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const result = localAgent.intercept(
+        createScent(
+          { attack: 'invalid-alpn-shape' },
+          { category: 'injection', severity: 'high' },
+        ),
+      )
+
+      expect(result.status).toBe('quarantined')
+      if (result.status !== 'quarantined') {
+        return
+      }
+      expect(result.handle.source).toEqual({ ip: 'unknown' })
+    })
+
     it('throws runtime membrane violation even if panic telemetry emit fails', () => {
       const throwingNotifications = {
         ...mockNotifications,

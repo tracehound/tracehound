@@ -577,6 +577,76 @@ describe('system-snapshot utilities', () => {
         },
         signature: 'x',
       },
+      {
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: 'healthy',
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot({
+            lastAlert: {
+              id: 'alert-invalid-type',
+              type: 'invalid-type' as 'threat_detected',
+              severity: 'warning',
+              message: 'bad alert type',
+              timestamp: Date.now(),
+            },
+          }),
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: 'x',
+      },
+      {
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: 'healthy',
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot({
+            lastAlert: {
+              id: 'alert-invalid-severity',
+              type: 'threat_detected',
+              severity: 'fatal' as 'warning',
+              message: 'bad severity',
+              timestamp: Number.NaN,
+            },
+          }),
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: 'x',
+      },
+      {
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: {
+          generatedAt: Date.now(),
+          systemHealth: 'healthy',
+          quarantineMaxBytes: 1024,
+          agent: createAgentStats(),
+          quarantine: createQuarantineStats(),
+          watcher: createWatcherSnapshot({
+            lastAlert: {
+              id: 'alert-invalid-context',
+              type: 'threat_detected',
+              severity: 'warning',
+              message: 'bad context',
+              timestamp: Date.now(),
+              context: 'not-an-object' as unknown as Record<string, unknown>,
+            },
+          }),
+          houndPool: createHoundPoolStats(),
+          rateLimiter: createRateLimiterStats(),
+        },
+        signature: 'x',
+      },
     ]
 
     try {

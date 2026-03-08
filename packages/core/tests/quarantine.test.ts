@@ -2,7 +2,7 @@
  * Quarantine tests (TDD).
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuditChain } from '../src/core/audit-chain.js'
 import { MemoryColdStorage } from '../src/core/cold-storage.js'
 import { Evidence } from '../src/core/evidence.js'
@@ -891,6 +891,95 @@ describe('Quarantine', () => {
 
       expect(result.decayedCount).toBe(1)
       expect(expiringQuarantine.stats.count).toBe(0)
+    })
+
+    it('returns archive cancelled when signal aborts after availability check', async () => {
+      const controller = new AbortController()
+      const coldStorage = {
+        isAvailable: async () => {
+          controller.abort()
+          return true
+        },
+        write: vi.fn(async () => ({ success: true })),
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      }
+      const q = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        auditChain,
+        { coldStorage, now: () => 1_500 },
+      )
+      const internals = q as unknown as {
+        runArchive: (
+          signature: string,
+          bytes: Uint8Array,
+          signal: AbortSignal,
+        ) => Promise<{ archived: boolean; storageId?: string; storageError?: string }>
+      }
+
+      const result = await internals.runArchive(
+        'sig-abort-after-availability',
+        new Uint8Array([1, 2, 3]),
+        controller.signal,
+      )
+
+      expect(result).toEqual({
+        archived: false,
+        storageError: 'archive cancelled',
+      })
+      expect(coldStorage.write).not.toHaveBeenCalled()
+    })
+
+    it('returns archive cancelled when signal aborts during async encoding', async () => {
+      const writeSpy = vi.fn(async () => ({ success: true }))
+      const coldStorage = {
+        isAvailable: async () => true,
+        write: writeSpy,
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      }
+      const q = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        auditChain,
+        { coldStorage, now: () => 1_500 },
+      )
+      const internals = q as unknown as {
+        runArchive: (
+          signature: string,
+          bytes: Uint8Array,
+          signal: AbortSignal,
+        ) => Promise<{ archived: boolean; storageId?: string; storageError?: string }>
+      }
+      const controller = new AbortController()
+      const largePayload = new Uint8Array(4 * 1024 * 1024).fill(65)
+      const abortTimer = setTimeout(() => controller.abort(), 0)
+
+      const result = await internals.runArchive(
+        'sig-abort-after-encode',
+        largePayload,
+        controller.signal,
+      )
+      clearTimeout(abortTimer)
+
+      expect(result).toEqual({
+        archived: false,
+        storageError: 'archive cancelled',
+      })
+      expect(writeSpy).not.toHaveBeenCalled()
     })
   })
 

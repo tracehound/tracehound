@@ -338,6 +338,59 @@ describe('RateLimiter', () => {
       expect(limiter.check(rawMimic).allowed).toBe(true)
       expect(limiter.stats.sources).toBe(2)
     })
+
+    it('normalizes empty optional source components deterministically', () => {
+      const limiter = new RateLimiter({
+        ...config,
+        maxRequests: 10,
+        blockDurationMs: 0,
+      })
+
+      const source: ScentSource = {
+        ip: '198.51.100.10',
+        userAgent: '',
+        tls: {
+          cipherSuite: '',
+          version: '',
+          alpn: '',
+        },
+      }
+
+      expect(limiter.check(source).allowed).toBe(true)
+      expect(limiter.check(source).allowed).toBe(true)
+      expect(limiter.stats.sources).toBe(1)
+    })
+
+    it('refreshes LRU ordering when evaluating an already-tracked composite key', () => {
+      const limiter = new RateLimiter({
+        ...config,
+        maxRequests: 10,
+        blockDurationMs: 0,
+      })
+      const source = createSource('203.0.113.20', 'existing-ua', {
+        cipherSuite: 'TLS_AES_256_GCM_SHA384',
+        version: 'TLSv1.3',
+      })
+
+      expect(limiter.check(source).allowed).toBe(true)
+
+      const internals = limiter as unknown as {
+        sources: Map<string, { timestamps: number[]; blockedUntil: number | null; lastActivity: number }>
+        evaluateComposite: (key: string, now: number) => RateLimitResult
+      }
+      const key = Array.from(internals.sources.keys())[0]
+      expect(key).toBeDefined()
+      if (key === undefined) {
+        return
+      }
+      const entryBefore = internals.sources.get(key)
+
+      const result = internals.evaluateComposite(key, Date.now())
+
+      expect(result.allowed).toBe(true)
+      expect(internals.sources.has(key)).toBe(true)
+      expect(internals.sources.get(key)).toBe(entryBefore)
+    })
   })
 
   describe('capacity limits (LRU eviction)', () => {

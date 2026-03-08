@@ -18,22 +18,28 @@ const MAX_SOURCE_KEY_COMPONENT_LENGTH = 256;
 const SOURCE_KEY_HEAD_LENGTH = 160;
 const SOURCE_KEY_TAIL_LENGTH = 80;
 
+type NormalizedSourceKeyComponent =
+  | { kind: "raw"; value: string }
+  | { kind: "truncated"; head: string; tail: string; length: number };
+
 /**
  * Bound source key component size to mitigate CPU amplification from oversized headers.
  * Keeps deterministic entropy by preserving head + tail + original length.
  */
-function normalizeSourceKeyComponent(value: string | undefined): string {
+function normalizeSourceKeyComponent(
+  value: string | undefined,
+): NormalizedSourceKeyComponent {
   if (value === undefined || value.length === 0) {
-    return "";
+    return { kind: "raw", value: "" };
   }
 
   if (value.length <= MAX_SOURCE_KEY_COMPONENT_LENGTH) {
-    return value;
+    return { kind: "raw", value };
   }
 
   const head = value.slice(0, SOURCE_KEY_HEAD_LENGTH);
   const tail = value.slice(value.length - SOURCE_KEY_TAIL_LENGTH);
-  return `${head}|${tail}|len=${value.length}`;
+  return { kind: "truncated", head, tail, length: value.length };
 }
 
 /**
@@ -82,7 +88,7 @@ interface IpCeilingEntry {
  * - Component normalization bounds per-check processing for oversized headers.
  */
 function generateSourceKey(source: ScentSource): string {
-  const components = [
+  const components: NormalizedSourceKeyComponent[] = [
     normalizeSourceKeyComponent(source.ip),
     normalizeSourceKeyComponent(source.userAgent),
     normalizeSourceKeyComponent(source.tls?.cipherSuite),
@@ -349,20 +355,26 @@ export class RateLimiter implements IRateLimiter {
     const entry = this.ipCeiling.get(ip);
     if (!entry) return { allowed: true };
 
+    // Treat reads as activity: keep hot entries fresh in LRU and cleanup horizon.
+    this.ipCeiling.delete(ip);
+    this.ipCeiling.set(ip, entry);
+    entry.lastActivity = now;
+
     const windowStart = now - this.config.windowMs;
-    let inWindowCount = 0;
+    const inWindow: number[] = [];
     let oldestInWindow: number | undefined;
-    for (let i = 0; i < entry.timestamps.length; i++) {
-      const ts = entry.timestamps[i] as number;
-      if (ts > windowStart) {
+    for (let i = 0; i < entry.timestamps.length; i += 1) {
+      const ts = entry.timestamps[i];
+      if (ts !== undefined && ts > windowStart) {
         if (oldestInWindow === undefined) {
           oldestInWindow = ts;
         }
-        inWindowCount++;
+        inWindow.push(ts);
       }
     }
+    entry.timestamps = inWindow;
 
-    if (inWindowCount >= this.config.maxRequests) {
+    if (inWindow.length >= this.config.maxRequests) {
       const retryAfter =
         oldestInWindow !== undefined
           ? oldestInWindow + this.config.windowMs - now

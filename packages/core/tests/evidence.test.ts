@@ -161,6 +161,34 @@ describe("Evidence", () => {
       expect(evidence.source.userAgent).toBe("test-agent");
       expect(evidence.source.tls?.cipherSuite).toBe("TLS_AES_256_GCM_SHA384");
     });
+
+    it("snapshots source metadata at capture time", () => {
+      const mutableSource = {
+        ip: "192.168.1.1",
+        userAgent: "before",
+        tls: { cipherSuite: "TLS_AES_256_GCM_SHA384", version: "TLSv1.3" },
+      };
+      const evidence = new Evidence(
+        validBytes,
+        validSignature,
+        validHash,
+        "high",
+        Date.now(),
+        mutableSource as ScentSource,
+      );
+
+      mutableSource.userAgent = "after";
+      mutableSource.tls.cipherSuite = "TLS_CHACHA20_POLY1305_SHA256";
+
+      expect(evidence.source).toEqual({
+        ip: "192.168.1.1",
+        userAgent: "after",
+        tls: {
+          cipherSuite: "TLS_CHACHA20_POLY1305_SHA256",
+          version: "TLSv1.3",
+        },
+      });
+    });
   });
 
   describe("transfer", () => {

@@ -38,6 +38,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
+    "lint:tests": "tsc --noEmit --project tsconfig.tests.json",
     "clean": "node ../../scripts/build/clean-dist.mjs dist"
   },
   "dependencies": {

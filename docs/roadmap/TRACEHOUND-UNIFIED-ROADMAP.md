@@ -180,3 +180,4 @@ Usage rule:
 4. [docs/rfc/0008-RustCorePivot.md](../rfc/0008-RustCorePivot.md)
 5. [docs/rfc/0009-CoordinationProviderContract.md](../rfc/0009-CoordinationProviderContract.md)
 6. [docs/rfc/0014-Watchtower.md](../rfc/0014-Watchtower.md)
+7. [docs/roadmap/FORENSIC-INTEGRITY-AND-TEST-HARDENING-NOTE.md](./FORENSIC-INTEGRITY-AND-TEST-HARDENING-NOTE.md)

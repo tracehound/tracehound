@@ -8,7 +8,7 @@ For upgrade-impacting changes, see [BREAKING-CHANGES.md](./BREAKING-CHANGES.md).
 ## Migration Note (v1.7.0)
 
 1. **Breaking:** `Scent.source` changed from `string` to `ScentSource` (structured object with `ip`, `userAgent?`, `tls?`). Update all custom scent extraction functions accordingly.
-2. **Breaking:** `IRateLimiter.check()` and `IRateLimiter.reset()` now accept `ScentSource` instead of `string`. The rate limiter generates a SHA-256 composite key internally from IP + User-Agent + TLS metadata for higher entropy.
+2. **Breaking:** `IRateLimiter.check()` and `IRateLimiter.reset()` now accept `ScentSource` instead of `string`. The rate limiter generates a SHA-256 composite key internally from IP + User-Agent + TLS metadata and also enforces an IP-only ceiling to prevent same-IP UA/TLS rotation from creating fresh buckets.
 3. New public types exported: `ScentSource`, `TLSConnectionInfo`.
 4. Express and Fastify adapters now automatically extract TLS cipher suite, protocol version, and ALPN from the socket when available.
 

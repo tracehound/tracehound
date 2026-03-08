@@ -195,7 +195,10 @@ describe('tracehound middleware', () => {
 
       expect(agent.intercept).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: '10.0.0.1',
+          source: expect.objectContaining({
+            ip: '10.0.0.1',
+            userAgent: 'test-agent',
+          }),
           payload: expect.objectContaining({
             method: 'POST',
             path: '/api/data',
@@ -324,7 +327,7 @@ describe('tracehound middleware', () => {
     const customScent = {
       id: 'test-id',
       timestamp: Date.now(),
-      source: 'custom',
+      source: { ip: 'custom' },
       payload: { custom: true },
     }
     const extractScent = vi.fn().mockReturnValue(customScent)

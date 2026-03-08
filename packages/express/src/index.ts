@@ -4,7 +4,6 @@
  * Express middleware for Tracehound security buffer.
  */
 
-import { Buffer } from 'node:buffer'
 import {
   generateSecureId,
   recordTraceInspectionEntry,
@@ -15,6 +14,7 @@ import {
   type ScentSource,
 } from "@tracehound/core";
 import type { NextFunction, Request, RequestHandler, Response } from "express";
+import { Buffer } from "node:buffer";
 
 /**
  * Middleware configuration options.
@@ -51,7 +51,7 @@ export interface TracehoundMiddlewareOptions {
   onIntercept?: (result: InterceptResult, req: Request, res: Response) => void;
 }
 
-const textEncoder = new TextEncoder()
+const textEncoder = new TextEncoder();
 
 /**
  * Defensive clone for safely copying deeply nested or cyclical external payloads
@@ -67,34 +67,34 @@ function safeClone(obj: unknown): JsonSerializable | undefined {
 }
 
 function toIngressBytes(value: unknown): Uint8Array | undefined {
-  if (typeof value === 'string') {
-    return textEncoder.encode(value)
+  if (typeof value === "string") {
+    return textEncoder.encode(value);
   }
 
   if (Buffer.isBuffer(value)) {
     // Create a zero-copy Uint8Array view over the Buffer's underlying memory.
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength)
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   }
 
   if (value instanceof Uint8Array) {
     // Reuse existing bytes; core performs the single defensive copy.
-    return value
+    return value;
   }
 
   if (value instanceof ArrayBuffer) {
     // Create a view without copying; core performs the single defensive copy.
-    return new Uint8Array(value)
+    return new Uint8Array(value);
   }
 
-  return undefined
+  return undefined;
 }
 
 function extractIngressBytes(req: Request): Uint8Array | undefined {
   // Only use rawBody — set explicitly by body-parser middleware (e.g. verify callback).
   // Falling back to req.body would create signature non-determinism: the same logical
   // payload would produce different signatures depending on middleware configuration.
-  const rawBody = Reflect.get(req, 'rawBody')
-  return toIngressBytes(rawBody)
+  const rawBody = Reflect.get(req, "rawBody");
+  return toIngressBytes(rawBody);
 }
 
 /**
@@ -105,13 +105,21 @@ function defaultExtractScent(req: Request): Scent {
   const userAgentHeader = req.get("user-agent");
   const query = safeClone(req.query) ?? {};
   const body = safeClone(req.body);
-  const ingressBytes = extractIngressBytes(req)
+  const ingressBytes = extractIngressBytes(req);
 
   // Extract TLS information if available
-  const socket = req.socket as (typeof req.socket & { getCipher?: () => { name: string }, protocol?: string, alpn?: { protocol: string } }) | undefined;
-  const cipher = socket?.getCipher?.();
-  const tlsVersion = socket?.protocol;
-  const tlsAlpn = socket?.alpn?.protocol;
+  const socket = req.socket as
+    | (typeof req.socket & {
+        getCipher?: () => { name: string } | null;
+        getProtocol?: () => string | null;
+        alpnProtocol?: string | false | null;
+      })
+    | undefined;
+  const cipher = socket?.getCipher?.() ?? undefined;
+  const tlsVersion = socket?.getProtocol?.() ?? undefined;
+  const alpnRaw = socket?.alpnProtocol ?? undefined;
+  const tlsAlpn =
+    typeof alpnRaw === "string" && alpnRaw.length > 0 ? alpnRaw : undefined;
 
   const payload: Record<string, JsonSerializable> = {
     method: req.method,
@@ -130,11 +138,15 @@ function defaultExtractScent(req: Request): Scent {
   const source: ScentSource = {
     ip,
     ...(userAgentHeader ? { userAgent: userAgentHeader } : {}),
-    ...(cipher ? { tls: {
-      cipherSuite: cipher.name,
-      version: tlsVersion || 'unknown',
-      ...(tlsAlpn ? { alpn: tlsAlpn } : {}),
-    } } : {}),
+    ...(cipher
+      ? {
+          tls: {
+            cipherSuite: cipher.name,
+            version: tlsVersion || "unknown",
+            ...(tlsAlpn ? { alpn: tlsAlpn } : {}),
+          },
+        }
+      : {}),
   };
 
   return {

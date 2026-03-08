@@ -30,9 +30,11 @@
 
 **Reason:** It's a simple bot bypass test.
 
-**Answer:** "As of v1.7.0, the composite key includes IP + User-Agent + TLS metadata (cipher suite, protocol version, ALPN) when available over HTTPS connections. This significantly increases entropy since TLS handshake parameters are harder to spoof than HTTP headers. The rate limiter hashes these components with SHA-256 for deterministic, high-entropy source identification. Additionally, optional trusted context binding (JWT claim, etc.) is available. Stateless mode is the default, but identity-aware mode is optional. Entropy can be increased while maintaining determinism."
+**Answer:** "As of v1.7.0, the composite key includes IP + User-Agent + TLS metadata (cipher suite, protocol version, ALPN) when available over HTTPS connections. The rate limiter uses a two-tier design: a composite fingerprint key for fine-grained per-client tracking, and an IP-only ceiling that caps total requests from one IP address regardless of fingerprint rotation. This prevents a client from minting fresh rate-limit buckets by rotating User-Agent strings or TLS parameters. The composite key is SHA-256 hashed for deterministic, log-safe source identification.
 
-**Conclusion:** Accept the design trade-off, but TLS enrichment narrows the spoofing surface.
+**Important deployment caveat:** TLS metadata is extracted from the server-side socket. Behind a TLS-terminating proxy or CDN, the TLS fields reflect the proxy-to-server connection — not the original client — and may be unavailable or identical across all clients. In such deployments, the TLS component of the composite key provides no additional entropy; the IP-only ceiling still applies, but the IP seen will be the proxy's egress address. Deploy Tracehound at the TLS termination point, or use trusted forwarded headers (e.g. X-Forwarded-For with proxy trust configured), to retain per-client IP accuracy."
+
+**Conclusion:** The two-tier design (composite fingerprint + IP ceiling) eliminates the rotation bypass surface. Proxy deployments must account for TLS termination topology.
 
 ---
 

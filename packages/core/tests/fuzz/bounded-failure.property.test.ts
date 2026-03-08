@@ -17,7 +17,7 @@ describe('Fuzz Invariant: Bounded Failure + State Non-Amplification', () => {
         const result = runtime.agent.intercept({
           id: `oversized-${i}`,
           payload: { blob: oversizedBody },
-          source: 'fuzz-source',
+          source: { ip: 'fuzz-source' },
           timestamp: 1,
           threat: {
             category: 'flood',

@@ -241,7 +241,7 @@ export class Quarantine {
       reason,
       scent: {
         id: evidence.signature, // Using signature as proxy for scent ID
-        source: "unknown", // Not available from evidence handle
+        source: evidence.source, // ScentSource from evidence handle
         timestamp: evidence.captured,
         payloadHash: hash,
         payloadSize: size,
@@ -664,7 +664,7 @@ export class Quarantine {
 
       this.store.delete(signature);
       this.expirations.delete(signature);
-      this.totalBytes -= record.size;
+      this.totalBytes = Math.max(0, this.totalBytes - record.size);
       this.decayedCount++;
 
       if (archived) {

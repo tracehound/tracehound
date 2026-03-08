@@ -33,7 +33,7 @@ describe('Full Lifecycle Scenario', () => {
     return {
       id: generateSecureId(),
       timestamp: Date.now(),
-      source: '192.168.1.100',
+      source: { ip: '192.168.1.100' },
       payload,
       threat,
     }

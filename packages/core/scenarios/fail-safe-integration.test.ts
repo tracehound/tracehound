@@ -34,7 +34,7 @@ describe('Fail-Safe Integration Scenario', () => {
     return {
       id: generateSecureId(),
       timestamp: Date.now(),
-      source: 'attacker',
+      source: { ip: 'attacker' },
       payload: { attack: `unique-payload-${payloadCounter}`, time: Date.now() },
       threat: { category: 'injection', severity: 'high' },
     }

@@ -28,7 +28,7 @@ describe("Quarantine", () => {
       view[i] = signature.charCodeAt(i % signature.length);
     }
     const contentHash = hashBuffer(bytes);
-    return new Evidence(bytes, signature, contentHash, severity, captured);
+    return new Evidence(bytes, signature, contentHash, severity, captured, { ip: 'quarantine-test' });
   }
 
   function createDisposedEvidence(
@@ -699,7 +699,7 @@ describe("Quarantine", () => {
           ttlMs: 100,
           archiveOnDecay: true,
           archiveFailureMode: "drop",
-          archiveTimeoutMs: 5,
+          archiveTimeoutMs: 100,
         },
         localAuditChain,
         {
@@ -719,7 +719,7 @@ describe("Quarantine", () => {
 
       expect(result.archiveFailureCount).toBe(1);
       expect(decay.details.storageError).toContain(
-        "archive timed out after 5ms",
+        "archive timed out after 100ms",
       );
     });
 
@@ -752,7 +752,7 @@ describe("Quarantine", () => {
           ttlMs: 100,
           archiveOnDecay: true,
           archiveFailureMode: "drop",
-          archiveTimeoutMs: 5,
+          archiveTimeoutMs: 100,
         },
         localAuditChain,
         { coldStorage: signalAwareStorage, now: () => 1_500 },
@@ -768,7 +768,7 @@ describe("Quarantine", () => {
       const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
         details: { storageError: string };
       };
-      expect(decay.details.storageError).toContain("archive timed out after 5ms");
+      expect(decay.details.storageError).toContain("archive timed out after 100ms");
     });
 
     it("treats adapter errors named archive timeout as regular storage errors", async () => {
@@ -789,7 +789,7 @@ describe("Quarantine", () => {
           ttlMs: 100,
           archiveOnDecay: true,
           archiveFailureMode: "drop",
-          archiveTimeoutMs: 5,
+          archiveTimeoutMs: 100,
         },
         localAuditChain,
         {
@@ -809,7 +809,7 @@ describe("Quarantine", () => {
 
       expect(result.archiveFailureCount).toBe(1);
       expect(decay.details.storageError).toBe("archive timeout");
-      expect(decay.details.storageError).not.toContain("timed out after 5ms");
+      expect(decay.details.storageError).not.toContain("timed out after 100ms");
     });
 
     it("sanitizes archive adapter errors before recording them", async () => {

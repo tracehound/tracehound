@@ -176,7 +176,7 @@ describe("Tracehound Factory", () => {
         const result = tracehound.agent.intercept({
           id: "ttl-1",
           timestamp: Date.now(),
-          source: "ttl-source",
+          source: { ip: "ttl-source" },
           threat: { category: "injection", severity: "high" },
           payload: { attack: true },
         });
@@ -218,7 +218,7 @@ describe("Tracehound Factory", () => {
       tracehound.agent.intercept({
         id: "1",
         timestamp: Date.now(),
-        source: "1.2.3.4",
+        source: { ip: "1.2.3.4" },
         threat: { category: "injection", severity: "critical" },
         payload: {},
       });
@@ -245,7 +245,7 @@ describe("Tracehound Factory", () => {
       tracehound.agent.intercept({
         id: "2",
         timestamp: Date.now(),
-        source: "1.2.3.4",
+        source: { ip: "1.2.3.4" },
         threat: { category: "injection", severity: "high" },
         payload: {},
       });
@@ -272,7 +272,7 @@ describe("Tracehound Factory", () => {
       tracehound.agent.intercept({
         id: "3",
         timestamp: Date.now(),
-        source: "1.2.3.4",
+        source: { ip: "1.2.3.4" },
         threat: { category: "injection", severity: "high" },
         payload: { a: 1 },
       });
@@ -305,7 +305,7 @@ describe("Tracehound Factory", () => {
       tracehound.agent.intercept({
         id: "4",
         timestamp: Date.now(),
-        source: "1.2.3.5",
+        source: { ip: "1.2.3.5" },
         threat: { category: "injection", severity: "high" },
         payload: { a: 1 },
       });
@@ -345,7 +345,7 @@ describe("Tracehound Factory", () => {
       const first = tracehound.agent.intercept({
         id: "5",
         timestamp: Date.now(),
-        source: "1.2.3.6",
+        source: { ip: "1.2.3.6" },
         threat: { category: "injection", severity: "high" },
         payload: { first: true },
       });
@@ -357,7 +357,7 @@ describe("Tracehound Factory", () => {
       const second = tracehound.agent.intercept({
         id: "6",
         timestamp: Date.now(),
-        source: "1.2.3.7",
+        source: { ip: "1.2.3.7" },
         threat: { category: "injection", severity: "high" },
         payload: { second: true },
       });
@@ -414,7 +414,7 @@ describe("Tracehound Factory", () => {
       const result = tracehound.agent.intercept({
         id: "7",
         timestamp: Date.now(),
-        source: "1.2.3.8",
+        source: { ip: "1.2.3.8" },
         threat: { category: "injection", severity: "high" },
         payload: { terminate: true },
       });
@@ -450,21 +450,21 @@ describe("Tracehound Factory", () => {
       tracehound.agent.intercept({
         id: "8",
         timestamp: Date.now(),
-        source: "1.2.3.9",
+        source: { ip: "1.2.3.9" },
         threat: { category: "injection", severity: "high" },
         payload: { first: true },
       });
       tracehound.agent.intercept({
         id: "9",
         timestamp: Date.now(),
-        source: "1.2.3.10",
+        source: { ip: "1.2.3.10" },
         threat: { category: "injection", severity: "high" },
         payload: { second: true },
       });
       tracehound.agent.intercept({
         id: "10",
         timestamp: Date.now(),
-        source: "1.2.3.11",
+        source: { ip: "1.2.3.11" },
         threat: { category: "injection", severity: "high" },
         payload: { third: true },
       });
@@ -533,14 +533,14 @@ describe("Tracehound Factory", () => {
         tracehound.agent.intercept({
           id: "11",
           timestamp: Date.now(),
-          source: "1.2.3.12",
+          source: { ip: "1.2.3.12" },
           threat: { category: "injection", severity: "high" },
           payload: { first: true },
         });
         tracehound.agent.intercept({
           id: "12",
           timestamp: Date.now(),
-          source: "1.2.3.13",
+          source: { ip: "1.2.3.13" },
           threat: { category: "injection", severity: "high" },
           payload: { second: true },
         });
@@ -575,7 +575,7 @@ describe("Tracehound Factory", () => {
       tracehound.agent.intercept({
         id: "13",
         timestamp: Date.now(),
-        source: "1.2.3.14",
+        source: { ip: "1.2.3.14" },
         threat: { category: "injection", severity: "high" },
         payload: { spawn: true },
       });
@@ -604,14 +604,14 @@ describe("Tracehound Factory", () => {
       const first = tracehound.agent.intercept({
         id: "14",
         timestamp: Date.now(),
-        source: "1.2.3.15",
+        source: { ip: "1.2.3.15" },
         threat: { category: "injection", severity: "high" },
         payload: { first: true },
       });
       const second = tracehound.agent.intercept({
         id: "15",
         timestamp: Date.now(),
-        source: "1.2.3.16",
+        source: { ip: "1.2.3.16" },
         threat: { category: "injection", severity: "high" },
         payload: { second: true },
       });

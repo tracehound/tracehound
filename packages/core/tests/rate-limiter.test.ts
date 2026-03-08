@@ -146,34 +146,41 @@ describe('RateLimiter', () => {
       }
     })
 
-    it('uses TLS entropy for separate rate limiting', () => {
+    it('blocks same-IP TLS cipher rotation via IP ceiling', () => {
       const limiter = new RateLimiter(config)
 
-      // Same IP, different TLS cipher - should be tracked separately
+      // Exhaust IP ceiling for 192.168.1.1 using cipher1
       for (let i = 0; i < config.maxRequests; i++) {
-        limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3' }))
+        expect(limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3' })).allowed).toBe(true)
       }
 
-      // Next request with same IP but different cipher - should be allowed (different rate limit)
-      const result1 = limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_CHACHA20_POLY1305_SHA256', version: 'TLSv1.3' }))
-      expect(result1.allowed).toBe(true)
+      // Rotation attempt with different cipher, same IP — blocked by IP ceiling (soft reject, no penalty)
+      const rotated = limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_CHACHA20_POLY1305_SHA256', version: 'TLSv1.3' }))
+      expect(rotated.allowed).toBe(false)
+      if (!rotated.allowed) {
+        expect(rotated.blocked).toBe(false) // IP ceiling: no penalty block
+        expect(rotated.reason).toContain('IP rate ceiling')
+      }
 
-      // Next request with same IP and same cipher - should be blocked
-      const result2 = limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3' }))
-      expect(result2.allowed).toBe(false)
+      // Original cipher is also blocked (composite block)
+      const original = limiter.check(createSource('192.168.1.1', 'Mozilla/5.0', { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3' }))
+      expect(original.allowed).toBe(false)
     })
 
-    it('combines IP + UserAgent + TLS for entropy', () => {
+    it('blocks same-IP user-agent rotation via IP ceiling', () => {
       const limiter = new RateLimiter(config)
 
-      // Same IP, different UserAgent - should be tracked separately
+      // Exhaust IP ceiling for 192.168.1.1
       for (let i = 0; i < config.maxRequests; i++) {
-        limiter.check(createSource('192.168.1.1', 'Mozilla/5.0'))
+        expect(limiter.check(createSource('192.168.1.1', 'Mozilla/5.0')).allowed).toBe(true)
       }
 
-      // Same IP but different UserAgent - should be allowed
-      const result = limiter.check(createSource('192.168.1.1', 'curl/7.68.0'))
-      expect(result.allowed).toBe(true)
+      // UA rotation attempt — blocked by IP ceiling (soft reject)
+      const rotated = limiter.check(createSource('192.168.1.1', 'curl/7.68.0'))
+      expect(rotated.allowed).toBe(false)
+      if (!rotated.allowed) {
+        expect(rotated.blocked).toBe(false) // IP ceiling: no penalty block
+      }
     })
 
     it('falls back gracefully when TLS unavailable', () => {

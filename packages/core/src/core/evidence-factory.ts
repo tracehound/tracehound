@@ -10,7 +10,6 @@
 
 import type { TracehoundError } from "../types/errors.js";
 import { Errors } from "../types/errors.js";
-import type { EvidenceSourceMetadata } from "../types/evidence.js";
 import type { Scent, ThreatSignal } from "../types/scent.js";
 import type { HotPathCodec } from "../utils/binary-codec.js";
 import { encodePayload } from "../utils/encode.js";
@@ -123,12 +122,6 @@ export class EvidenceFactory implements IEvidenceFactory {
       }
 
       // Step 5: Create Evidence instance
-      const sourceMetadata: EvidenceSourceMetadata = {
-        ip: scent.source.ip,
-        ...(scent.source.userAgent ? { userAgent: scent.source.userAgent } : {}),
-        ...(scent.source.tls ? { tls: scent.source.tls } : {}),
-      }
-
       const evidence = new Evidence(
         finalBytes.buffer.slice(
           finalBytes.byteOffset,
@@ -138,7 +131,7 @@ export class EvidenceFactory implements IEvidenceFactory {
         hash,
         threat.severity,
         scent.timestamp,
-        sourceMetadata,
+        scent.source,
         compressed,
       );
 

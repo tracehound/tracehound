@@ -46,7 +46,7 @@ describe('Agent', () => {
     return {
       id: `scent-${Date.now()}-${Math.random()}`,
       payload,
-      source: '127.0.0.1',
+      source: { ip: '127.0.0.1' },
       timestamp: Date.now(),
       threat,
     }
@@ -391,7 +391,7 @@ describe('Agent', () => {
       const scent: Scent = {
         id: 'test',
         payload: { value: NaN } as any,
-        source: '127.0.0.1',
+        source: { ip: '127.0.0.1' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       }

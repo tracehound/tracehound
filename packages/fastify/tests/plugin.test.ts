@@ -269,7 +269,10 @@ describe('tracehoundPlugin', () => {
 
       expect(agent.intercept).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: '192.168.1.1',
+          source: expect.objectContaining({
+            ip: '192.168.1.1',
+            userAgent: 'test-agent',
+          }),
           payload: expect.objectContaining({
             method: 'PUT',
             path: '/v1/resource',
@@ -394,7 +397,7 @@ describe('tracehoundPlugin', () => {
     const customScent = {
       id: 'test-id',
       timestamp: Date.now(),
-      source: 'custom',
+      source: { ip: 'custom' },
       payload: { custom: true },
     }
     const extractScent = vi.fn().mockReturnValue(customScent)

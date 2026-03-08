@@ -128,7 +128,7 @@ describe('Stress Test Scenario', () => {
     const criticalScent: Scent = {
       id: generateSecureId(),
       timestamp: Date.now(),
-      source: 'critical-source',
+      source: { ip: 'critical-source' },
       payload: { attack: 'critical-attack' },
       threat: { category: 'injection', severity: 'critical' },
     }
@@ -155,7 +155,7 @@ describe('Stress Test Scenario', () => {
       agent.intercept({
         id: generateSecureId(),
         timestamp: Date.now(),
-        source: 'stats-test',
+        source: { ip: 'stats-test' },
         payload,
         threat: { category: 'injection', severity: 'medium' },
       })

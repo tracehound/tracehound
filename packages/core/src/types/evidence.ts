@@ -3,19 +3,7 @@
  */
 
 import type { Severity } from './common.js'
-import type { TLSConnectionInfo } from './scent.js'
-
-/**
- * Source metadata for forensic enrichment.
- */
-export interface EvidenceSourceMetadata {
-  /** Source IP address */
-  readonly ip: string
-  /** HTTP User-Agent header */
-  readonly userAgent?: string
-  /** TLS connection metadata if available */
-  readonly tls?: TLSConnectionInfo
-}
+import type { ScentSource } from './scent.js'
 
 /**
  * Record of a neutralized evidence.
@@ -77,7 +65,7 @@ export interface PurgeRecord {
   /** Minimal scent snapshot (hash only, not full payload) */
   scent: {
     id: string
-    source: string
+    source: ScentSource
     timestamp: number
     payloadHash: string
     payloadSize: number
@@ -187,7 +175,7 @@ export interface EvidenceHandle {
   /** Whether stored bytes are compressed */
   readonly compressed: boolean
   /** Source metadata for forensic enrichment */
-  readonly source: EvidenceSourceMetadata
+  readonly source: ScentSource
 
   /**
    * Transfer ownership of bytes.

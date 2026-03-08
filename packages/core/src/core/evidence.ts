@@ -6,7 +6,8 @@
 
 import type { Severity } from '../types/common.js'
 import { Errors } from '../types/errors.js'
-import type { EvidenceHandle, EvidenceSourceMetadata, EvacuateRecord, NeutralizationRecord } from '../types/evidence.js'
+import type { EvidenceHandle, EvacuateRecord, NeutralizationRecord } from '../types/evidence.js'
+import type { ScentSource } from '../types/scent.js'
 import { hashBuffer } from '../utils/hash.js'
 import { generateSecureId } from '../utils/id.js'
 
@@ -26,7 +27,7 @@ export class Evidence implements EvidenceHandle {
     private readonly _expectedHash: string,
     private readonly _severity: Severity,
     private readonly _captured: number,
-    private readonly _source: EvidenceSourceMetadata,
+    private readonly _source: ScentSource,
     compressed: boolean = false,
     now: () => number = Date.now,
   ) {
@@ -91,7 +92,7 @@ export class Evidence implements EvidenceHandle {
     return this._compressed
   }
 
-  get source(): EvidenceSourceMetadata {
+  get source(): ScentSource {
     return this._source
   }
 

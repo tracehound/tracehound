@@ -4,7 +4,7 @@ import { createTestRuntime, FUZZ_SEED, runDeterministicProperty } from './helper
 function buildThreatScent(id: string, payload: unknown, timestamp: number) {
   return {
     id,
-    source: 'state-machine-fuzz',
+    source: { ip: 'state-machine-fuzz' },
     timestamp,
     payload,
     threat: {

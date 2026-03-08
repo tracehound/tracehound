@@ -3,8 +3,8 @@
  */
 
 import type { Severity } from './common.js'
-import type { EvidenceSourceMetadata } from './evidence.js'
 import type { TracehoundError } from './errors.js'
+import type { ScentSource } from './scent.js'
 
 /**
  * Runtime-safe quarantine handle.
@@ -30,7 +30,7 @@ export interface RuntimeEvidenceHandle {
   /** Whether underlying evidence has been disposed. */
   readonly disposed: boolean
   /** Source metadata for forensic enrichment. */
-  readonly source: EvidenceSourceMetadata
+  readonly source: ScentSource
 
   /**
    * Always rejected in runtime membrane path.

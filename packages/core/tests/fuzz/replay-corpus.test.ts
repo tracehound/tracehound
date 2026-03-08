@@ -85,7 +85,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
           severity: entry.severity,
           scent: {
             id: "left",
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: 1,
             payload: entry.left.payload,
           },
@@ -96,7 +96,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
           severity: entry.severity,
           scent: {
             id: "right",
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: 2,
             payload: entry.right.payload,
           },
@@ -112,7 +112,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
         for (let idx = 0; idx < entry.payloads.length; idx++) {
           runtimeA.agent.intercept({
             id: `perm-a-${idx}`,
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: idx + 1,
             payload: entry.payloads[idx],
             threat: { category: "injection", severity: "high" },
@@ -122,7 +122,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
         for (let idx = entry.payloads.length - 1; idx >= 0; idx--) {
           runtimeB.agent.intercept({
             id: `perm-b-${idx}`,
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: idx + 1,
             payload: entry.payloads[idx],
             threat: { category: "injection", severity: "high" },
@@ -172,7 +172,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
         for (const [index, event] of entry.events.entries()) {
           runtimeA.agent.intercept({
             id: `rollback-a-${index}`,
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: index + 1,
             payload: event,
             threat: { category: "unknown", severity: "medium" },
@@ -182,7 +182,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
         for (const [index, event] of [...entry.events].reverse().entries()) {
           runtimeB.agent.intercept({
             id: `rollback-b-${index}`,
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: index + 1,
             payload: event,
             threat: { category: "unknown", severity: "medium" },
@@ -216,7 +216,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
           severity: entry.severity,
           scent: {
             id: "original",
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: 1,
             payload: entry.original.payload,
           },
@@ -227,7 +227,7 @@ describe.skipIf(!CORPUS_AVAILABLE)("Corpus Replay Regression", () => {
           severity: entry.severity,
           scent: {
             id: "mutated",
-            source: "corpus",
+            source: { ip: "corpus" },
             timestamp: 2,
             payload: entry.mutated.payload,
           },

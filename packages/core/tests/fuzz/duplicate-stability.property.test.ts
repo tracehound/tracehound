@@ -12,7 +12,7 @@ describe('Fuzz Invariant: Duplicate Stability', () => {
       const first = runtime.agent.intercept({
         id: `dup-${i}-1`,
         payload,
-        source: 'duplicate-fuzz',
+        source: { ip: 'duplicate-fuzz' },
         timestamp: 1,
         threat: {
           category: 'spam',
@@ -25,7 +25,7 @@ describe('Fuzz Invariant: Duplicate Stability', () => {
       const second = runtime.agent.intercept({
         id: `dup-${i}-2`,
         payload,
-        source: 'duplicate-fuzz',
+        source: { ip: 'duplicate-fuzz' },
         timestamp: 2,
         threat: {
           category: 'spam',

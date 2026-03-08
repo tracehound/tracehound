@@ -73,7 +73,7 @@ describe('Integration: Full System Flow', () => {
     return {
       id,
       payload,
-      source: `source-${id}`,
+      source: { ip: `source-${id}` },
       timestamp: Date.now(),
       threat: threat ? { category: 'injection', severity: 'high' } : undefined,
     }
@@ -206,7 +206,7 @@ describe('Integration: Full System Flow', () => {
 
   describe('Rate Limiting Integration', () => {
     it('rate limits excessive requests from same source', () => {
-      const source = 'attacker-ip'
+      const source = { ip: 'attacker-ip' }
       let rateLimitedCount = 0
 
       for (let i = 0; i < 15; i++) {
@@ -227,7 +227,7 @@ describe('Integration: Full System Flow', () => {
     })
 
     it('rate limit resets after window', () => {
-      const source = 'temp-attacker'
+      const source = { ip: 'temp-attacker' }
 
       // Fill rate limit
       for (let i = 0; i < 10; i++) {
@@ -246,7 +246,7 @@ describe('Integration: Full System Flow', () => {
       const result = agent.intercept({
         id: 'after-window',
         payload: { test: true },
-        source,
+        source: source,
         timestamp: Date.now(),
       })
 
@@ -277,7 +277,7 @@ describe('Integration: Full System Flow', () => {
         smallAgent.intercept({
           id: `evict-${i}`,
           payload: { unique: i },
-          source: 'test',
+          source: { ip: 'test' },
           timestamp: Date.now(),
           threat: { category: 'spam', severity: 'low' },
         })
@@ -304,7 +304,7 @@ describe('Integration: Full System Flow', () => {
         const result = tinyAgent.intercept({
           id: `rapid-${i}`,
           payload: { data: `value-${i}` },
-          source: 'test',
+          source: { ip: 'test' },
           timestamp: Date.now(),
           threat: { category: 'injection', severity: 'high' },
         })
@@ -489,7 +489,7 @@ describe('Integration: Full System Flow', () => {
           const result = agent.intercept({
             id: `${source}-${i}`,
             payload: { source, i },
-            source,
+            source: { ip: source },
             timestamp: Date.now(),
             threat: { category: 'ddos', severity: 'medium' },
           })
@@ -529,7 +529,7 @@ describe('Integration: Full System Flow', () => {
         limitedAgent.intercept({
           id: `big-${i}`,
           payload: { data: 'x'.repeat(500), unique: i },
-          source: 'test',
+          source: { ip: 'test' },
           timestamp: Date.now(),
           threat: { category: 'malware', severity: 'low' },
         })

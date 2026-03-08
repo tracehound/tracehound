@@ -13,7 +13,7 @@ describe('Fuzz Invariant: Integrity Enforcement', () => {
         severity: 'high' as const,
         scent: {
           id: `integrity-${i}`,
-          source: 'fuzz',
+          source: { ip: 'fuzz' },
           timestamp: 1,
           payload,
         },

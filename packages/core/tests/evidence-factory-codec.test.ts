@@ -13,7 +13,7 @@ describe('EvidenceFactory with Codec', () => {
   const createScent = (payload: JsonSerializable): Scent => ({
     id: 'test-scent',
     payload,
-    source: 'test',
+    source: { ip: 'test' },
     timestamp: Date.now(),
   })
 
@@ -108,7 +108,7 @@ describe('EvidenceFactory with Codec', () => {
         id: 'raw-scent',
         payload: { normalized: true },
         ingressBytes: raw,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -136,7 +136,7 @@ describe('EvidenceFactory with Codec', () => {
         id: 'array-buffer-scent',
         payload: { normalized: true },
         ingressBytes: raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -155,7 +155,7 @@ describe('EvidenceFactory with Codec', () => {
         id: 'oversized-ingress',
         payload: { normalized: true },
         ingressBytes: raw.buffer.slice(0),
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 

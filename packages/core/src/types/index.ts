@@ -31,7 +31,6 @@ export type {
   EvacuateRecord,
   EvictionRecord,
   EvidenceHandle,
-  EvidenceSourceMetadata,
   NeutralizationRecord,
   PurgeRecord,
 } from './evidence.js'

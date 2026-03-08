@@ -322,7 +322,7 @@ describe('AuditChain', () => {
         reason: 'panic',
         scent: {
           id: 'scent-purge',
-          source: '10.0.0.1',
+          source: { ip: '10.0.0.1' },
           timestamp: 1_011,
           payloadHash: 'payload-hash',
           payloadSize: 10,

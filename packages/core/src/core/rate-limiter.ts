@@ -3,8 +3,9 @@
  *
  * SECURITY: Two-tier rate limiting prevents DoS and bucket-rotation bypass.
  *   - Composite fingerprint (IP + UA + TLS): fine-grained tracking with block semantics.
- *   - IP-only ceiling: evaluated after composite, caps total requests from one IP
- *     regardless of how many distinct fingerprints the sender presents.
+ *   - IP-only ceiling: caps total requests from one IP regardless of how many
+ *     distinct fingerprints the sender presents. New composite entries are not
+ *     created when the IP ceiling already rejects the request.
  * Memory Safety: TTL-based cleanup prevents memory leaks.
  */
 
@@ -117,11 +118,11 @@ export interface RateLimiterStats {
  * Sliding window rate limiter implementation.
  *
  * Algorithm:
- * 1. Evaluate composite fingerprint (handles block state, window count)
- * 2. If composite rejects: return rejection (stats driven here)
- * 3. If composite allows: evaluate IP-only ceiling
- * 4. If IP ceiling rejects: return soft rejection (no penalty block)
- * 5. Otherwise: record timestamp in both maps and allow
+ * 1. If composite entry exists: evaluate block/window state first
+ * 2. Evaluate IP-only ceiling
+ * 3. If IP ceiling rejects: return soft rejection (no penalty block)
+ * 4. If composite entry does not exist and IP allows: create/evaluate composite entry
+ * 5. Record timestamp in both maps and allow
  *
  * Block State:
  * - After maxRequests exceeded, composite entry enters blockDurationMs penalty
@@ -164,12 +165,15 @@ export class RateLimiter implements IRateLimiter {
     this.totalChecks++;
     const now = Date.now();
     const key = generateSourceKey(source);
+    const hasCompositeEntry = this.sources.has(key);
 
-    // --- Step 1: Composite fingerprint evaluation (blocking semantics, drives stats) ---
-    const compositeResult = this.evaluateComposite(key, now);
-    if (!compositeResult.allowed) {
-      this.totalRejections++;
-      return compositeResult;
+    // --- Step 1: Existing composite entry evaluation (preserve block semantics) ---
+    if (hasCompositeEntry) {
+      const compositeResult = this.evaluateExistingComposite(key, now);
+      if (!compositeResult.allowed) {
+        this.totalRejections++;
+        return compositeResult;
+      }
     }
 
     // --- Step 2: IP-only ceiling (prevents bucket-rotation bypass via UA/TLS rotation) ---
@@ -177,6 +181,15 @@ export class RateLimiter implements IRateLimiter {
     if (!ipResult.allowed) {
       this.totalRejections++;
       return ipResult;
+    }
+
+    // --- Step 3: Create/evaluate composite entry only when IP ceiling allows ---
+    if (!hasCompositeEntry) {
+      const compositeResult = this.evaluateComposite(key, now);
+      if (!compositeResult.allowed) {
+        this.totalRejections++;
+        return compositeResult;
+      }
     }
 
     // --- Both checks passed: record timestamps ---
@@ -210,6 +223,28 @@ export class RateLimiter implements IRateLimiter {
       this.sources.set(key, entry);
     }
 
+    return this.evaluateCompositeEntry(entry, now);
+  }
+
+  /**
+   * Evaluate existing composite fingerprint entry only (no creation).
+   * Preserves block state precedence without allocating new keys.
+   */
+  private evaluateExistingComposite(key: string, now: number): RateLimitResult {
+    const entry = this.sources.get(key);
+    if (!entry) return { allowed: true };
+
+    // LRU: move to back (youngest)
+    this.sources.delete(key);
+    this.sources.set(key, entry);
+
+    return this.evaluateCompositeEntry(entry, now);
+  }
+
+  /**
+   * Shared composite state evaluation logic.
+   */
+  private evaluateCompositeEntry(entry: SourceEntry, now: number): RateLimitResult {
     entry.lastActivity = now;
 
     // Check block state

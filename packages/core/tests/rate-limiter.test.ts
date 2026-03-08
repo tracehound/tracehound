@@ -183,6 +183,39 @@ describe('RateLimiter', () => {
       }
     })
 
+    it('does not create new composite entries when IP ceiling rejects rotated fingerprints', () => {
+      const limiter = new RateLimiter({ ...config, maxSources: 2 })
+      const attackerIp = '192.168.77.10'
+
+      // Fill ceiling for attacker IP with one composite fingerprint.
+      for (let i = 0; i < config.maxRequests; i++) {
+        expect(limiter.check(createSource(attackerIp, 'base-ua')).allowed).toBe(true)
+      }
+
+      const sourcesBeforeRotation = limiter.stats.sources
+      const evictionsBeforeRotation = limiter.stats.totalEvictions
+      expect(sourcesBeforeRotation).toBe(1)
+
+      // Rotate fingerprints on the same IP while ceiling is already exceeded.
+      for (let i = 0; i < 8; i++) {
+        const rotated = limiter.check(
+          createSource(attackerIp, `rotated-ua-${i}`, {
+            cipherSuite: 'TLS_AES_256_GCM_SHA384',
+            version: 'TLSv1.3',
+            alpn: `h2-${i}`,
+          }),
+        )
+        expect(rotated.allowed).toBe(false)
+        if (!rotated.allowed) {
+          expect(rotated.reason).toContain('IP rate ceiling')
+          expect(rotated.blocked).toBe(false)
+        }
+      }
+
+      expect(limiter.stats.sources).toBe(sourcesBeforeRotation)
+      expect(limiter.stats.totalEvictions).toBe(evictionsBeforeRotation)
+    })
+
     it('falls back gracefully when TLS unavailable', () => {
       const limiter = new RateLimiter(config)
 

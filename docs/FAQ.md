@@ -1,6 +1,6 @@
 # FAQ
 
-### 1).
+### 1)
 
 **Question:** "You say Tracehound isn't a WAF. So what threat class exactly are you addressing?"
 
@@ -12,7 +12,7 @@
 
 ---
 
-### 2).
+### 2)
 
 **Question:** "When forced into fail-open mode, can't an attacker deliberately create a bypass?"
 
@@ -24,21 +24,21 @@
 
 ---
 
-### 3).
+### 3)
 
 **Question:** "Can the composite key IP + UA be spoofed? Is this sufficient entropy?"
 
 **Reason:** It's a simple bot bypass test.
 
-**Answer:** "As of v1.7.0, the composite key includes IP + User-Agent + TLS metadata (cipher suite, protocol version, ALPN) when available over HTTPS connections. The rate limiter uses a two-tier design: a composite fingerprint key for fine-grained per-client tracking, and an IP-only ceiling that caps total requests from one IP address regardless of fingerprint rotation. This prevents a client from minting fresh rate-limit buckets by rotating User-Agent strings or TLS parameters. The composite key is SHA-256 hashed for deterministic, log-safe source identification.
+**Answer:** "As of v1.7.0, the composite key includes IP + User-Agent + TLS metadata (cipher suite, protocol version, ALPN) when available over HTTPS connections. The rate limiter uses a two-tier design: a composite fingerprint key for fine-grained per-client tracking, and an IP-only ceiling that caps total requests from one IP address regardless of fingerprint rotation. This prevents a client from minting fresh rate-limit buckets by rotating User-Agent strings or TLS parameters. The composite key is SHA-256 hashed for deterministic, log-safe source identification."
 
-**Important deployment caveat:** TLS metadata is extracted from the server-side socket. Behind a TLS-terminating proxy or CDN, the TLS fields reflect the proxy-to-server connection — not the original client — and may be unavailable or identical across all clients. In such deployments, the TLS component of the composite key provides no additional entropy; the IP-only ceiling still applies, but the IP seen will be the proxy's egress address. Deploy Tracehound at the TLS termination point, or use trusted forwarded headers (e.g. X-Forwarded-For with proxy trust configured), to retain per-client IP accuracy."
+**Important deployment caveat:** "TLS metadata is extracted from the server-side socket. Behind a TLS-terminating proxy or CDN, the TLS fields reflect the proxy-to-server connection — not the original client — and may be unavailable or identical across all clients. In such deployments, the TLS component of the composite key provides no additional entropy; the IP-only ceiling still applies, but the IP seen will be the proxy's egress address. Deploy Tracehound at the TLS termination point, or use trusted forwarded headers (e.g. X-Forwarded-For with proxy trust configured), to retain per-client IP accuracy."
 
 **Conclusion:** The two-tier design (composite fingerprint + IP ceiling) eliminates the rotation bypass surface. Proxy deployments must account for TLS termination topology.
 
 ---
 
-### 4).
+### 4)
 
 **Question:** "What happens if a bug in the raw HTTP layer crashes the Node process?"
 
@@ -50,7 +50,7 @@ Why it is asked: Blast radius.
 
 ---
 
-### 5).
+### 5)
 
 **Question:** "What happens if the remote sink goes down during SIEM integration?"
 
@@ -62,7 +62,7 @@ Why it is asked: Blast radius.
 
 ---
 
-### 6).
+### 6)
 
 **Question:** "What is your false positive rate?"
 
@@ -74,7 +74,7 @@ Why it is asked: Blast radius.
 
 ---
 
-### 7).
+### 7)
 
 **Question:** "Which of the OWASP Top 10 do you block?"
 
@@ -86,7 +86,7 @@ Possible reference: OWASP
 
 ---
 
-### 8).
+### 8)
 
 **Question:** "What is the worst-case scenario if we deploy this product to production?"
 

@@ -209,7 +209,9 @@ TTL decay runs in the background when `quarantine.ttlMs` is enabled. Expired evi
 
 ### Rate Limiter (`th.rateLimiter`)
 
-Token bucket rate limiter with source blocking.
+Sliding-window rate limiter with two-tier source enforcement:
+composite fingerprint tracking (IP + User-Agent + TLS metadata) plus an
+IP-only ceiling to prevent fingerprint-rotation bypass.
 
 ```ts
 // Manually checking a source against the limits

@@ -66,4 +66,3 @@ This is valuable for contract safety, but broad immediate enforcement can block 
 ## Execution Trigger (Future Cycle)
 
 Start this work when current TLS/cipher-suite objectives are complete and release risk is acceptable for a hardening-focused iteration.
-

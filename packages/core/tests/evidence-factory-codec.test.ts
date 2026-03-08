@@ -176,7 +176,11 @@ describe('EvidenceFactory with Codec', () => {
         },
       })
 
-      const result = factory.create(createScent({ payload: true }), { category: 'spam', severity: 'low' }, 1_000_000)
+      const result = factory.create(
+        createScent({ payload: true }),
+        { category: 'spam', severity: 'low' },
+        1_000_000,
+      )
 
       expect(result.ok).toBe(false)
       if (!result.ok) {

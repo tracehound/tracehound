@@ -22,25 +22,25 @@
 
 ## 2. Canonical Baseline
 
-| Fact | Canonical Source | Value |
-| --- | --- | --- |
-| Current workspace version | `package.json` | `1.7.0` |
-| Latest core changelog release | `packages/core/CHANGELOG.md` | `1.7.0` (`2026-03-07`) |
-| Current release character | repo state | Docs-weighted / minimal code-change release |
-| Legacy internal roadmap | `internal/ROADMAP.md` | Deprecated; historical context only |
-| Latest harness decision baseline | `tracehound-security-harness/test-results/v1.6.0/go-no-go.md` | Pre-soak green for `v1.6.0`; useful historical evidence, not current release authority |
-| Horizon package availability in monorepo | `pnpm-workspace.yaml`, `packages/*` | Not present |
+| Fact                                     | Canonical Source                                              | Value                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Current workspace version                | `package.json`                                                | `1.7.0`                                                                                |
+| Latest core changelog release            | `packages/core/CHANGELOG.md`                                  | `1.7.0` (`2026-03-07`)                                                                 |
+| Current release character                | repo state                                                    | Docs-weighted / minimal code-change release                                            |
+| Legacy internal roadmap                  | `internal/ROADMAP.md`                                         | Deprecated; historical context only                                                    |
+| Latest harness decision baseline         | `tracehound-security-harness/test-results/v1.6.0/go-no-go.md` | Pre-soak green for `v1.6.0`; useful historical evidence, not current release authority |
+| Horizon package availability in monorepo | `pnpm-workspace.yaml`, `packages/*`                           | Not present                                                                            |
 
 ---
 
 ## 3. Current Position
 
-| Track | Status | Meaning |
-| --- | --- | --- |
-| M0-M3 historical governance work | Completed | Baseline, unified roadmap, backlog intake, and contract-first governance work are done. |
-| Enhanced quarantine protocol | Completed | Core membrane, pressure containment, TTL decay/archive, and audit custody expansion are in the codebase. |
-| M4 field validation and OSS adoption | In Progress | The active focus is real-world learning, operator usability, and deployment confidence. |
-| M5 roadmap consolidation | Completed | Legacy roadmap redirect exists; roadmap authority is consolidated here. |
+| Track                                | Status      | Meaning                                                                                                  |
+| ------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------- |
+| M0-M3 historical governance work     | Completed   | Baseline, unified roadmap, backlog intake, and contract-first governance work are done.                  |
+| Enhanced quarantine protocol         | Completed   | Core membrane, pressure containment, TTL decay/archive, and audit custody expansion are in the codebase. |
+| M4 field validation and OSS adoption | In Progress | The active focus is real-world learning, operator usability, and deployment confidence.                  |
+| M5 roadmap consolidation             | Completed   | Legacy roadmap redirect exists; roadmap authority is consolidated here.                                  |
 
 Interpretation:
 
@@ -102,17 +102,17 @@ Goal: expand only after field evidence justifies it.
 
 ## 6. Capability Horizon
 
-| Area | Status | Notes |
-| --- | --- | --- |
-| Node.js / TypeScript core | Implemented | Current production baseline |
-| Enhanced quarantine expansion | Implemented | Membrane, raw-ingress hashing preference, TTL decay, archival fallback, and batched audit custody are live |
-| Real-world OSS validation | In Progress | Active priority |
-| Soak testing | Optional | Confidence activity; not universal blocker |
-| External audit program | Optional Later | Not current execution driver |
-| Horizon coordination contract | Planned | Contract-first, external boundary preserved |
-| Enterprise integrations | Planned | Pursue only when field demand is concrete |
-| Satellite ecosystem | Planned | Remains directional, not active execution |
-| Rust core pivot | Planned | RFC exists; implementation remains on hold pending stronger field signal |
+| Area                          | Status         | Notes                                                                                                      |
+| ----------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------- |
+| Node.js / TypeScript core     | Implemented    | Current production baseline                                                                                |
+| Enhanced quarantine expansion | Implemented    | Membrane, raw-ingress hashing preference, TTL decay, archival fallback, and batched audit custody are live |
+| Real-world OSS validation     | In Progress    | Active priority                                                                                            |
+| Soak testing                  | Optional       | Confidence activity; not universal blocker                                                                 |
+| External audit program        | Optional Later | Not current execution driver                                                                               |
+| Horizon coordination contract | Planned        | Contract-first, external boundary preserved                                                                |
+| Enterprise integrations       | Planned        | Pursue only when field demand is concrete                                                                  |
+| Satellite ecosystem           | Planned        | Remains directional, not active execution                                                                  |
+| Rust core pivot               | Planned        | RFC exists; implementation remains on hold pending stronger field signal                                   |
 
 ---
 

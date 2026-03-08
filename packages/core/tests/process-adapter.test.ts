@@ -36,19 +36,18 @@ describe('process-adapter', () => {
     vi.doMock('node:child_process', () => ({
       spawn: (_command: string, args: string[]) => {
         capturedArgs = args
-        return ({
+        return {
           pid: 7777,
           stdin: null,
           stdout: null,
           on: () => {},
           kill: () => true,
-        }) as unknown
+        } as unknown
       },
     }))
 
-    const { createProcessAdapter, getProcessIsolationTelemetry } = await import(
-      '../src/core/process-adapter.js'
-    )
+    const { createProcessAdapter, getProcessIsolationTelemetry } =
+      await import('../src/core/process-adapter.js')
 
     const telemetry = getProcessIsolationTelemetry({ maxMemoryMB: 64.5 }, 'linux')
     expect(telemetry.capabilities.memoryLimit).toBe('declarative')
@@ -142,13 +141,13 @@ describe('process-adapter', () => {
       vi.doMock('node:child_process', () => ({
         spawn: (_command: string, _args: string[], options: { env?: NodeJS.ProcessEnv }) => {
           capturedEnv = options.env
-          return ({
+          return {
             pid: 4321,
             stdin: null,
             stdout: null,
             on: () => {},
             kill: () => true,
-          }) as unknown
+          } as unknown
         },
       }))
 

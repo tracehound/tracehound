@@ -206,7 +206,11 @@ export class MemoryColdStorage implements IColdStorageAdapter {
     }
   }
 
-  async write(id: string, payload: EncodedPayload, signal?: AbortSignal): Promise<ColdStorageWriteResult> {
+  async write(
+    id: string,
+    payload: EncodedPayload,
+    signal?: AbortSignal,
+  ): Promise<ColdStorageWriteResult> {
     if (signal?.aborted) {
       return { success: false, error: 'aborted' }
     }
@@ -532,7 +536,10 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       await mkdir(dirname(path), { recursive: true })
 
       while (this.diskQueue.length > 0) {
-        const batch = this.diskQueue.slice(0, Math.min(DISK_FLUSH_BATCH_SIZE, this.diskQueue.length))
+        const batch = this.diskQueue.slice(
+          0,
+          Math.min(DISK_FLUSH_BATCH_SIZE, this.diskQueue.length),
+        )
         if (batch.length === 0) {
           break
         }
@@ -843,4 +850,3 @@ function safeFileSize(path: string): number {
     return 0
   }
 }
-

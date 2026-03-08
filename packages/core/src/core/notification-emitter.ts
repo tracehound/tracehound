@@ -7,8 +7,8 @@
  * - No blocking on consumer processing
  */
 
-import { generateSecureId } from "../utils/id.js";
-import { Errors } from "../types/errors.js";
+import { generateSecureId } from '../utils/id.js'
+import { Errors } from '../types/errors.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Event Types
@@ -18,26 +18,26 @@ import { Errors } from "../types/errors.js";
  * All possible event types emitted by Tracehound.
  */
 export type EventType =
-  | "threat.detected"
-  | "evidence.quarantined"
-  | "evidence.evicted"
-  | "rate_limit.exceeded"
-  | "system.panic"
-  | "license.validated"
-  | "license.expired";
+  | 'threat.detected'
+  | 'evidence.quarantined'
+  | 'evidence.evicted'
+  | 'rate_limit.exceeded'
+  | 'system.panic'
+  | 'license.validated'
+  | 'license.expired'
 
 /**
  * Base event structure.
  */
 export interface TracehoundEvent<T = unknown> {
   /** Event type */
-  type: EventType;
+  type: EventType
   /** Unix timestamp (ms) */
-  timestamp: number;
+  timestamp: number
   /** Event payload */
-  payload: T;
+  payload: T
   /** Unique event ID */
-  id: string;
+  id: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,42 +45,42 @@ export interface TracehoundEvent<T = unknown> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface ThreatDetectedPayload {
-  scentId: string;
-  category: string;
-  severity: "low" | "medium" | "high" | "critical";
-  source: string;
+  scentId: string
+  category: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  source: string
 }
 
 export interface EvidenceQuarantinedPayload {
-  signature: string;
-  severity: "low" | "medium" | "high" | "critical";
-  sizeBytes: number;
+  signature: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  sizeBytes: number
 }
 
 export interface EvidenceEvictedPayload {
-  signature: string;
-  reason: "capacity" | "policy" | "manual";
+  signature: string
+  reason: 'capacity' | 'policy' | 'manual'
 }
 
 export interface RateLimitExceededPayload {
-  source: string;
-  retryAfterMs: number;
+  source: string
+  retryAfterMs: number
 }
 
 export interface SystemPanicPayload {
-  level: "warning" | "critical" | "fatal";
-  reason: string;
-  context?: Record<string, unknown>;
+  level: 'warning' | 'critical' | 'fatal'
+  reason: string
+  context?: Record<string, unknown>
 }
 
 export interface LicenseValidatedPayload {
-  tier: "starter" | "pro" | "enterprise";
-  daysRemaining?: number;
+  tier: 'starter' | 'pro' | 'enterprise'
+  daysRemaining?: number
 }
 
 export interface LicenseExpiredPayload {
-  tier: "starter" | "pro" | "enterprise";
-  gracePeriod: boolean;
+  tier: 'starter' | 'pro' | 'enterprise'
+  gracePeriod: boolean
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -89,72 +89,57 @@ export interface LicenseExpiredPayload {
 
 export interface WebhookConfig {
   /** Webhook URL */
-  url: string;
+  url: string
   /** Events to subscribe to (empty = all) */
-  events?: EventType[];
+  events?: EventType[]
   /** Custom headers */
-  headers?: Record<string, string>;
+  headers?: Record<string, string>
   /** Secret for HMAC signature (minimum 16 characters) */
-  secret?: string;
+  secret?: string
   /** Retry configuration */
   retry?: {
-    maxAttempts: number;
-    delayMs: number;
-  };
+    maxAttempts: number
+    delayMs: number
+  }
 }
 
-const MIN_SECRET_LENGTH = 16;
+const MIN_SECRET_LENGTH = 16
 
 function isAllowedWebhookUrl(url: string): boolean {
   try {
-    const parsed = new URL(url);
-    const hostname = parsed.hostname.toLowerCase();
-    if (
-      hostname === "169.254.169.254" ||
-      hostname === "metadata.google.internal"
-    )
-      return false;
-    if (hostname === "::1" || hostname === "[::1]") return false;
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "0.0.0.0"
-    )
-      return false;
-    const ipv4Match = hostname.match(
-      /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/,
-    );
+    const parsed = new URL(url)
+    const hostname = parsed.hostname.toLowerCase()
+    if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') return false
+    if (hostname === '::1' || hostname === '[::1]') return false
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') return false
+    const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
     if (ipv4Match) {
-      const [, a, b] = ipv4Match;
-      const first = parseInt(a!, 10);
-      const second = parseInt(b!, 10);
-      if (first === 10) return false;
-      if (first === 172 && second >= 16 && second <= 31) return false;
-      if (first === 192 && second === 168) return false;
-      if (first === 127) return false;
-      if (first === 169 && second === 254) return false;
+      const [, a, b] = ipv4Match
+      const first = parseInt(a!, 10)
+      const second = parseInt(b!, 10)
+      if (first === 10) return false
+      if (first === 172 && second >= 16 && second <= 31) return false
+      if (first === 192 && second === 168) return false
+      if (first === 127) return false
+      if (first === 169 && second === 254) return false
     }
-    if (
-      hostname.startsWith("fc") ||
-      hostname.startsWith("fd") ||
-      hostname.startsWith("fe80")
-    )
-      return false;
-    return true;
+    if (hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80'))
+      return false
+    return true
   } catch {
-    return false;
+    return false
   }
 }
 
 interface RegisteredWebhook extends WebhookConfig {
-  id: string;
+  id: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Interface
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type EventCallback<T = unknown> = (event: TracehoundEvent<T>) => void;
+export type EventCallback<T = unknown> = (event: TracehoundEvent<T>) => void
 
 /**
  * Notification Emitter interface.
@@ -163,47 +148,47 @@ export interface INotificationEmitter {
   /**
    * Register a callback for an event type.
    */
-  on<T = unknown>(event: EventType, callback: EventCallback<T>): void;
+  on<T = unknown>(event: EventType, callback: EventCallback<T>): void
 
   /**
    * Unregister a callback for an event type.
    */
-  off<T = unknown>(event: EventType, callback: EventCallback<T>): void;
+  off<T = unknown>(event: EventType, callback: EventCallback<T>): void
 
   /**
    * Subscribe to events as an async iterable.
    * @param events - Event types to subscribe to (empty = all)
    */
-  subscribe(events?: EventType[]): AsyncIterable<TracehoundEvent>;
+  subscribe(events?: EventType[]): AsyncIterable<TracehoundEvent>
 
   /**
    * Register a webhook for event delivery.
    * @returns Webhook ID
    */
-  registerWebhook(config: WebhookConfig): string;
+  registerWebhook(config: WebhookConfig): string
 
   /**
    * Unregister a webhook.
    */
-  unregisterWebhook(id: string): void;
+  unregisterWebhook(id: string): void
 
   /**
    * Emit an event to all consumers.
    */
-  emit<T>(type: EventType, payload: T): void;
+  emit<T>(type: EventType, payload: T): void
 
   /**
    * Get emitter statistics.
    */
-  readonly stats: NotificationEmitterStats;
+  readonly stats: NotificationEmitterStats
 }
 
 export interface NotificationEmitterStats {
-  totalEmitted: number;
-  byType: Record<EventType, number>;
-  activeCallbacks: number;
-  activeSubscribers: number;
-  activeWebhooks: number;
+  totalEmitted: number
+  byType: Record<EventType, number>
+  activeCallbacks: number
+  activeSubscribers: number
+  activeWebhooks: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -214,102 +199,98 @@ export interface NotificationEmitterStats {
  * Notification Emitter implementation.
  */
 export class NotificationEmitter implements INotificationEmitter {
-  private callbacks = new Map<EventType, Set<EventCallback>>();
+  private callbacks = new Map<EventType, Set<EventCallback>>()
   private subscribers: Array<{
-    events: EventType[] | null;
-    push: (event: TracehoundEvent) => void;
-  }> = [];
-  private webhooks = new Map<string, RegisteredWebhook>();
+    events: EventType[] | null
+    push: (event: TracehoundEvent) => void
+  }> = []
+  private webhooks = new Map<string, RegisteredWebhook>()
 
-  private _totalEmitted = 0;
-  private _byType = new Map<EventType, number>();
+  private _totalEmitted = 0
+  private _byType = new Map<EventType, number>()
 
   on<T = unknown>(event: EventType, callback: EventCallback<T>): void {
-    let set = this.callbacks.get(event);
+    let set = this.callbacks.get(event)
     if (!set) {
-      set = new Set();
-      this.callbacks.set(event, set);
+      set = new Set()
+      this.callbacks.set(event, set)
     }
-    set.add(callback as EventCallback);
+    set.add(callback as EventCallback)
   }
 
   off<T = unknown>(event: EventType, callback: EventCallback<T>): void {
-    const set = this.callbacks.get(event);
+    const set = this.callbacks.get(event)
     if (set) {
-      set.delete(callback as EventCallback);
+      set.delete(callback as EventCallback)
     }
   }
 
   subscribe(events?: EventType[]): AsyncIterable<TracehoundEvent> {
-    const self = this;
-    const queue: TracehoundEvent[] = [];
-    let resolve: ((value: IteratorResult<TracehoundEvent>) => void) | null =
-      null;
-    let closed = false;
+    const self = this
+    const queue: TracehoundEvent[] = []
+    let resolve: ((value: IteratorResult<TracehoundEvent>) => void) | null = null
+    let closed = false
 
     const subscriber = {
       events: events ?? null,
       push: (event: TracehoundEvent) => {
-        if (closed) return;
+        if (closed) return
         if (resolve) {
-          const r = resolve;
-          resolve = null;
-          r({ value: event, done: false });
+          const r = resolve
+          resolve = null
+          r({ value: event, done: false })
         } else {
-          queue.push(event);
+          queue.push(event)
         }
       },
-    };
+    }
 
-    this.subscribers.push(subscriber);
+    this.subscribers.push(subscriber)
 
     return {
       [Symbol.asyncIterator]() {
         return {
           next(): Promise<IteratorResult<TracehoundEvent>> {
             if (closed) {
-              return Promise.resolve({ value: undefined, done: true });
+              return Promise.resolve({ value: undefined, done: true })
             }
 
-            const queued = queue.shift();
+            const queued = queue.shift()
             if (queued) {
-              return Promise.resolve({ value: queued, done: false });
+              return Promise.resolve({ value: queued, done: false })
             }
 
             return new Promise((r) => {
-              resolve = r;
-            });
+              resolve = r
+            })
           },
           return(): Promise<IteratorResult<TracehoundEvent>> {
-            closed = true;
-            const idx = self.subscribers.indexOf(subscriber);
+            closed = true
+            const idx = self.subscribers.indexOf(subscriber)
             if (idx !== -1) {
-              self.subscribers.splice(idx, 1);
+              self.subscribers.splice(idx, 1)
             }
-            return Promise.resolve({ value: undefined, done: true });
+            return Promise.resolve({ value: undefined, done: true })
           },
-        };
+        }
       },
-    };
+    }
   }
 
   registerWebhook(config: WebhookConfig): string {
     if (!isAllowedWebhookUrl(config.url)) {
-      throw Errors.invalidConfigWebhookUrl(config.url);
+      throw Errors.invalidConfigWebhookUrl(config.url)
     }
-    if (
-      config.secret !== undefined &&
-      config.secret.length < MIN_SECRET_LENGTH
-    ) {
-      throw Errors.invalidConfigWebhookSecret(MIN_SECRET_LENGTH);
+    if (config.secret !== undefined && config.secret.length < MIN_SECRET_LENGTH) {
+      throw Errors.invalidConfigWebhookSecret(MIN_SECRET_LENGTH)
     }
-    const id = generateSecureId();
-    this.webhooks.set(id, { ...config, id });
-    return id;
+    const id = generateSecureId()
+    this.webhooks.set(id, { ...config, id })
+    return id
   }
 
   unregisterWebhook(id: string): void {
-    this.webhooks.delete(id);
+    this.webhooks.delete(id)
   }
 
   emit<T>(type: EventType, payload: T): void {
@@ -318,18 +299,18 @@ export class NotificationEmitter implements INotificationEmitter {
       timestamp: Date.now(),
       payload,
       id: generateSecureId(),
-    };
+    }
 
     // Update stats
-    this._totalEmitted++;
-    this._byType.set(type, (this._byType.get(type) ?? 0) + 1);
+    this._totalEmitted++
+    this._byType.set(type, (this._byType.get(type) ?? 0) + 1)
 
     // Notify callbacks (fire-and-forget)
-    const callbacks = this.callbacks.get(type);
+    const callbacks = this.callbacks.get(type)
     if (callbacks) {
       for (const cb of callbacks) {
         try {
-          cb(event);
+          cb(event)
         } catch {
           // Silently ignore callback errors
         }
@@ -339,90 +320,78 @@ export class NotificationEmitter implements INotificationEmitter {
     // Notify subscribers
     for (const sub of this.subscribers) {
       if (sub.events === null || sub.events.includes(type)) {
-        sub.push(event);
+        sub.push(event)
       }
     }
 
     // Dispatch webhooks (async, fire-and-forget)
     for (const [, webhook] of this.webhooks) {
-      if (
-        !webhook.events ||
-        webhook.events.length === 0 ||
-        webhook.events.includes(type)
-      ) {
+      if (!webhook.events || webhook.events.length === 0 || webhook.events.includes(type)) {
         this.dispatchWebhook(webhook, event).catch(() => {
           // Silently ignore webhook errors
-        });
+        })
       }
     }
   }
 
   get stats(): NotificationEmitterStats {
-    const byType: Record<string, number> = {};
+    const byType: Record<string, number> = {}
     for (const [type, count] of this._byType) {
-      byType[type] = count;
+      byType[type] = count
     }
 
     return {
       totalEmitted: this._totalEmitted,
       byType: byType as Record<EventType, number>,
-      activeCallbacks: Array.from(this.callbacks.values()).reduce(
-        (sum, set) => sum + set.size,
-        0,
-      ),
+      activeCallbacks: Array.from(this.callbacks.values()).reduce((sum, set) => sum + set.size, 0),
       activeSubscribers: this.subscribers.length,
       activeWebhooks: this.webhooks.size,
-    };
+    }
   }
 
   // ─── Private Methods ─────────────────────────────────────────────────────────
 
-  private async dispatchWebhook(
-    webhook: RegisteredWebhook,
-    event: TracehoundEvent,
-  ): Promise<void> {
-    const body = JSON.stringify(event);
+  private async dispatchWebhook(webhook: RegisteredWebhook, event: TracehoundEvent): Promise<void> {
+    const body = JSON.stringify(event)
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "User-Agent": "Tracehound/1.0",
+      'Content-Type': 'application/json',
+      'User-Agent': 'Tracehound/1.0',
       ...webhook.headers,
-    };
+    }
 
     // Add HMAC signature if secret provided
     if (webhook.secret) {
-      const { createHmac } = await import("node:crypto");
-      const signature = createHmac("sha256", webhook.secret)
-        .update(body)
-        .digest("hex");
-      headers["X-Tracehound-Signature"] = `sha256=${signature}`;
+      const { createHmac } = await import('node:crypto')
+      const signature = createHmac('sha256', webhook.secret).update(body).digest('hex')
+      headers['X-Tracehound-Signature'] = `sha256=${signature}`
     }
 
-    const maxAttempts = webhook.retry?.maxAttempts ?? 3;
-    const delayMs = webhook.retry?.delayMs ?? 1000;
+    const maxAttempts = webhook.retry?.maxAttempts ?? 3
+    const delayMs = webhook.retry?.delayMs ?? 1000
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         const response = await fetch(webhook.url, {
-          method: "POST",
+          method: 'POST',
           headers,
           body,
-        });
+        })
 
         if (response.ok) {
-          return;
+          return
         }
 
         // Retry on 5xx errors
         if (response.status >= 500 && attempt < maxAttempts) {
-          await this.sleep(delayMs * attempt);
-          continue;
+          await this.sleep(delayMs * attempt)
+          continue
         }
 
-        return; // Non-retryable error, give up silently
+        return // Non-retryable error, give up silently
       } catch {
         if (attempt < maxAttempts) {
-          await this.sleep(delayMs * attempt);
-          continue;
+          await this.sleep(delayMs * attempt)
+          continue
         }
         // Max attempts reached, give up silently
       }
@@ -430,7 +399,7 @@ export class NotificationEmitter implements INotificationEmitter {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 }
 
@@ -442,5 +411,5 @@ export class NotificationEmitter implements INotificationEmitter {
  * Create a Notification Emitter instance.
  */
 export function createNotificationEmitter(): INotificationEmitter {
-  return new NotificationEmitter();
+  return new NotificationEmitter()
 }

@@ -16,7 +16,11 @@
  */
 
 import type { EncodedPayload } from '../utils/binary-codec.js'
-import type { ColdStorageReadResult, ColdStorageWriteResult, IColdStorageAdapter } from './cold-storage.js'
+import type {
+  ColdStorageReadResult,
+  ColdStorageWriteResult,
+  IColdStorageAdapter,
+} from './cold-storage.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S3-Like Client Interface (Dependency Injection)
@@ -49,19 +53,11 @@ export interface S3LikeClient {
     ContentType?: string
   }): Promise<void>
 
-  getObject(params: {
-    Bucket: string
-    Key: string
-  }): Promise<{ Body: Uint8Array }>
+  getObject(params: { Bucket: string; Key: string }): Promise<{ Body: Uint8Array }>
 
-  deleteObject(params: {
-    Bucket: string
-    Key: string
-  }): Promise<void>
+  deleteObject(params: { Bucket: string; Key: string }): Promise<void>
 
-  headBucket(params: {
-    Bucket: string
-  }): Promise<void>
+  headBucket(params: { Bucket: string }): Promise<void>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -212,7 +208,11 @@ export class S3ColdStorage implements IColdStorageAdapter {
     return `${this.prefix}${id}.thcs`
   }
 
-  async write(id: string, payload: EncodedPayload, signal?: AbortSignal): Promise<ColdStorageWriteResult> {
+  async write(
+    id: string,
+    payload: EncodedPayload,
+    signal?: AbortSignal,
+  ): Promise<ColdStorageWriteResult> {
     if (signal?.aborted) {
       return { success: false, error: 'aborted' }
     }

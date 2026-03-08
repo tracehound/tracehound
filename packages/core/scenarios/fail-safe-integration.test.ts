@@ -45,7 +45,7 @@ describe('Fail-Safe Integration Scenario', () => {
     const auditChain = new AuditChain()
     quarantine = new Quarantine(
       { maxCount: 100, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-      auditChain
+      auditChain,
     )
     const rateLimiter = createRateLimiter({
       windowMs: 60_000,
@@ -58,7 +58,7 @@ describe('Fail-Safe Integration Scenario', () => {
       { maxPayloadSize: 1_000_000 },
       quarantine,
       rateLimiter,
-      evidenceFactory
+      evidenceFactory,
     ) as Agent
 
     failSafe = createFailSafe({
@@ -88,7 +88,7 @@ describe('Fail-Safe Integration Scenario', () => {
       expect.objectContaining({
         level: 'warning',
         reason: 'quarantine_capacity',
-      })
+      }),
     )
   })
 
@@ -174,7 +174,7 @@ describe('Fail-Safe Integration Scenario', () => {
       expect.objectContaining({
         level: 'critical',
         reason: 'error_rate',
-      })
+      }),
     )
   })
 })

@@ -40,6 +40,7 @@ This guide covers deploying Tracehound-enabled Node.js applications on Kubernete
 ```
 
 **Key points:**
+
 - Tracehound runs **inside** each application pod (not as a sidecar)
 - Each pod has its own quarantine buffer (process-local)
 - Hound child processes are bounded by `HoundPool.maxActive`
@@ -51,17 +52,17 @@ This guide covers deploying Tracehound-enabled Node.js applications on Kubernete
 
 ### Minimum Resources (per pod)
 
-| Resource | Request | Limit  | Notes                                    |
-| -------- | ------- | ------ | ---------------------------------------- |
-| CPU      | 100m    | 500m   | Agent.intercept() is CPU-light           |
-| Memory   | 128Mi   | 512Mi  | Quarantine buffer = primary consumer     |
+| Resource | Request | Limit | Notes                                |
+| -------- | ------- | ----- | ------------------------------------ |
+| CPU      | 100m    | 500m  | Agent.intercept() is CPU-light       |
+| Memory   | 128Mi   | 512Mi | Quarantine buffer = primary consumer |
 
 ### Production Resources (per pod)
 
-| Resource | Request | Limit  | Notes                                    |
-| -------- | ------- | ------ | ---------------------------------------- |
-| CPU      | 250m    | 1000m  | Headroom for Hound child processes       |
-| Memory   | 256Mi   | 1Gi    | Quarantine maxBytes + Hound pool buffers |
+| Resource | Request | Limit | Notes                                    |
+| -------- | ------- | ----- | ---------------------------------------- |
+| CPU      | 250m    | 1000m | Headroom for Hound child processes       |
+| Memory   | 256Mi   | 1Gi   | Quarantine maxBytes + Hound pool buffers |
 
 ### Memory Sizing Formula
 
@@ -88,33 +89,33 @@ metadata:
   namespace: production
 data:
   # Quarantine
-  TRACEHOUND_QUARANTINE_MAX_COUNT: "10000"
-  TRACEHOUND_QUARANTINE_MAX_BYTES: "104857600"   # 100MB
-  TRACEHOUND_QUARANTINE_EVICTION: "priority"
+  TRACEHOUND_QUARANTINE_MAX_COUNT: '10000'
+  TRACEHOUND_QUARANTINE_MAX_BYTES: '104857600' # 100MB
+  TRACEHOUND_QUARANTINE_EVICTION: 'priority'
 
   # Rate Limiter
-  TRACEHOUND_RATE_LIMIT_WINDOW_MS: "60000"
-  TRACEHOUND_RATE_LIMIT_MAX_REQUESTS: "1000"
-  TRACEHOUND_RATE_LIMIT_BLOCK_MS: "30000"
+  TRACEHOUND_RATE_LIMIT_WINDOW_MS: '60000'
+  TRACEHOUND_RATE_LIMIT_MAX_REQUESTS: '1000'
+  TRACEHOUND_RATE_LIMIT_BLOCK_MS: '30000'
 
   # Agent
-  TRACEHOUND_MAX_PAYLOAD_SIZE: "1048576"          # 1MB
+  TRACEHOUND_MAX_PAYLOAD_SIZE: '1048576' # 1MB
 
   # Hound Pool
-  TRACEHOUND_HOUND_MAX_ACTIVE: "4"
-  TRACEHOUND_HOUND_TIMEOUT_MS: "30000"
+  TRACEHOUND_HOUND_MAX_ACTIVE: '4'
+  TRACEHOUND_HOUND_TIMEOUT_MS: '30000'
 
   # Cold Storage
-  TRACEHOUND_COLD_STORAGE_BUCKET: "tracehound-evidence"
-  TRACEHOUND_COLD_STORAGE_PREFIX: "prod/evidence/"
-  TRACEHOUND_COLD_STORAGE_REGION: "us-east-1"
+  TRACEHOUND_COLD_STORAGE_BUCKET: 'tracehound-evidence'
+  TRACEHOUND_COLD_STORAGE_PREFIX: 'prod/evidence/'
+  TRACEHOUND_COLD_STORAGE_REGION: 'us-east-1'
 
   # Scheduler
-  TRACEHOUND_SCHEDULER_TICK_MS: "5000"
+  TRACEHOUND_SCHEDULER_TICK_MS: '5000'
 
   # Fail-Safe
-  TRACEHOUND_FAILSAFE_PANIC_THRESHOLD: "10"
-  TRACEHOUND_FAILSAFE_WINDOW_MS: "60000"
+  TRACEHOUND_FAILSAFE_PANIC_THRESHOLD: '10'
+  TRACEHOUND_FAILSAFE_WINDOW_MS: '60000'
 ```
 
 ### Application Code (reading ConfigMap values)
@@ -241,7 +242,9 @@ import express from 'express'
 import { createTracehound } from '@tracehound/core'
 
 const app = express()
-const th = createTracehound({ /* config */ })
+const th = createTracehound({
+  /* config */
+})
 
 // Liveness: is the process alive?
 app.get('/healthz', (_req, res) => {
@@ -320,12 +323,12 @@ spec:
 
 ### Scaling Considerations
 
-| Factor                    | Impact                                              |
-| ------------------------- | --------------------------------------------------- |
-| Quarantine buffer         | Per-pod. More pods = more total quarantine capacity  |
-| Hound child processes     | Per-pod. Keep `maxActive` low (2-4) to limit memory |
-| Cold storage writes       | Shared. S3 handles concurrent writes from all pods  |
-| Rate limiter state        | Per-pod. Distributed rate limiting requires Redis    |
+| Factor                | Impact                                              |
+| --------------------- | --------------------------------------------------- |
+| Quarantine buffer     | Per-pod. More pods = more total quarantine capacity |
+| Hound child processes | Per-pod. Keep `maxActive` low (2-4) to limit memory |
+| Cold storage writes   | Shared. S3 handles concurrent writes from all pods  |
+| Rate limiter state    | Per-pod. Distributed rate limiting requires Redis   |
 
 ---
 
@@ -457,12 +460,12 @@ app.get('/metrics', (_req, res) => {
 
 ### Key Metrics to Monitor
 
-| Metric                          | Alert Threshold         | Description                         |
-| ------------------------------- | ----------------------- | ----------------------------------- |
-| `quarantine_count`              | > 80% of maxCount       | Quarantine nearing capacity         |
-| `quarantine_bytes`              | > 80% of maxBytes       | Memory pressure from evidence       |
-| `rate_limiter_blocked_sources`  | Spike > 3x baseline     | Possible attack wave                |
-| `fail_safe_panic_count`         | > 0                     | Tracehound internal failure         |
+| Metric                         | Alert Threshold     | Description                   |
+| ------------------------------ | ------------------- | ----------------------------- |
+| `quarantine_count`             | > 80% of maxCount   | Quarantine nearing capacity   |
+| `quarantine_bytes`             | > 80% of maxBytes   | Memory pressure from evidence |
+| `rate_limiter_blocked_sources` | Spike > 3x baseline | Possible attack wave          |
+| `fail_safe_panic_count`        | > 0                 | Tracehound internal failure   |
 
 ---
 
@@ -473,6 +476,7 @@ app.get('/metrics', (_req, res) => {
 **Cause:** Quarantine buffer + Hound processes exceed memory limit.
 
 **Fix:**
+
 1. Reduce `TRACEHOUND_QUARANTINE_MAX_BYTES`
 2. Reduce `TRACEHOUND_HOUND_MAX_ACTIVE`
 3. Increase pod memory limit
@@ -482,6 +486,7 @@ app.get('/metrics', (_req, res) => {
 **Cause:** Evidence compression (gzip) under heavy attack load.
 
 **Fix:**
+
 1. Ensure Async Codec is used for cold storage operations
 2. Reduce `TRACEHOUND_QUARANTINE_MAX_COUNT` to limit compression work
 3. Scale out via HPA
@@ -491,6 +496,7 @@ app.get('/metrics', (_req, res) => {
 **Cause:** S3 connectivity or permissions issue.
 
 **Fix:**
+
 1. Verify network policy allows port 443 egress
 2. Check IAM role / service account permissions
 3. Tracehound is fail-open — writes fail silently, application continues

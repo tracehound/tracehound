@@ -1,13 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AgentStats } from "../src/core/agent.js";
-import type { HoundPoolStats } from "../src/core/hound-pool.js";
-import type { QuarantineStats } from "../src/core/quarantine.js";
-import type { RateLimiterStats } from "../src/core/rate-limiter.js";
-import type { ITracehound } from "../src/core/tracehound.js";
-import type { WatcherSnapshot } from "../src/core/watcher.js";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { AgentStats } from '../src/core/agent.js'
+import type { HoundPoolStats } from '../src/core/hound-pool.js'
+import type { QuarantineStats } from '../src/core/quarantine.js'
+import type { RateLimiterStats } from '../src/core/rate-limiter.js'
+import type { ITracehound } from '../src/core/tracehound.js'
+import type { WatcherSnapshot } from '../src/core/watcher.js'
 import {
   exportSystemSnapshot,
   readSystemSnapshotFromDisk,
@@ -16,7 +16,7 @@ import {
   SYSTEM_SNAPSHOT_ENV,
   writeSystemSnapshotToDisk,
   type SystemSnapshot,
-} from "../src/utils/system-snapshot.js";
+} from '../src/utils/system-snapshot.js'
 
 function createAgentStats(): AgentStats {
   return {
@@ -30,7 +30,7 @@ function createAgentStats(): AgentStats {
     coordinationFallbackCount: 0,
     coordinationWarningCount: 0,
     membraneRejectionCount: 0,
-  };
+  }
 }
 
 function createQuarantineStats(): QuarantineStats {
@@ -40,7 +40,7 @@ function createQuarantineStats(): QuarantineStats {
     droppedCount: 0,
     droppedBytes: 0,
     bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
-  };
+  }
 }
 
 function createRateLimiterStats(): RateLimiterStats {
@@ -50,7 +50,7 @@ function createRateLimiterStats(): RateLimiterStats {
     totalChecks: 10,
     totalRejections: 1,
     totalEvictions: 0,
-  };
+  }
 }
 
 function createWatcherSnapshot(
@@ -75,7 +75,7 @@ function createWatcherSnapshot(
     overloaded: false,
     snapshotTime: now,
     ...partial,
-  };
+  }
 }
 
 function createIsolationTelemetry() {
@@ -87,21 +87,19 @@ function createIsolationTelemetry() {
       childSpawn: false,
     },
     capabilities: {
-      platform: "linux",
-      memoryLimit: "enforced",
-      processTermination: "enforced",
-      environmentIsolation: "allowlist",
-      networkAccess: "declarative",
-      fileSystemWrite: "declarative",
-      childSpawn: "declarative",
+      platform: 'linux',
+      memoryLimit: 'enforced',
+      processTermination: 'enforced',
+      environmentIsolation: 'allowlist',
+      networkAccess: 'declarative',
+      fileSystemWrite: 'declarative',
+      childSpawn: 'declarative',
     },
     environmentAllowlistSize: 10,
-  } as const;
+  } as const
 }
 
-function createHoundPoolStats(
-  partial: Partial<HoundPoolStats> = {},
-): HoundPoolStats {
+function createHoundPoolStats(partial: Partial<HoundPoolStats> = {}): HoundPoolStats {
   return {
     activeProcesses: 0,
     totalProcesses: 4,
@@ -111,13 +109,10 @@ function createHoundPoolStats(
     avgProcessingMs: 5,
     isolationTelemetry: createIsolationTelemetry(),
     ...partial,
-  };
+  }
 }
 
-function createMockTracehound(
-  watcher: WatcherSnapshot,
-  pool: HoundPoolStats,
-): ITracehound {
+function createMockTracehound(watcher: WatcherSnapshot, pool: HoundPoolStats): ITracehound {
   const mock = {
     agent: { getStats: () => createAgentStats() },
     quarantine: { stats: createQuarantineStats(), maxBytes: 4096 },
@@ -127,117 +122,111 @@ function createMockTracehound(
     notifications: {},
     houndPool: { stats: pool, shutdown: () => {} },
     snapshot: () => {
-      throw new Error("not used in tests");
+      throw new Error('not used in tests')
     },
     shutdown: () => {},
-  };
+  }
 
-  return mock as unknown as ITracehound;
+  return mock as unknown as ITracehound
 }
 
-describe("system-snapshot utilities", () => {
-  const previousPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH];
-  const previousSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
+describe('system-snapshot utilities', () => {
+  const previousPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+  const previousSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
 
   afterEach(() => {
     if (previousPath === undefined) {
-      delete process.env[SYSTEM_SNAPSHOT_ENV.PATH];
+      delete process.env[SYSTEM_SNAPSHOT_ENV.PATH]
     } else {
-      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousPath;
+      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousPath
     }
     if (previousSecret === undefined) {
-      delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
+      delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
     } else {
-      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSecret;
+      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSecret
     }
-    vi.restoreAllMocks();
-  });
+    vi.restoreAllMocks()
+  })
 
-  it("should resolve snapshot path from override, env, and default", () => {
-    const override = resolveSystemSnapshotPath("/tmp/custom.json");
-    expect(override).toBe("/tmp/custom.json");
+  it('should resolve snapshot path from override, env, and default', () => {
+    const override = resolveSystemSnapshotPath('/tmp/custom.json')
+    expect(override).toBe('/tmp/custom.json')
 
-    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = "/tmp/from-env.json";
-    const fromEnv = resolveSystemSnapshotPath();
-    expect(fromEnv).toBe("/tmp/from-env.json");
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = '/tmp/from-env.json'
+    const fromEnv = resolveSystemSnapshotPath()
+    expect(fromEnv).toBe('/tmp/from-env.json')
 
-    delete process.env[SYSTEM_SNAPSHOT_ENV.PATH];
-    const fallback = resolveSystemSnapshotPath();
-    expect(fallback).toContain("tracehound");
-    expect(fallback).toContain("system-snapshot.json");
-  });
+    delete process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+    const fallback = resolveSystemSnapshotPath()
+    expect(fallback).toContain('tracehound')
+    expect(fallback).toContain('system-snapshot.json')
+  })
 
-  it("should resolve snapshot secret from override, env, and null", () => {
-    const override = resolveSystemSnapshotSecret("abc");
-    expect(override).toBe("abc");
+  it('should resolve snapshot secret from override, env, and null', () => {
+    const override = resolveSystemSnapshotSecret('abc')
+    expect(override).toBe('abc')
 
-    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = "env-secret";
-    expect(resolveSystemSnapshotSecret()).toBe("env-secret");
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = 'env-secret'
+    expect(resolveSystemSnapshotSecret()).toBe('env-secret')
 
-    delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
-    expect(resolveSystemSnapshotSecret()).toBeNull();
-  });
+    delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
+    expect(resolveSystemSnapshotSecret()).toBeNull()
+  })
 
-  it("should derive critical health when watcher is overloaded", () => {
-    const watcher = createWatcherSnapshot({ overloaded: true });
-    const pool = createHoundPoolStats();
-    const snapshot = exportSystemSnapshot(createMockTracehound(watcher, pool));
+  it('should derive critical health when watcher is overloaded', () => {
+    const watcher = createWatcherSnapshot({ overloaded: true })
+    const pool = createHoundPoolStats()
+    const snapshot = exportSystemSnapshot(createMockTracehound(watcher, pool))
 
-    expect(snapshot.systemHealth).toBe("critical");
-  });
+    expect(snapshot.systemHealth).toBe('critical')
+  })
 
-  it("should derive critical health when pool is exhausted", () => {
+  it('should derive critical health when pool is exhausted', () => {
     const watcher = createWatcherSnapshot({
       overloaded: false,
       alertsInWindow: 0,
-    });
+    })
     const pool = createHoundPoolStats({
       activeProcesses: 4,
       totalProcesses: 4,
-    });
-    const snapshot = exportSystemSnapshot(createMockTracehound(watcher, pool));
+    })
+    const snapshot = exportSystemSnapshot(createMockTracehound(watcher, pool))
 
-    expect(snapshot.systemHealth).toBe("critical");
-  });
+    expect(snapshot.systemHealth).toBe('critical')
+  })
 
-  it("should derive degraded and healthy health states", () => {
+  it('should derive degraded and healthy health states', () => {
     const degraded = exportSystemSnapshot(
-      createMockTracehound(
-        createWatcherSnapshot({ alertsInWindow: 2 }),
-        createHoundPoolStats(),
-      ),
-    );
+      createMockTracehound(createWatcherSnapshot({ alertsInWindow: 2 }), createHoundPoolStats()),
+    )
     const healthy = exportSystemSnapshot(
-      createMockTracehound(
-        createWatcherSnapshot({ alertsInWindow: 0 }),
-        createHoundPoolStats(),
-      ),
-    );
+      createMockTracehound(createWatcherSnapshot({ alertsInWindow: 0 }), createHoundPoolStats()),
+    )
 
-    expect(degraded.systemHealth).toBe("degraded");
-    expect(healthy.systemHealth).toBe("healthy");
-  });
+    expect(degraded.systemHealth).toBe('degraded')
+    expect(healthy.systemHealth).toBe('healthy')
+  })
 
-  it("should write and read signed snapshot round-trip", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
+  it('should write and read signed snapshot round-trip', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
+    )
 
-    writeSystemSnapshotToDisk(snapshot, path, "secret");
-    const result = readSystemSnapshotFromDisk(path, "secret");
+    writeSystemSnapshotToDisk(snapshot, path, 'secret')
+    const result = readSystemSnapshotFromDisk(path, 'secret')
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.snapshot.systemHealth).toBe(snapshot.systemHealth);
-    rmSync(dir, { recursive: true, force: true });
-  });
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.systemHealth).toBe(snapshot.systemHealth)
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should accept decimal maxMemoryMB in isolation telemetry", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
-    const telemetry = createIsolationTelemetry();
+  it('should accept decimal maxMemoryMB in isolation telemetry', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
+    const telemetry = createIsolationTelemetry()
     const snapshot = exportSystemSnapshot(
       createMockTracehound(
         createWatcherSnapshot(),
@@ -251,21 +240,21 @@ describe("system-snapshot utilities", () => {
           },
         }),
       ),
-    );
+    )
 
-    writeSystemSnapshotToDisk(snapshot, path, "secret");
-    const result = readSystemSnapshotFromDisk(path, "secret");
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.snapshot.houndPool.isolationTelemetry?.constraints.maxMemoryMB).toBe(64.5);
+    writeSystemSnapshotToDisk(snapshot, path, 'secret')
+    const result = readSystemSnapshotFromDisk(path, 'secret')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.houndPool.isolationTelemetry?.constraints.maxMemoryMB).toBe(64.5)
 
-    rmSync(dir, { recursive: true, force: true });
-  });
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should accept unknown platform and best_effort telemetry capabilities", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
-    const telemetry = createIsolationTelemetry();
+  it('should accept unknown platform and best_effort telemetry capabilities', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
+    const telemetry = createIsolationTelemetry()
     const snapshot = exportSystemSnapshot(
       createMockTracehound(
         createWatcherSnapshot(),
@@ -274,115 +263,113 @@ describe("system-snapshot utilities", () => {
             ...telemetry,
             capabilities: {
               ...telemetry.capabilities,
-              platform: "unknown",
-              memoryLimit: "best_effort",
-              processTermination: "best_effort",
-              networkAccess: "best_effort",
-              fileSystemWrite: "best_effort",
-              childSpawn: "best_effort",
+              platform: 'unknown',
+              memoryLimit: 'best_effort',
+              processTermination: 'best_effort',
+              networkAccess: 'best_effort',
+              fileSystemWrite: 'best_effort',
+              childSpawn: 'best_effort',
             },
           },
         }),
       ),
-    );
+    )
 
-    writeSystemSnapshotToDisk(snapshot, path, "secret");
-    const result = readSystemSnapshotFromDisk(path, "secret");
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.snapshot.houndPool.isolationTelemetry?.capabilities.platform).toBe(
-      "unknown",
-    );
-    expect(
-      result.snapshot.houndPool.isolationTelemetry?.capabilities.memoryLimit,
-    ).toBe("best_effort");
+    writeSystemSnapshotToDisk(snapshot, path, 'secret')
+    const result = readSystemSnapshotFromDisk(path, 'secret')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.houndPool.isolationTelemetry?.capabilities.platform).toBe('unknown')
+    expect(result.snapshot.houndPool.isolationTelemetry?.capabilities.memoryLimit).toBe(
+      'best_effort',
+    )
 
-    rmSync(dir, { recursive: true, force: true });
-  });
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should accept legacy hound pool stats without isolation telemetry", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
+  it('should accept legacy hound pool stats without isolation telemetry', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(
         createWatcherSnapshot(),
         createHoundPoolStats({ isolationTelemetry: undefined }),
       ),
-    );
+    )
 
-    writeSystemSnapshotToDisk(snapshot, path, "secret");
-    const result = readSystemSnapshotFromDisk(path, "secret");
-    expect(result.ok).toBe(true);
+    writeSystemSnapshotToDisk(snapshot, path, 'secret')
+    const result = readSystemSnapshotFromDisk(path, 'secret')
+    expect(result.ok).toBe(true)
 
-    rmSync(dir, { recursive: true, force: true });
-  });
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should return NO_INSTANCE when file does not exist", () => {
-    const path = join(tmpdir(), "tracehound-missing", "snapshot.json");
-    const result = readSystemSnapshotFromDisk(path, "secret");
-    expect(result).toEqual({ ok: false, reason: "NO_INSTANCE" });
-  });
+  it('should return NO_INSTANCE when file does not exist', () => {
+    const path = join(tmpdir(), 'tracehound-missing', 'snapshot.json')
+    const result = readSystemSnapshotFromDisk(path, 'secret')
+    expect(result).toEqual({ ok: false, reason: 'NO_INSTANCE' })
+  })
 
-  it("should return INTEGRITY_VIOLATION when secret is empty", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
+  it('should return INTEGRITY_VIOLATION when secret is empty', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
-    writeSystemSnapshotToDisk(snapshot, path, "secret");
+    )
+    writeSystemSnapshotToDisk(snapshot, path, 'secret')
 
-    const result = readSystemSnapshotFromDisk(path, "");
-    expect(result).toEqual({ ok: false, reason: "INTEGRITY_VIOLATION" });
-    rmSync(dir, { recursive: true, force: true });
-  });
+    const result = readSystemSnapshotFromDisk(path, '')
+    expect(result).toEqual({ ok: false, reason: 'INTEGRITY_VIOLATION' })
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should return INVALID_FORMAT for malformed and structurally invalid payloads", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const malformedPath = join(dir, "malformed.json");
-    writeFileSync(malformedPath, "{", "utf8");
-    expect(readSystemSnapshotFromDisk(malformedPath, "secret")).toEqual({
+  it('should return INVALID_FORMAT for malformed and structurally invalid payloads', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const malformedPath = join(dir, 'malformed.json')
+    writeFileSync(malformedPath, '{', 'utf8')
+    expect(readSystemSnapshotFromDisk(malformedPath, 'secret')).toEqual({
       ok: false,
-      reason: "INVALID_FORMAT",
-    });
+      reason: 'INVALID_FORMAT',
+    })
 
-    const invalidStructPath = join(dir, "invalid-struct.json");
+    const invalidStructPath = join(dir, 'invalid-struct.json')
     writeFileSync(
       invalidStructPath,
       JSON.stringify({
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {},
-        signature: "x",
+        signature: 'x',
       }),
-      "utf8",
-    );
-    expect(readSystemSnapshotFromDisk(invalidStructPath, "secret")).toEqual({
+      'utf8',
+    )
+    expect(readSystemSnapshotFromDisk(invalidStructPath, 'secret')).toEqual({
       ok: false,
-      reason: "INVALID_FORMAT",
-    });
+      reason: 'INVALID_FORMAT',
+    })
 
-    rmSync(dir, { recursive: true, force: true });
-  });
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should reject signed envelope with invalid metadata variants", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "invalid-signed.json");
+  it('should reject signed envelope with invalid metadata variants', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'invalid-signed.json')
     const invalidCases = [
-      { version: 2, algorithm: "HMAC-SHA256", payload: {}, signature: "x" },
-      { version: 1, algorithm: "HMAC-MD5", payload: {}, signature: "x" },
-      { version: 1, algorithm: "HMAC-SHA256", payload: {}, signature: "" },
+      { version: 2, algorithm: 'HMAC-SHA256', payload: {}, signature: 'x' },
+      { version: 1, algorithm: 'HMAC-MD5', payload: {}, signature: 'x' },
+      { version: 1, algorithm: 'HMAC-SHA256', payload: {}, signature: '' },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
-        payload: { generatedAt: Number.NaN, systemHealth: "healthy" },
-        signature: "x",
+        algorithm: 'HMAC-SHA256',
+        payload: { generatedAt: Number.NaN, systemHealth: 'healthy' },
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "unknown",
+          systemHealth: 'unknown',
           quarantineMaxBytes: 1,
           agent: {},
           quarantine: {},
@@ -390,39 +377,39 @@ describe("system-snapshot utilities", () => {
           houndPool: {},
           rateLimiter: {},
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: {
             ...createQuarantineStats(),
-            bySeverity: { critical: 1, high: "1", medium: 1, low: 0 },
+            bySeverity: { critical: 1, high: '1', medium: 1, low: 0 },
           },
           watcher: {
             ...createWatcherSnapshot(),
             threats: {
               total: 3,
-              byCategory: { injection: "2" },
+              byCategory: { injection: '2' },
               bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
             },
           },
           houndPool: createHoundPoolStats(),
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -430,14 +417,14 @@ describe("system-snapshot utilities", () => {
           houndPool: null,
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -448,14 +435,14 @@ describe("system-snapshot utilities", () => {
           },
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -469,14 +456,14 @@ describe("system-snapshot utilities", () => {
           },
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -490,14 +477,14 @@ describe("system-snapshot utilities", () => {
           },
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: {
@@ -508,14 +495,14 @@ describe("system-snapshot utilities", () => {
           houndPool: createHoundPoolStats(),
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -530,14 +517,14 @@ describe("system-snapshot utilities", () => {
           houndPool: createHoundPoolStats(),
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -545,21 +532,21 @@ describe("system-snapshot utilities", () => {
             ...createWatcherSnapshot(),
             threats: {
               total: 3,
-              byCategory: { injection: "2" },
+              byCategory: { injection: '2' },
               bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
             },
           },
           houndPool: createHoundPoolStats(),
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -567,14 +554,14 @@ describe("system-snapshot utilities", () => {
           houndPool: createHoundPoolStats(),
           rateLimiter: null,
         },
-        signature: "x",
+        signature: 'x',
       },
       {
         version: 1,
-        algorithm: "HMAC-SHA256",
+        algorithm: 'HMAC-SHA256',
         payload: {
           generatedAt: Date.now(),
-          systemHealth: "healthy",
+          systemHealth: 'healthy',
           quarantineMaxBytes: 1024,
           agent: createAgentStats(),
           quarantine: createQuarantineStats(),
@@ -588,150 +575,146 @@ describe("system-snapshot utilities", () => {
           },
           rateLimiter: createRateLimiterStats(),
         },
-        signature: "x",
+        signature: 'x',
       },
-    ];
+    ]
 
     try {
       for (const invalid of invalidCases) {
-        writeFileSync(path, JSON.stringify(invalid), "utf8");
-        expect(readSystemSnapshotFromDisk(path, "secret")).toEqual({
+        writeFileSync(path, JSON.stringify(invalid), 'utf8')
+        expect(readSystemSnapshotFromDisk(path, 'secret')).toEqual({
           ok: false,
-          reason: "INVALID_FORMAT",
-        });
+          reason: 'INVALID_FORMAT',
+        })
       }
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true })
     }
-  });
+  })
 
-  it("should return INTEGRITY_VIOLATION when signature is mismatched", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
+  it('should return INTEGRITY_VIOLATION when signature is mismatched', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
-    writeSystemSnapshotToDisk(snapshot, path, "secret-a");
-    const result = readSystemSnapshotFromDisk(path, "secret-b");
+    )
+    writeSystemSnapshotToDisk(snapshot, path, 'secret-a')
+    const result = readSystemSnapshotFromDisk(path, 'secret-b')
 
-    expect(result).toEqual({ ok: false, reason: "INTEGRITY_VIOLATION" });
-    rmSync(dir, { recursive: true, force: true });
-  });
+    expect(result).toEqual({ ok: false, reason: 'INTEGRITY_VIOLATION' })
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should return IO_ERROR when target is a directory", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-dir-"));
-    const result = readSystemSnapshotFromDisk(dir, "secret");
+  it('should return IO_ERROR when target is a directory', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-dir-'))
+    const result = readSystemSnapshotFromDisk(dir, 'secret')
 
-    expect(result).toEqual({ ok: false, reason: "IO_ERROR" });
-    rmSync(dir, { recursive: true, force: true });
-  });
+    expect(result).toEqual({ ok: false, reason: 'IO_ERROR' })
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should throw typed error when write secret is missing", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
+  it('should throw typed error when write secret is missing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
+    )
 
-    expect(() => writeSystemSnapshotToDisk(snapshot, path, "")).toThrow();
-    rmSync(dir, { recursive: true, force: true });
-  });
+    expect(() => writeSystemSnapshotToDisk(snapshot, path, '')).toThrow()
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should wrap filesystem write errors as snapshot write failure", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const parentFile = join(dir, "not-a-directory");
-    writeFileSync(parentFile, "x", "utf8");
+  it('should wrap filesystem write errors as snapshot write failure', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const parentFile = join(dir, 'not-a-directory')
+    writeFileSync(parentFile, 'x', 'utf8')
 
-    const path = join(parentFile, "snapshot.json");
+    const path = join(parentFile, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
+    )
 
     try {
-      writeSystemSnapshotToDisk(snapshot, path, "secret");
-      expect.fail("writeSystemSnapshotToDisk should throw");
+      writeSystemSnapshotToDisk(snapshot, path, 'secret')
+      expect.fail('writeSystemSnapshotToDisk should throw')
     } catch (error: unknown) {
-      const typed = error as { code?: string };
-      expect(typed.code).toBe("RUNTIME_SNAPSHOT_WRITE_FAILED");
+      const typed = error as { code?: string }
+      expect(typed.code).toBe('RUNTIME_SNAPSHOT_WRITE_FAILED')
     } finally {
-      rmSync(dir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true })
     }
-  });
+  })
 
-  it("should replace existing snapshot on repeated writes and emit at most one Windows ACL warning", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
-    const warningSpy = vi
-      .spyOn(process, "emitWarning")
-      .mockImplementation(() => {});
+  it('should replace existing snapshot on repeated writes and emit at most one Windows ACL warning', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
+    const warningSpy = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
     const snapshotA = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
+    )
     const snapshotB: SystemSnapshot = {
       ...snapshotA,
       generatedAt: snapshotA.generatedAt + 1,
-    };
+    }
 
-    writeSystemSnapshotToDisk(snapshotA, path, "secret");
-    writeSystemSnapshotToDisk(snapshotB, path, "secret");
-    const loaded = readSystemSnapshotFromDisk(path, "secret");
-    expect(loaded.ok).toBe(true);
-    if (!loaded.ok) return;
-    expect(loaded.snapshot.generatedAt).toBe(snapshotB.generatedAt);
+    writeSystemSnapshotToDisk(snapshotA, path, 'secret')
+    writeSystemSnapshotToDisk(snapshotB, path, 'secret')
+    const loaded = readSystemSnapshotFromDisk(path, 'secret')
+    expect(loaded.ok).toBe(true)
+    if (!loaded.ok) return
+    expect(loaded.snapshot.generatedAt).toBe(snapshotB.generatedAt)
 
-    if (process.platform === "win32") {
-      expect(warningSpy.mock.calls.length).toBeLessThanOrEqual(1);
+    if (process.platform === 'win32') {
+      expect(warningSpy.mock.calls.length).toBeLessThanOrEqual(1)
     } else {
-      expect(warningSpy).not.toHaveBeenCalled();
+      expect(warningSpy).not.toHaveBeenCalled()
     }
 
-    rmSync(dir, { recursive: true, force: true });
-  });
+    rmSync(dir, { recursive: true, force: true })
+  })
 
-  it("should execute non-win32 hardening path without warning", () => {
-    if (process.platform === "win32") {
-      return;
+  it('should execute non-win32 hardening path without warning', () => {
+    if (process.platform === 'win32') {
+      return
     }
 
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
-    const warningSpy = vi
-      .spyOn(process, "emitWarning")
-      .mockImplementation(() => {});
+    )
+    const warningSpy = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
 
     try {
-      expect(() => writeSystemSnapshotToDisk(snapshot, path, "secret")).not.toThrow();
-      expect(warningSpy).not.toHaveBeenCalled();
+      expect(() => writeSystemSnapshotToDisk(snapshot, path, 'secret')).not.toThrow()
+      expect(warningSpy).not.toHaveBeenCalled()
     } finally {
-      warningSpy.mockRestore();
-      rmSync(dir, { recursive: true, force: true });
+      warningSpy.mockRestore()
+      rmSync(dir, { recursive: true, force: true })
     }
-  });
+  })
 
-  it("should produce signed envelope with expected metadata", () => {
-    const dir = mkdtempSync(join(tmpdir(), "tracehound-system-snapshot-"));
-    const path = join(dir, "snapshot.json");
+  it('should produce signed envelope with expected metadata', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
-    );
-    writeSystemSnapshotToDisk(snapshot, path, "secret");
+    )
+    writeSystemSnapshotToDisk(snapshot, path, 'secret')
 
-    const raw = JSON.parse(readFileSync(path, "utf8")) as {
-      version: number;
-      algorithm: string;
-      signature: string;
-      payload: unknown;
-    };
+    const raw = JSON.parse(readFileSync(path, 'utf8')) as {
+      version: number
+      algorithm: string
+      signature: string
+      payload: unknown
+    }
 
-    expect(raw.version).toBe(1);
-    expect(raw.algorithm).toBe("HMAC-SHA256");
-    expect(typeof raw.signature).toBe("string");
-    expect(raw.signature.length).toBeGreaterThan(0);
-    expect(typeof raw.payload).toBe("object");
+    expect(raw.version).toBe(1)
+    expect(raw.algorithm).toBe('HMAC-SHA256')
+    expect(typeof raw.signature).toBe('string')
+    expect(raw.signature.length).toBeGreaterThan(0)
+    expect(typeof raw.payload).toBe('object')
 
-    rmSync(dir, { recursive: true, force: true });
-  });
-});
+    rmSync(dir, { recursive: true, force: true })
+  })
+})

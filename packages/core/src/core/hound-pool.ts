@@ -12,12 +12,12 @@
  * activeProcesses reflects OS-level active child processes
  */
 
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { Errors } from "../types/errors.js";
-import type { Evidence } from "./evidence.js";
-import type { HoundAnalysisMessage } from "./hound-ipc.js";
-import { decodeHoundMessage } from "./hound-ipc.js";
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Errors } from '../types/errors.js'
+import type { Evidence } from './evidence.js'
+import type { HoundAnalysisMessage } from './hound-ipc.js'
+import { decodeHoundMessage } from './hound-ipc.js'
 import {
   createMockAdapter,
   createProcessAdapter,
@@ -27,7 +27,7 @@ import {
   type HoundProcessIsolationTelemetry,
   type HoundProcessConstraints,
   type IHoundProcessAdapter,
-} from "./process-adapter.js";
+} from './process-adapter.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -39,40 +39,38 @@ import {
  */
 export interface HoundResult {
   /** Evidence signature */
-  signature: string;
+  signature: string
   /** Execution status */
-  status: "processed" | "timeout" | "error";
+  status: 'processed' | 'timeout' | 'error'
   /** Processing duration in ms */
-  durationMs: number;
+  durationMs: number
   /** Process ID that processed this */
-  processId: string;
+  processId: string
   /** Error message if status is 'error' */
-  error?: string;
+  error?: string
   /** Optional deterministic analysis metadata from child process */
-  analysis?: Omit<HoundAnalysisMessage, "type">;
+  analysis?: Omit<HoundAnalysisMessage, 'type'>
 }
 
 export const HOUND_PRESSURE_ERRORS = Object.freeze({
-  POOL_EXHAUSTED: "pool_exhausted",
-  POOL_EXHAUSTED_ESCALATED: "pool_exhausted_escalated",
-  DEFER_QUEUE_FULL: "defer_queue_full",
-  SPAWN_FAILED: "spawn_failed",
-} as const);
+  POOL_EXHAUSTED: 'pool_exhausted',
+  POOL_EXHAUSTED_ESCALATED: 'pool_exhausted_escalated',
+  DEFER_QUEUE_FULL: 'defer_queue_full',
+  SPAWN_FAILED: 'spawn_failed',
+} as const)
 
 export type HoundPressureErrorCode =
-  (typeof HOUND_PRESSURE_ERRORS)[keyof typeof HOUND_PRESSURE_ERRORS];
+  (typeof HOUND_PRESSURE_ERRORS)[keyof typeof HOUND_PRESSURE_ERRORS]
 
-const HOUND_PRESSURE_ERROR_SET: ReadonlySet<string> = new Set(
-  Object.values(HOUND_PRESSURE_ERRORS),
-);
+const HOUND_PRESSURE_ERROR_SET: ReadonlySet<string> = new Set(Object.values(HOUND_PRESSURE_ERRORS))
 
 const HOUND_SPAWN_PRESSURE_PATTERNS: ReadonlyArray<RegExp> = [
   /^spawn_failed(?:\b|:)/i,
   /\bfailed to spawn process\b/i,
   /\bprocess spawn failed\b/i,
-];
+]
 
-const POOL_PROCESS_ID = "pool";
+const POOL_PROCESS_ID = 'pool'
 
 /**
  * Checks whether an error payload indicates capacity/pressure stress.
@@ -80,16 +78,16 @@ const POOL_PROCESS_ID = "pool";
  */
 export function isHoundPressureError(errorMessage: string): boolean {
   if (HOUND_PRESSURE_ERROR_SET.has(errorMessage)) {
-    return true;
+    return true
   }
 
   for (const pattern of HOUND_SPAWN_PRESSURE_PATTERNS) {
     if (pattern.test(errorMessage)) {
-      return true;
+      return true
     }
   }
 
-  return false;
+  return false
 }
 
 /**
@@ -99,46 +97,46 @@ export function isHoundPressureError(errorMessage: string): boolean {
  */
 export interface HoundPoolStats {
   /** Number of active processes (OS-level) */
-  activeProcesses: number;
+  activeProcesses: number
   /** Total processes in pool */
-  totalProcesses: number;
+  totalProcesses: number
   /** Total activations */
-  totalActivations: number;
+  totalActivations: number
   /** Total timeouts */
-  totalTimeouts: number;
+  totalTimeouts: number
   /** Total errors */
-  totalErrors: number;
+  totalErrors: number
   /** Average processing time in ms */
-  avgProcessingMs: number;
+  avgProcessingMs: number
   /** Process isolation constraints/capabilities telemetry */
-  isolationTelemetry?: Readonly<HoundProcessIsolationTelemetry>;
+  isolationTelemetry?: Readonly<HoundProcessIsolationTelemetry>
 }
 
 /**
  * Pool exhaustion action.
  */
-export type PoolExhaustedAction = "drop" | "escalate" | "defer";
+export type PoolExhaustedAction = 'drop' | 'escalate' | 'defer'
 
 /**
  * Hound pool configuration.
  */
 export interface HoundPoolConfig {
   /** Number of pre-spawned processes */
-  poolSize: number;
+  poolSize: number
   /** Timeout per process in ms */
-  timeout: number;
+  timeout: number
   /** Jitter range for rotation in ms */
-  rotationJitterMs: number;
+  rotationJitterMs: number
   /** Action when pool exhausted (default: 'drop') */
-  onPoolExhausted?: PoolExhaustedAction;
+  onPoolExhausted?: PoolExhaustedAction
   /** Max queue size for 'defer' action (default: 100) */
-  deferQueueLimit?: number;
+  deferQueueLimit?: number
   /** Process constraints (declarative, best-effort) */
-  processConstraints?: Partial<HoundProcessConstraints>;
+  processConstraints?: Partial<HoundProcessConstraints>
   /** Path to hound process script */
-  processScriptPath?: string;
+  processScriptPath?: string
   /** Custom process adapter (for testing) */
-  adapter?: IHoundProcessAdapter;
+  adapter?: IHoundProcessAdapter
 }
 
 /**
@@ -154,30 +152,30 @@ export interface IHoundPool {
    *
    * @param evidence - Evidence to process
    */
-  activate(evidence: Evidence): void;
+  activate(evidence: Evidence): void
 
   /**
    * Force terminate specific hound by signature.
    *
    * @param signature - Evidence signature to terminate
    */
-  terminate(signature: string): void;
+  terminate(signature: string): void
 
   /**
    * Get pool statistics (immutable snapshot).
    */
-  readonly stats: Readonly<HoundPoolStats>;
+  readonly stats: Readonly<HoundPoolStats>
 
   /**
    * Register result handler.
    * Internal use only - NOT exposed to Agent.
    */
-  onResult(handler: (result: HoundResult) => void): void;
+  onResult(handler: (result: HoundResult) => void): void
 
   /**
    * Shutdown all processes.
    */
-  shutdown(): void;
+  shutdown(): void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -188,14 +186,14 @@ export interface IHoundPool {
  * Internal process state.
  */
 interface ProcessState {
-  id: string;
-  pid: number | null;
-  handle: HoundHandle | null;
-  busy: boolean;
-  currentSignature: string | null;
-  currentAnalysis: Omit<HoundAnalysisMessage, "type"> | null;
-  startTime: number | null;
-  timeoutId: ReturnType<typeof setTimeout> | null;
+  id: string
+  pid: number | null
+  handle: HoundHandle | null
+  busy: boolean
+  currentSignature: string | null
+  currentAnalysis: Omit<HoundAnalysisMessage, 'type'> | null
+  startTime: number | null
+  timeoutId: ReturnType<typeof setTimeout> | null
 }
 
 /**
@@ -204,136 +202,133 @@ interface ProcessState {
  * Uses child process isolation per RFC-0000 amendment.
  */
 export class HoundPool implements IHoundPool {
-  private readonly processes: Map<string, ProcessState> = new Map();
-  private readonly pendingQueue: Evidence[] = [];
-  private readonly resultHandlers: Array<(result: HoundResult) => void> = [];
-  private readonly processingTimes: number[] = [];
-  private readonly adapter: IHoundProcessAdapter;
-  private readonly processScriptPath: string;
-  private readonly onPoolExhausted: PoolExhaustedAction;
-  private readonly deferQueueLimit: number;
-  private readonly mergedProcessConstraints: HoundProcessConstraints;
-  private readonly isolationTelemetry: Readonly<HoundProcessIsolationTelemetry>;
+  private readonly processes: Map<string, ProcessState> = new Map()
+  private readonly pendingQueue: Evidence[] = []
+  private readonly resultHandlers: Array<(result: HoundResult) => void> = []
+  private readonly processingTimes: number[] = []
+  private readonly adapter: IHoundProcessAdapter
+  private readonly processScriptPath: string
+  private readonly onPoolExhausted: PoolExhaustedAction
+  private readonly deferQueueLimit: number
+  private readonly mergedProcessConstraints: HoundProcessConstraints
+  private readonly isolationTelemetry: Readonly<HoundProcessIsolationTelemetry>
 
   // Statistics
-  private _totalActivations = 0;
-  private _totalTimeouts = 0;
-  private _totalErrors = 0;
-  private shuttingDown = false;
+  private _totalActivations = 0
+  private _totalTimeouts = 0
+  private _totalErrors = 0
+  private shuttingDown = false
 
   constructor(private readonly config: HoundPoolConfig) {
     // Determine default script path relative to this file
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = dirname(__filename);
-    const defaultScript = join(__dirname, "hound-process.js");
+    const __filename = fileURLToPath(import.meta.url)
+    const __dirname = dirname(__filename)
+    const defaultScript = join(__dirname, 'hound-process.js')
 
     // Use provided adapter or create real one
-    this.adapter = config.adapter ?? createProcessAdapter();
-    this.processScriptPath = config.processScriptPath ?? defaultScript;
-    this.onPoolExhausted = config.onPoolExhausted ?? "drop";
-    this.deferQueueLimit = config.deferQueueLimit ?? 100;
+    this.adapter = config.adapter ?? createProcessAdapter()
+    this.processScriptPath = config.processScriptPath ?? defaultScript
+    this.onPoolExhausted = config.onPoolExhausted ?? 'drop'
+    this.deferQueueLimit = config.deferQueueLimit ?? 100
     this.mergedProcessConstraints = Object.freeze({
       ...DEFAULT_CONSTRAINTS,
       ...config.processConstraints,
-    });
-    this.isolationTelemetry = getProcessIsolationTelemetry(
-      this.mergedProcessConstraints,
-    );
+    })
+    this.isolationTelemetry = getProcessIsolationTelemetry(this.mergedProcessConstraints)
 
     // Pre-spawn process slots (lazy spawn)
     for (let i = 0; i < config.poolSize; i++) {
-      const state = this.createProcessState(`hound-${i}`);
-      this.processes.set(state.id, state);
+      const state = this.createProcessState(`hound-${i}`)
+      this.processes.set(state.id, state)
     }
   }
 
   /**
    * Process constraints (declarative, best-effort).
    */
-  static readonly DEFAULT_CONSTRAINTS = DEFAULT_CONSTRAINTS;
+  static readonly DEFAULT_CONSTRAINTS = DEFAULT_CONSTRAINTS
 
   activate(evidence: Evidence): void {
     if (this.shuttingDown) {
-      return;
+      return
     }
 
-    this._totalActivations++;
+    this._totalActivations++
 
     // Find available process
-    const processState = this.findAvailableProcess();
+    const processState = this.findAvailableProcess()
 
     if (processState) {
-      this.assignToProcess(processState, evidence);
+      this.assignToProcess(processState, evidence)
     } else {
       // Pool exhausted - apply configured action
-      this.handlePoolExhausted(evidence);
+      this.handlePoolExhausted(evidence)
     }
     // Returns immediately - no Promise
   }
 
   private handlePoolExhausted(evidence: Evidence): void {
     switch (this.onPoolExhausted) {
-      case "drop":
+      case 'drop':
         // Silently drop - emit error result
         this.emitResult({
           signature: evidence.signature,
-          status: "error",
+          status: 'error',
           durationMs: 0,
           processId: POOL_PROCESS_ID,
           error: HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED,
-        });
-        break;
+        })
+        break
 
-      case "escalate":
+      case 'escalate':
         // Emit error and continue
-        this._totalErrors++;
+        this._totalErrors++
         this.emitResult({
           signature: evidence.signature,
-          status: "error",
+          status: 'error',
           durationMs: 0,
           processId: POOL_PROCESS_ID,
           error: HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED_ESCALATED,
-        });
-        break;
+        })
+        break
 
-      case "defer":
+      case 'defer':
         // Queue for later (bounded)
         if (this.pendingQueue.length < this.deferQueueLimit) {
-          this.pendingQueue.push(evidence);
+          this.pendingQueue.push(evidence)
         } else {
           // Queue full - drop
           this.emitResult({
             signature: evidence.signature,
-            status: "error",
+            status: 'error',
             durationMs: 0,
             processId: POOL_PROCESS_ID,
             error: HOUND_PRESSURE_ERRORS.DEFER_QUEUE_FULL,
-          });
+          })
         }
-        break;
+        break
     }
   }
 
   terminate(signature: string): void {
     for (const [, processState] of this.processes) {
       if (processState.currentSignature === signature) {
-        this.terminateProcess(processState, "forced_terminate");
-        return;
+        this.terminateProcess(processState, 'forced_terminate')
+        return
       }
     }
   }
 
   get stats(): Readonly<HoundPoolStats> {
-    let activeCount = 0;
+    let activeCount = 0
     for (const [, processState] of this.processes) {
-      if (processState.busy) activeCount++;
+      if (processState.busy) activeCount++
     }
 
     const avgProcessingMs =
       this.processingTimes.length > 0
-        ? this.processingTimes.reduce((a, b) => a + b, 0) /
-          this.processingTimes.length
-        : 0;
+        ? this.processingTimes.reduce((a, b) => a + b, 0) / this.processingTimes.length
+        : 0
 
     return Object.freeze({
       activeProcesses: activeCount,
@@ -343,36 +338,36 @@ export class HoundPool implements IHoundPool {
       totalErrors: this._totalErrors,
       avgProcessingMs,
       isolationTelemetry: this.isolationTelemetry,
-    });
+    })
   }
 
   onResult(handler: (result: HoundResult) => void): void {
-    this.resultHandlers.push(handler);
+    this.resultHandlers.push(handler)
   }
 
   shutdown(): void {
-    this.shuttingDown = true;
+    this.shuttingDown = true
 
     for (const [, processState] of this.processes) {
       if (processState.timeoutId) {
-        clearTimeout(processState.timeoutId);
-        processState.timeoutId = null;
+        clearTimeout(processState.timeoutId)
+        processState.timeoutId = null
       }
 
       // Planned shutdown must not emit timeout/error lifecycle noise.
-      processState.busy = false;
-      processState.currentSignature = null;
-      processState.currentAnalysis = null;
-      processState.startTime = null;
+      processState.busy = false
+      processState.currentSignature = null
+      processState.currentAnalysis = null
+      processState.startTime = null
 
       if (processState.handle) {
-        this.adapter.kill(processState.handle);
-        processState.handle = null;
-        processState.pid = null;
+        this.adapter.kill(processState.handle)
+        processState.handle = null
+        processState.pid = null
       }
     }
-    this.processes.clear();
-    this.pendingQueue.length = 0;
+    this.processes.clear()
+    this.pendingQueue.length = 0
   }
 
   // ─── Private Methods ───────────────────────────────────────────────────────
@@ -387,26 +382,23 @@ export class HoundPool implements IHoundPool {
       currentAnalysis: null,
       startTime: null,
       timeoutId: null,
-    };
+    }
   }
 
   private findAvailableProcess(): ProcessState | null {
     for (const [, processState] of this.processes) {
       if (!processState.busy) {
-        return processState;
+        return processState
       }
     }
-    return null;
+    return null
   }
 
-  private assignToProcess(
-    processState: ProcessState,
-    evidence: Evidence,
-  ): void {
-    processState.busy = true;
-    processState.currentSignature = evidence.signature;
-    processState.currentAnalysis = null;
-    processState.startTime = Date.now();
+  private assignToProcess(processState: ProcessState, evidence: Evidence): void {
+    processState.busy = true
+    processState.currentSignature = evidence.signature
+    processState.currentAnalysis = null
+    processState.startTime = Date.now()
 
     // Lazy spawn if needed
     if (!processState.handle) {
@@ -414,182 +406,167 @@ export class HoundPool implements IHoundPool {
         processState.handle = this.adapter.spawn(
           this.processScriptPath,
           this.mergedProcessConstraints,
-        );
-        processState.pid = processState.handle.pid;
+        )
+        processState.pid = processState.handle.pid
 
         // Set up message handler
         this.adapter.onMessage(processState.handle, (payload) => {
-          this.handleProcessMessage(processState, payload);
-        });
+          this.handleProcessMessage(processState, payload)
+        })
 
         // Set up exit handler
         this.adapter.onExit(processState.handle, (code) => {
-          this.handleProcessExit(processState, code);
-        });
+          this.handleProcessExit(processState, code)
+        })
       } catch (err) {
         // Spawn failed
-        this._totalErrors++;
+        this._totalErrors++
         this.emitResult({
           signature: evidence.signature,
-          status: "error",
+          status: 'error',
           durationMs: 0,
           processId: processState.id,
           error: toErrorMessage(err, HOUND_PRESSURE_ERRORS.SPAWN_FAILED),
-        });
-        processState.busy = false;
-        processState.currentSignature = null;
-        processState.startTime = null;
-        return;
+        })
+        processState.busy = false
+        processState.currentSignature = null
+        processState.startTime = null
+        return
       }
     }
 
     // Set timeout
     processState.timeoutId = setTimeout(() => {
-      this.handleTimeout(processState);
-    }, this.config.timeout);
+      this.handleTimeout(processState)
+    }, this.config.timeout)
 
     // Send evidence to process
-    this.adapter.send(processState.handle, evidence.bytes);
+    this.adapter.send(processState.handle, evidence.bytes)
   }
 
-  private handleProcessMessage(
-    processState: ProcessState,
-    payload: ArrayBuffer,
-  ): void {
+  private handleProcessMessage(processState: ProcessState, payload: ArrayBuffer): void {
     try {
-      const message = decodeHoundMessage(payload);
+      const message = decodeHoundMessage(payload)
 
-      if (message.type === "status" && message.state === "complete") {
+      if (message.type === 'status' && message.state === 'complete') {
         if (!processState.currentAnalysis) {
-          this._totalErrors++;
-          this.terminateProcess(
-            processState,
-            "error",
-            "process_ipc_missing_analysis",
-          );
-          return;
+          this._totalErrors++
+          this.terminateProcess(processState, 'error', 'process_ipc_missing_analysis')
+          return
         }
-        this.completeProcessing(processState, "processed");
-      } else if (message.type === "status" && message.state === "error") {
-        this._totalErrors++;
-        this.terminateProcess(processState, "error", message.error);
-      } else if (message.type === "analysis") {
+        this.completeProcessing(processState, 'processed')
+      } else if (message.type === 'status' && message.state === 'error') {
+        this._totalErrors++
+        this.terminateProcess(processState, 'error', message.error)
+      } else if (message.type === 'analysis') {
         processState.currentAnalysis = {
           hash: message.hash,
           entropy: message.entropy,
           contentType: message.contentType,
           sizeBytes: message.sizeBytes,
-        };
+        }
       }
       // Ignore 'processing' status - just acknowledgment
     } catch (error: unknown) {
       // Decode error - terminate
-      this._totalErrors++;
-      const decodeError = Errors.processIpcDecodeFailed(
-        toErrorMessage(error, "unknown_error"),
-      );
-      this.terminateProcess(processState, "error", decodeError.message);
+      this._totalErrors++
+      const decodeError = Errors.processIpcDecodeFailed(toErrorMessage(error, 'unknown_error'))
+      this.terminateProcess(processState, 'error', decodeError.message)
     }
   }
 
-  private handleProcessExit(
-    processState: ProcessState,
-    code: number | null,
-  ): void {
+  private handleProcessExit(processState: ProcessState, code: number | null): void {
     if (processState.busy) {
       // Unexpected exit while busy
-      this._totalErrors++;
-      this.terminateProcess(processState, "error", `process_exit_${code}`);
+      this._totalErrors++
+      this.terminateProcess(processState, 'error', `process_exit_${code}`)
     }
     // Reset handle - will respawn on next use
-    processState.handle = null;
-    processState.pid = null;
+    processState.handle = null
+    processState.pid = null
   }
 
   private handleTimeout(processState: ProcessState): void {
-    this._totalTimeouts++;
-    this.terminateProcess(processState, "timeout");
+    this._totalTimeouts++
+    this.terminateProcess(processState, 'timeout')
   }
 
   private terminateProcess(
     processState: ProcessState,
-    reason: "timeout" | "forced_terminate" | "error",
+    reason: 'timeout' | 'forced_terminate' | 'error',
     errorMessage?: string,
   ): void {
-    const signature = processState.currentSignature;
-    const analysis = processState.currentAnalysis;
-    const startTime = processState.startTime;
-    const handle = processState.handle;
+    const signature = processState.currentSignature
+    const analysis = processState.currentAnalysis
+    const startTime = processState.startTime
+    const handle = processState.handle
 
     // Clear timeout
     if (processState.timeoutId) {
-      clearTimeout(processState.timeoutId);
-      processState.timeoutId = null;
+      clearTimeout(processState.timeoutId)
+      processState.timeoutId = null
     }
 
     // Reset state before kill so sync exit callbacks cannot emit duplicate lifecycle results.
-    processState.busy = false;
-    processState.currentSignature = null;
-    processState.currentAnalysis = null;
-    processState.startTime = null;
-    processState.handle = null;
-    processState.pid = null;
+    processState.busy = false
+    processState.currentSignature = null
+    processState.currentAnalysis = null
+    processState.startTime = null
+    processState.handle = null
+    processState.pid = null
 
     // Kill process if alive
     if (handle) {
-      this.adapter.kill(handle);
+      this.adapter.kill(handle)
     }
 
     // Emit result
     if (signature && startTime !== null) {
-      const durationMs = Date.now() - startTime;
+      const durationMs = Date.now() - startTime
 
       const result: HoundResult = {
         signature,
-        status: reason === "timeout" ? "timeout" : "error",
+        status: reason === 'timeout' ? 'timeout' : 'error',
         durationMs,
         processId: processState.id,
         error: errorMessage ?? reason,
-      };
+      }
       if (analysis) {
-        result.analysis = analysis;
+        result.analysis = analysis
       }
 
-      this.emitResult(result);
+      this.emitResult(result)
     }
 
     // Process next in queue
-    this.processNextInQueue();
+    this.processNextInQueue()
   }
 
-  private completeProcessing(
-    processState: ProcessState,
-    status: "processed",
-  ): void {
-    const signature = processState.currentSignature;
-    const analysis = processState.currentAnalysis;
-    const startTime = processState.startTime;
+  private completeProcessing(processState: ProcessState, status: 'processed'): void {
+    const signature = processState.currentSignature
+    const analysis = processState.currentAnalysis
+    const startTime = processState.startTime
 
     // Clear timeout
     if (processState.timeoutId) {
-      clearTimeout(processState.timeoutId);
-      processState.timeoutId = null;
+      clearTimeout(processState.timeoutId)
+      processState.timeoutId = null
     }
 
     // Reset state (keep handle alive for reuse)
-    processState.busy = false;
-    processState.currentSignature = null;
-    processState.currentAnalysis = null;
-    processState.startTime = null;
+    processState.busy = false
+    processState.currentSignature = null
+    processState.currentAnalysis = null
+    processState.startTime = null
 
     // Emit result
     if (signature && startTime !== null) {
-      const durationMs = Date.now() - startTime;
-      this.processingTimes.push(durationMs);
+      const durationMs = Date.now() - startTime
+      this.processingTimes.push(durationMs)
 
       // Keep only last 100 times for avg calculation
       if (this.processingTimes.length > 100) {
-        this.processingTimes.shift();
+        this.processingTimes.shift()
       }
 
       const result: HoundResult = {
@@ -597,38 +574,38 @@ export class HoundPool implements IHoundPool {
         status,
         durationMs,
         processId: processState.id,
-      };
+      }
       if (analysis) {
-        result.analysis = analysis;
+        result.analysis = analysis
       }
 
-      this.emitResult(result);
+      this.emitResult(result)
     }
 
     // Process next in queue
-    this.processNextInQueue();
+    this.processNextInQueue()
   }
 
   private processNextInQueue(): void {
-    if (this.pendingQueue.length === 0) return;
+    if (this.pendingQueue.length === 0) return
 
-    const processState = this.findAvailableProcess();
+    const processState = this.findAvailableProcess()
     if (processState) {
-      const evidence = this.pendingQueue.shift()!;
-      this.assignToProcess(processState, evidence);
+      const evidence = this.pendingQueue.shift()!
+      this.assignToProcess(processState, evidence)
     }
   }
 
   private emitResult(result: HoundResult): void {
     if (this.shuttingDown) {
-      return;
+      return
     }
 
     for (const handler of this.resultHandlers) {
       try {
-        handler(result);
+        handler(result)
       } catch {
-        this._totalErrors++;
+        this._totalErrors++
       }
     }
   }
@@ -644,23 +621,23 @@ export class HoundPool implements IHoundPool {
  * @param config - Pool configuration
  */
 export function createHoundPool(config: HoundPoolConfig): IHoundPool {
-  return new HoundPool(config);
+  return new HoundPool(config)
 }
 
 // Re-export for testing
-export { createMockAdapter };
+export { createMockAdapter }
 
 function toErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) {
-    return error.message;
+    return error.message
   }
 
-  if (typeof error === "object" && error !== null && "message" in error) {
-    const message = (error as { message?: unknown })["message"];
-    if (typeof message === "string" && message.length > 0) {
-      return message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown })['message']
+    if (typeof message === 'string' && message.length > 0) {
+      return message
     }
   }
 
-  return fallback;
+  return fallback
 }

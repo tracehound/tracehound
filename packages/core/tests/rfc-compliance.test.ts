@@ -12,7 +12,11 @@ import { createEvidenceFactory, EvidenceFactory } from '../src/core/evidence-fac
 import { Evidence } from '../src/core/evidence.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
-import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
+import type {
+  CoordinationFeature,
+  CoordinationHealth,
+  CoordinationProvider,
+} from '../src/types/coordination.js'
 import type { Scent } from '../src/types/scent.js'
 import { encodePayload } from '../src/utils/encode.js'
 import { hashBuffer } from '../src/utils/hash.js'
@@ -513,7 +517,7 @@ function createTestSetup(options: { maxRequests?: number } = {}) {
   const auditChain = new AuditChain()
   const quarantine = new Quarantine(
     { maxCount: 1000, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-    auditChain
+    auditChain,
   )
   const rateLimiter = createRateLimiter({
     windowMs: 60_000,

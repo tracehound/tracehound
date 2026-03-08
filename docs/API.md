@@ -61,7 +61,16 @@ const th = createTracehound({
 })
 
 // The Tracehound instance provides access to the initialized components
-const { agent, quarantine, rateLimiter, watcher, auditChain, notifications, houndPool, coldStorage } = th
+const {
+  agent,
+  quarantine,
+  rateLimiter,
+  watcher,
+  auditChain,
+  notifications,
+  houndPool,
+  coldStorage,
+} = th
 ```
 
 ### TracehoundOptions Overview

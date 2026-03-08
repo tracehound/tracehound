@@ -8,8 +8,8 @@
  * - Watcher is an observer, not a controller
  */
 
-import type { Severity } from "../types/common.js";
-import { generateSecureId } from "../utils/id.js";
+import type { Severity } from '../types/common.js'
+import { generateSecureId } from '../utils/id.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -18,51 +18,51 @@ import { generateSecureId } from "../utils/id.js";
 /**
  * Alert severity levels.
  */
-export type AlertSeverity = "info" | "warning" | "critical";
+export type AlertSeverity = 'info' | 'warning' | 'critical'
 
 /**
  * Alert definition.
  */
 export interface Alert {
   /** Alert ID */
-  id: string;
+  id: string
   /** Alert type */
-  type: AlertType;
+  type: AlertType
   /** Alert severity */
-  severity: AlertSeverity;
+  severity: AlertSeverity
   /** Human-readable message */
-  message: string;
+  message: string
   /** Timestamp of alert */
-  timestamp: number;
+  timestamp: number
   /** Additional context */
-  context?: Record<string, unknown>;
+  context?: Record<string, unknown>
 }
 
 /**
  * Alert types.
  */
 export const WATCHER_ALERT_TYPES = Object.freeze([
-  "threat_detected",
-  "evidence_neutralized",
-  "quarantine_full",
-  "quarantine_high",
-  "rate_limit_exceeded",
-  "hound_timeout",
-  "system_overload",
-] as const);
+  'threat_detected',
+  'evidence_neutralized',
+  'quarantine_full',
+  'quarantine_high',
+  'rate_limit_exceeded',
+  'hound_timeout',
+  'system_overload',
+] as const)
 
-export type AlertType = (typeof WATCHER_ALERT_TYPES)[number];
+export type AlertType = (typeof WATCHER_ALERT_TYPES)[number]
 
 /**
  * Threat statistics.
  */
 export interface ThreatStats {
   /** Total threats detected */
-  total: number;
+  total: number
   /** Threats by category */
-  byCategory: Record<string, number>;
+  byCategory: Record<string, number>
   /** Threats by severity */
-  bySeverity: Record<Severity, number>;
+  bySeverity: Record<Severity, number>
 }
 
 /**
@@ -70,11 +70,11 @@ export interface ThreatStats {
  */
 export interface WatcherQuarantineStats {
   /** Current count */
-  count: number;
+  count: number
   /** Current bytes */
-  bytes: number;
+  bytes: number
   /** Capacity percentage */
-  capacityPercent: number;
+  capacityPercent: number
 }
 
 /**
@@ -82,21 +82,21 @@ export interface WatcherQuarantineStats {
  */
 export interface WatcherSnapshot {
   /** System uptime in ms */
-  uptimeMs: number;
+  uptimeMs: number
   /** Threat statistics */
-  threats: ThreatStats;
+  threats: ThreatStats
   /** Quarantine statistics */
-  quarantine: WatcherQuarantineStats;
+  quarantine: WatcherQuarantineStats
   /** Total alerts emitted */
-  totalAlerts: number;
+  totalAlerts: number
   /** Alerts in current window */
-  alertsInWindow: number;
+  alertsInWindow: number
   /** Last alert (if any) */
-  lastAlert: Alert | null;
+  lastAlert: Alert | null
   /** Whether system is in overload state */
-  overloaded: boolean;
+  overloaded: boolean
   /** Timestamp of snapshot */
-  snapshotTime: number;
+  snapshotTime: number
 }
 
 /**
@@ -104,13 +104,13 @@ export interface WatcherSnapshot {
  */
 export interface WatcherConfig {
   /** Maximum alerts per window (rate limiting) */
-  maxAlertsPerWindow: number;
+  maxAlertsPerWindow: number
   /** Alert window in ms */
-  alertWindowMs: number;
+  alertWindowMs: number
   /** Quarantine high watermark (0-1) */
-  quarantineHighWatermark: number;
+  quarantineHighWatermark: number
   /** Maximum total alerts to keep in memory (default: 10000) */
-  maxAlerts?: number;
+  maxAlerts?: number
 }
 
 /**
@@ -123,30 +123,30 @@ export interface IWatcher {
    * Get current state snapshot.
    * External consumers poll this.
    */
-  snapshot(): Readonly<WatcherSnapshot>;
+  snapshot(): Readonly<WatcherSnapshot>
 
   /**
    * Record a threat detection.
    * Internal use only.
    */
-  recordThreat(category: string, severity: Severity): void;
+  recordThreat(category: string, severity: Severity): void
 
   /**
    * Update quarantine stats.
    * Internal use only.
    */
-  updateQuarantine(count: number, bytes: number, maxBytes: number): void;
+  updateQuarantine(count: number, bytes: number, maxBytes: number): void
 
   /**
    * Emit an alert (rate-limited).
    * Internal use only.
    */
-  alert(alert: Omit<Alert, "id" | "timestamp">): boolean;
+  alert(alert: Omit<Alert, 'id' | 'timestamp'>): boolean
 
   /**
    * Mark system as overloaded.
    */
-  setOverloaded(overloaded: boolean): void;
+  setOverloaded(overloaded: boolean): void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,48 +159,48 @@ export interface IWatcher {
  * Pull-based observability. No EventEmitter.
  */
 export class Watcher implements IWatcher {
-  private readonly startTime: number;
-  private readonly alerts: Alert[] = [];
-  private alertWindowStart: number;
-  private alertsInCurrentWindow = 0;
+  private readonly startTime: number
+  private readonly alerts: Alert[] = []
+  private alertWindowStart: number
+  private alertsInCurrentWindow = 0
 
   // Threat tracking
-  private _totalThreats = 0;
-  private readonly threatsByCategory: Map<string, number> = new Map();
-  private readonly threatsBySeverity: Map<Severity, number> = new Map();
+  private _totalThreats = 0
+  private readonly threatsByCategory: Map<string, number> = new Map()
+  private readonly threatsBySeverity: Map<Severity, number> = new Map()
 
   // Quarantine tracking
-  private _quarantineCount = 0;
-  private _quarantineBytes = 0;
-  private _quarantineCapacity = 0;
+  private _quarantineCount = 0
+  private _quarantineBytes = 0
+  private _quarantineCapacity = 0
 
   // State
-  private _overloaded = false;
-  private _lastAlert: Alert | null = null;
+  private _overloaded = false
+  private _lastAlert: Alert | null = null
 
-  private readonly maxAlerts: number;
+  private readonly maxAlerts: number
 
   constructor(private readonly config: WatcherConfig) {
-    this.startTime = Date.now();
-    this.alertWindowStart = this.startTime;
-    this.maxAlerts = config.maxAlerts ?? 10_000;
+    this.startTime = Date.now()
+    this.alertWindowStart = this.startTime
+    this.maxAlerts = config.maxAlerts ?? 10_000
   }
 
   snapshot(): Readonly<WatcherSnapshot> {
-    const now = Date.now();
+    const now = Date.now()
 
     // Build threat stats
-    const byCategory: Record<string, number> = {};
+    const byCategory: Record<string, number> = {}
     for (const [cat, count] of this.threatsByCategory) {
-      byCategory[cat] = count;
+      byCategory[cat] = count
     }
 
     const bySeverity: Record<Severity, number> = {
-      low: this.threatsBySeverity.get("low") ?? 0,
-      medium: this.threatsBySeverity.get("medium") ?? 0,
-      high: this.threatsBySeverity.get("high") ?? 0,
-      critical: this.threatsBySeverity.get("critical") ?? 0,
-    };
+      low: this.threatsBySeverity.get('low') ?? 0,
+      medium: this.threatsBySeverity.get('medium') ?? 0,
+      high: this.threatsBySeverity.get('high') ?? 0,
+      critical: this.threatsBySeverity.get('critical') ?? 0,
+    }
 
     return Object.freeze({
       uptimeMs: now - this.startTime,
@@ -219,49 +219,49 @@ export class Watcher implements IWatcher {
       lastAlert: this._lastAlert,
       overloaded: this._overloaded,
       snapshotTime: now,
-    });
+    })
   }
 
   recordThreat(category: string, severity: Severity): void {
-    this._totalThreats++;
+    this._totalThreats++
 
     // Update by category
-    const catCount = this.threatsByCategory.get(category) ?? 0;
-    this.threatsByCategory.set(category, catCount + 1);
+    const catCount = this.threatsByCategory.get(category) ?? 0
+    this.threatsByCategory.set(category, catCount + 1)
 
     // Update by severity
-    const sevCount = this.threatsBySeverity.get(severity) ?? 0;
-    this.threatsBySeverity.set(severity, sevCount + 1);
+    const sevCount = this.threatsBySeverity.get(severity) ?? 0
+    this.threatsBySeverity.set(severity, sevCount + 1)
   }
 
   updateQuarantine(count: number, bytes: number, maxBytes: number): void {
-    this._quarantineCount = count;
-    this._quarantineBytes = bytes;
-    this._quarantineCapacity = maxBytes > 0 ? (bytes / maxBytes) * 100 : 0;
+    this._quarantineCount = count
+    this._quarantineBytes = bytes
+    this._quarantineCapacity = maxBytes > 0 ? (bytes / maxBytes) * 100 : 0
 
     // Check high watermark
     if (this._quarantineCapacity >= this.config.quarantineHighWatermark * 100) {
       this.alert({
-        type: "quarantine_high",
-        severity: "warning",
+        type: 'quarantine_high',
+        severity: 'warning',
         message: `Quarantine at ${this._quarantineCapacity.toFixed(1)}% capacity`,
         context: { count, bytes, maxBytes },
-      });
+      })
     }
   }
 
-  alert(alertInput: Omit<Alert, "id" | "timestamp">): boolean {
-    const now = Date.now();
+  alert(alertInput: Omit<Alert, 'id' | 'timestamp'>): boolean {
+    const now = Date.now()
 
     // Check if we need to reset the window
     if (now - this.alertWindowStart >= this.config.alertWindowMs) {
-      this.alertWindowStart = now;
-      this.alertsInCurrentWindow = 0;
+      this.alertWindowStart = now
+      this.alertsInCurrentWindow = 0
     }
 
     // Rate limit check
     if (this.alertsInCurrentWindow >= this.config.maxAlertsPerWindow) {
-      return false; // Rate limited
+      return false // Rate limited
     }
 
     // Create alert
@@ -269,29 +269,29 @@ export class Watcher implements IWatcher {
       ...alertInput,
       id: generateSecureId(),
       timestamp: now,
-    };
-
-    this.alerts.push(alert);
-    if (this.alerts.length > this.maxAlerts) {
-      this.alerts.splice(0, this.alerts.length - this.maxAlerts);
     }
-    this.alertsInCurrentWindow++;
-    this._lastAlert = alert;
 
-    return true;
+    this.alerts.push(alert)
+    if (this.alerts.length > this.maxAlerts) {
+      this.alerts.splice(0, this.alerts.length - this.maxAlerts)
+    }
+    this.alertsInCurrentWindow++
+    this._lastAlert = alert
+
+    return true
   }
 
   setOverloaded(overloaded: boolean): void {
-    const wasOverloaded = this._overloaded;
-    this._overloaded = overloaded;
+    const wasOverloaded = this._overloaded
+    this._overloaded = overloaded
 
     // Emit alert on transition to overloaded
     if (overloaded && !wasOverloaded) {
       this.alert({
-        type: "system_overload",
-        severity: "critical",
-        message: "System is overloaded",
-      });
+        type: 'system_overload',
+        severity: 'critical',
+        message: 'System is overloaded',
+      })
     }
   }
 }
@@ -306,5 +306,5 @@ export class Watcher implements IWatcher {
  * @param config - Watcher configuration
  */
 export function createWatcher(config: WatcherConfig): IWatcher {
-  return new Watcher(config);
+  return new Watcher(config)
 }

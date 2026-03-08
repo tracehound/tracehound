@@ -8,36 +8,36 @@
  * - Agent interface remains unchanged
  */
 
-import type { TracehoundError } from "../types/errors.js";
-import { Errors } from "../types/errors.js";
-import type { Scent, ThreatSignal } from "../types/scent.js";
-import type { HotPathCodec } from "../utils/binary-codec.js";
-import { encodePayload } from "../utils/encode.js";
-import { hashBuffer } from "../utils/hash.js";
-import { Evidence } from "./evidence.js";
+import type { TracehoundError } from '../types/errors.js'
+import { Errors } from '../types/errors.js'
+import type { Scent, ThreatSignal } from '../types/scent.js'
+import type { HotPathCodec } from '../utils/binary-codec.js'
+import { encodePayload } from '../utils/encode.js'
+import { hashBuffer } from '../utils/hash.js'
+import { Evidence } from './evidence.js'
 
 /**
  * Result of evidence creation.
  */
 export type EvidenceCreationResult =
   | {
-      ok: true;
+      ok: true
       /** Created evidence handle */
-      evidence: Evidence;
+      evidence: Evidence
       /** Generated signature */
-      signature: string;
+      signature: string
       /** Payload hash (of uncompressed canonical bytes) */
-      hash: string;
+      hash: string
       /** Size in bytes (compressed if codec provided) */
-      size: number;
+      size: number
       /** Whether compression was applied */
-      compressed: boolean;
+      compressed: boolean
     }
   | {
-      ok: false;
+      ok: false
       /** Error that prevented creation */
-      error: TracehoundError;
-    };
+      error: TracehoundError
+    }
 
 /**
  * Evidence factory options.
@@ -48,7 +48,7 @@ export interface EvidenceFactoryOptions {
    * If provided, evidence bytes will be compressed.
    * Use createHotPathCodec() - NO decode access.
    */
-  codec?: HotPathCodec;
+  codec?: HotPathCodec
 }
 
 /**
@@ -63,11 +63,7 @@ export interface IEvidenceFactory {
    * @param maxPayloadSize - Maximum allowed payload size (before compression)
    * @returns Evidence creation result
    */
-  create(
-    scent: Scent,
-    threat: ThreatSignal,
-    maxPayloadSize: number,
-  ): EvidenceCreationResult;
+  create(scent: Scent, threat: ThreatSignal, maxPayloadSize: number): EvidenceCreationResult
 }
 
 /**
@@ -84,41 +80,37 @@ export interface IEvidenceFactory {
  * This ensures signature determinism regardless of compression.
  */
 export class EvidenceFactory implements IEvidenceFactory {
-  private readonly codec: HotPathCodec | undefined;
+  private readonly codec: HotPathCodec | undefined
 
   constructor(options: EvidenceFactoryOptions = {}) {
-    this.codec = options.codec;
+    this.codec = options.codec
   }
 
-  create(
-    scent: Scent,
-    threat: ThreatSignal,
-    maxPayloadSize: number,
-  ): EvidenceCreationResult {
+  create(scent: Scent, threat: ThreatSignal, maxPayloadSize: number): EvidenceCreationResult {
     try {
       // Step 1: Prefer raw ingress bytes when provided; otherwise fall back to
       // canonical payload encoding.
-      const rawIngress = normalizeIngressBytes(scent.ingressBytes);
+      const rawIngress = normalizeIngressBytes(scent.ingressBytes)
       const encoded = rawIngress
         ? encodeIngressBytes(rawIngress, maxPayloadSize)
-        : encodePayload(scent.payload, maxPayloadSize);
+        : encodePayload(scent.payload, maxPayloadSize)
 
       // Step 2: Compute hash of canonical bytes (BEFORE compression)
       // This ensures signature determinism
-      const hash = hashBuffer(encoded.bytes);
+      const hash = hashBuffer(encoded.bytes)
 
       // Step 3: Generate signature (category + hash)
-      const signature = `${threat.category}:${hash}`;
+      const signature = `${threat.category}:${hash}`
 
       // Step 4: Optionally compress bytes
-      let finalBytes: Uint8Array;
-      let compressed = false;
+      let finalBytes: Uint8Array
+      let compressed = false
 
       if (this.codec) {
-        finalBytes = this.codec.encode(encoded.bytes);
-        compressed = true;
+        finalBytes = this.codec.encode(encoded.bytes)
+        compressed = true
       } else {
-        finalBytes = encoded.bytes;
+        finalBytes = encoded.bytes
       }
 
       // Step 5: Create Evidence instance
@@ -133,7 +125,7 @@ export class EvidenceFactory implements IEvidenceFactory {
         scent.timestamp,
         scent.source,
         compressed,
-      );
+      )
 
       return {
         ok: true,
@@ -142,54 +134,52 @@ export class EvidenceFactory implements IEvidenceFactory {
         hash,
         size: finalBytes.length,
         compressed,
-      };
+      }
     } catch (error: unknown) {
       // Convert to TracehoundError if not already
       if (this.isTracehoundError(error)) {
-        return { ok: false, error };
+        return { ok: false, error }
       }
 
       // Wrap unknown error
       return {
         ok: false,
         error: {
-          state: "agent",
-          code: "EVIDENCE_CREATION_FAILED",
-          message: error instanceof Error ? error.message : "Unknown error",
+          state: 'agent',
+          code: 'EVIDENCE_CREATION_FAILED',
+          message: error instanceof Error ? error.message : 'Unknown error',
           context: { scentId: scent.id },
           recoverable: false,
         },
-      };
+      }
     }
   }
 
   private isTracehoundError(error: unknown): error is TracehoundError {
     return (
-      typeof error === "object" &&
+      typeof error === 'object' &&
       error !== null &&
-      "state" in error &&
-      "code" in error &&
-      "message" in error
-    );
+      'state' in error &&
+      'code' in error &&
+      'message' in error
+    )
   }
 }
 
-function normalizeIngressBytes(
-  input: Scent["ingressBytes"],
-): Uint8Array | null {
+function normalizeIngressBytes(input: Scent['ingressBytes']): Uint8Array | null {
   if (input instanceof Uint8Array) {
     // Reuse existing view; Evidence construction performs the single
     // defensive copy for ownership isolation.
-    return input;
+    return input
   }
 
   if (input instanceof ArrayBuffer) {
     // Create a view without copying; Evidence construction performs the
     // defensive copy.
-    return new Uint8Array(input);
+    return new Uint8Array(input)
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -200,9 +190,7 @@ function normalizeIngressBytes(
  * non-zero-length Evidence so the event is hashed, signed, and preserved
  * in the audit chain like any other threat artifact.
  */
-const EMPTY_INGRESS_SENTINEL = new TextEncoder().encode(
-  '{"__th_empty_ingress":true}',
-);
+const EMPTY_INGRESS_SENTINEL = new TextEncoder().encode('{"__th_empty_ingress":true}')
 
 function encodeIngressBytes(
   bytes: Uint8Array,
@@ -212,17 +200,17 @@ function encodeIngressBytes(
     return {
       bytes: EMPTY_INGRESS_SENTINEL,
       size: EMPTY_INGRESS_SENTINEL.byteLength,
-    };
+    }
   }
 
   if (bytes.byteLength > maxPayloadSize) {
-    throw Errors.payloadTooLarge(bytes.byteLength, maxPayloadSize);
+    throw Errors.payloadTooLarge(bytes.byteLength, maxPayloadSize)
   }
 
   return {
     bytes,
     size: bytes.byteLength,
-  };
+  }
 }
 
 /**
@@ -231,8 +219,6 @@ function encodeIngressBytes(
  *
  * @param options - Optional configuration including codec
  */
-export function createEvidenceFactory(
-  options: EvidenceFactoryOptions = {},
-): IEvidenceFactory {
-  return new EvidenceFactory(options);
+export function createEvidenceFactory(options: EvidenceFactoryOptions = {}): IEvidenceFactory {
+  return new EvidenceFactory(options)
 }

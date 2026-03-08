@@ -8,7 +8,7 @@
  * - POSIX permissions are set to owner-only best-effort (0600).
  */
 
-import { createHmac } from "node:crypto";
+import { createHmac } from 'node:crypto'
 import {
   chmodSync,
   existsSync,
@@ -17,111 +17,101 @@ import {
   renameSync,
   unlinkSync,
   writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import type { AgentStats } from "../core/agent.js";
-import type { HoundPoolStats } from "../core/hound-pool.js";
-import type { QuarantineStats } from "../core/quarantine.js";
-import type { RateLimiterStats } from "../core/rate-limiter.js";
-import type { ITracehound } from "../core/tracehound.js";
-import { WATCHER_ALERT_TYPES, type WatcherSnapshot } from "../core/watcher.js";
-import { Errors } from "../types/errors.js";
-import { constantTimeEqual } from "./compare.js";
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import type { AgentStats } from '../core/agent.js'
+import type { HoundPoolStats } from '../core/hound-pool.js'
+import type { QuarantineStats } from '../core/quarantine.js'
+import type { RateLimiterStats } from '../core/rate-limiter.js'
+import type { ITracehound } from '../core/tracehound.js'
+import { WATCHER_ALERT_TYPES, type WatcherSnapshot } from '../core/watcher.js'
+import { Errors } from '../types/errors.js'
+import { constantTimeEqual } from './compare.js'
 
-export type SystemHealth = "healthy" | "degraded" | "critical";
+export type SystemHealth = 'healthy' | 'degraded' | 'critical'
 
 export interface SystemSnapshot {
-  generatedAt: number;
-  systemHealth: SystemHealth;
-  agent: Readonly<AgentStats>;
-  quarantine: Readonly<QuarantineStats>;
-  quarantineMaxBytes: number;
-  watcher: Readonly<WatcherSnapshot>;
-  houndPool: Readonly<HoundPoolStats>;
-  rateLimiter: Readonly<RateLimiterStats>;
+  generatedAt: number
+  systemHealth: SystemHealth
+  agent: Readonly<AgentStats>
+  quarantine: Readonly<QuarantineStats>
+  quarantineMaxBytes: number
+  watcher: Readonly<WatcherSnapshot>
+  houndPool: Readonly<HoundPoolStats>
+  rateLimiter: Readonly<RateLimiterStats>
 }
 
 interface SignedSystemSnapshot {
-  version: 1;
-  algorithm: "HMAC-SHA256";
-  payload: SystemSnapshot;
-  signature: string;
+  version: 1
+  algorithm: 'HMAC-SHA256'
+  payload: SystemSnapshot
+  signature: string
 }
 
 export type SnapshotReadResult =
   | { ok: true; snapshot: SystemSnapshot }
   | {
-      ok: false;
-      reason:
-        | "NO_INSTANCE"
-        | "INTEGRITY_VIOLATION"
-        | "INVALID_FORMAT"
-        | "IO_ERROR";
-    };
+      ok: false
+      reason: 'NO_INSTANCE' | 'INTEGRITY_VIOLATION' | 'INVALID_FORMAT' | 'IO_ERROR'
+    }
 
-const DEFAULT_SNAPSHOT_PATH = join(
-  tmpdir(),
-  "tracehound",
-  "system-snapshot.json",
-);
+const DEFAULT_SNAPSHOT_PATH = join(tmpdir(), 'tracehound', 'system-snapshot.json')
 
 export const SYSTEM_SNAPSHOT_ENV = Object.freeze({
   /** Snapshot file path used by resolveSystemSnapshotPath() and CLI readers. */
-  PATH: "TRACEHOUND_SYSTEM_SNAPSHOT_PATH",
+  PATH: 'TRACEHOUND_SYSTEM_SNAPSHOT_PATH',
   /** HMAC secret used by resolveSystemSnapshotSecret() and snapshot verification. */
-  SECRET: "TRACEHOUND_SNAPSHOT_SECRET",
+  SECRET: 'TRACEHOUND_SNAPSHOT_SECRET',
   /** Optional CLI freshness threshold override consumed by loadSystemSnapshot(). */
-  MAX_AGE_MS: "TRACEHOUND_SNAPSHOT_MAX_AGE_MS",
+  MAX_AGE_MS: 'TRACEHOUND_SNAPSHOT_MAX_AGE_MS',
   /** Optional CLI future-skew tolerance override consumed by loadSystemSnapshot(). */
-  MAX_FUTURE_SKEW_MS: "TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS",
-} as const);
+  MAX_FUTURE_SKEW_MS: 'TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS',
+} as const)
 
-let windowsAclWarningEmitted = false;
-const WATCHER_ALERT_TYPE_SET: ReadonlySet<string> = new Set(WATCHER_ALERT_TYPES);
+let windowsAclWarningEmitted = false
+const WATCHER_ALERT_TYPE_SET: ReadonlySet<string> = new Set(WATCHER_ALERT_TYPES)
 
 /**
  * Resolve snapshot path from explicit path, env, or default.
  */
 export function resolveSystemSnapshotPath(pathOverride?: string): string {
-  if (typeof pathOverride === "string" && pathOverride.length > 0) {
-    return pathOverride;
+  if (typeof pathOverride === 'string' && pathOverride.length > 0) {
+    return pathOverride
   }
 
-  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.PATH];
-  if (typeof fromEnv === "string" && fromEnv.length > 0) {
-    return fromEnv;
+  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+  if (typeof fromEnv === 'string' && fromEnv.length > 0) {
+    return fromEnv
   }
 
-  return DEFAULT_SNAPSHOT_PATH;
+  return DEFAULT_SNAPSHOT_PATH
 }
 
 /**
  * Resolve snapshot secret from explicit value or env.
  */
-export function resolveSystemSnapshotSecret(
-  secretOverride?: string,
-): string | null {
-  if (typeof secretOverride === "string" && secretOverride.length > 0) {
-    return secretOverride;
+export function resolveSystemSnapshotSecret(secretOverride?: string): string | null {
+  if (typeof secretOverride === 'string' && secretOverride.length > 0) {
+    return secretOverride
   }
 
-  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.SECRET];
-  if (typeof fromEnv === "string" && fromEnv.length > 0) {
-    return fromEnv;
+  const fromEnv = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
+  if (typeof fromEnv === 'string' && fromEnv.length > 0) {
+    return fromEnv
   }
 
-  return null;
+  return null
 }
 
 /**
  * Export immutable runtime snapshot from a live Tracehound instance.
  */
 export function exportSystemSnapshot(tracehound: ITracehound): SystemSnapshot {
-  const watcher = tracehound.watcher.snapshot();
-  const pool = tracehound.houndPool.stats;
+  const watcher = tracehound.watcher.snapshot()
+  const pool = tracehound.houndPool.stats
 
-  const systemHealth: SystemHealth = deriveSystemHealth(watcher, pool);
+  const systemHealth: SystemHealth = deriveSystemHealth(watcher, pool)
 
   return Object.freeze({
     generatedAt: Date.now(),
@@ -132,7 +122,7 @@ export function exportSystemSnapshot(tracehound: ITracehound): SystemSnapshot {
     watcher,
     houndPool: pool,
     rateLimiter: tracehound.rateLimiter.stats,
-  });
+  })
 }
 
 /**
@@ -144,130 +134,127 @@ export function writeSystemSnapshotToDisk(
   secret: string,
 ): void {
   if (secret.length === 0) {
-    throw Errors.snapshotSecretMissing();
+    throw Errors.snapshotSecretMissing()
   }
 
-  const payloadText = JSON.stringify(snapshot);
+  const payloadText = JSON.stringify(snapshot)
   const signed: SignedSystemSnapshot = {
     version: 1,
-    algorithm: "HMAC-SHA256",
+    algorithm: 'HMAC-SHA256',
     payload: snapshot,
     signature: signPayload(payloadText, secret),
-  };
-  const signedText = JSON.stringify(signed);
+  }
+  const signedText = JSON.stringify(signed)
 
-  const parent = dirname(path);
-  const tmpPath = `${path}.tmp-${process.pid}-${Date.now()}`;
+  const parent = dirname(path)
+  const tmpPath = `${path}.tmp-${process.pid}-${Date.now()}`
 
   try {
-    mkdirSync(parent, { recursive: true });
+    mkdirSync(parent, { recursive: true })
     writeFileSync(tmpPath, signedText, {
-      encoding: "utf8",
+      encoding: 'utf8',
       mode: 0o600,
-      flag: "w",
-    });
-    replaceSnapshotFile(tmpPath, path);
+      flag: 'w',
+    })
+    replaceSnapshotFile(tmpPath, path)
 
-    if (process.platform !== "win32") {
+    if (process.platform !== 'win32') {
       try {
-        chmodSync(path, 0o600);
+        chmodSync(path, 0o600)
       } catch {
         // Best-effort only. Not fatal for fail-open semantics.
       }
     } else if (!windowsAclWarningEmitted) {
-      windowsAclWarningEmitted = true;
+      windowsAclWarningEmitted = true
       process.emitWarning(
-        "Tracehound snapshot file ACL hardening is best-effort on Windows. Configure ACLs externally for strict isolation.",
-      );
+        'Tracehound snapshot file ACL hardening is best-effort on Windows. Configure ACLs externally for strict isolation.',
+      )
     }
   } catch (error: unknown) {
     try {
       if (existsSync(tmpPath)) {
-        unlinkSync(tmpPath);
+        unlinkSync(tmpPath)
       }
     } catch {
       // Ignore temp cleanup errors.
     }
-    const reason = error instanceof Error ? error.message : "unknown";
-    throw Errors.snapshotWriteFailed(reason);
+    const reason = error instanceof Error ? error.message : 'unknown'
+    throw Errors.snapshotWriteFailed(reason)
   }
 }
 
 /**
  * Read and verify snapshot from disk.
  */
-export function readSystemSnapshotFromDisk(
-  path: string,
-  secret: string,
-): SnapshotReadResult {
+export function readSystemSnapshotFromDisk(path: string, secret: string): SnapshotReadResult {
   if (!existsSync(path)) {
-    return { ok: false, reason: "NO_INSTANCE" };
+    return { ok: false, reason: 'NO_INSTANCE' }
   }
 
   if (secret.length === 0) {
-    return { ok: false, reason: "INTEGRITY_VIOLATION" };
+    return { ok: false, reason: 'INTEGRITY_VIOLATION' }
   }
 
   try {
-    const text = readFileSync(path, "utf8");
-    const parsed = JSON.parse(text) as unknown;
+    const text = readFileSync(path, 'utf8')
+    const parsed = JSON.parse(text) as unknown
     if (!isSignedSnapshot(parsed)) {
-      return { ok: false, reason: "INVALID_FORMAT" };
+      return { ok: false, reason: 'INVALID_FORMAT' }
     }
 
-    const payloadText = JSON.stringify(parsed.payload);
-    const expected = signPayload(payloadText, secret);
+    const payloadText = JSON.stringify(parsed.payload)
+    const expected = signPayload(payloadText, secret)
     if (!constantTimeEqual(expected, parsed.signature)) {
-      return { ok: false, reason: "INTEGRITY_VIOLATION" };
+      return { ok: false, reason: 'INTEGRITY_VIOLATION' }
     }
 
-    return { ok: true, snapshot: parsed.payload };
+    return { ok: true, snapshot: parsed.payload }
   } catch (error: unknown) {
-    if (error && typeof error === "object" && "code" in error) {
-      return { ok: false, reason: "IO_ERROR" };
+    if (error && typeof error === 'object' && 'code' in error) {
+      return { ok: false, reason: 'IO_ERROR' }
     }
-    return { ok: false, reason: "INVALID_FORMAT" };
+    return { ok: false, reason: 'INVALID_FORMAT' }
   }
 }
 
 function signPayload(payloadText: string, secret: string): string {
-  return createHmac("sha256", secret).update(payloadText).digest("hex");
+  return createHmac('sha256', secret).update(payloadText).digest('hex')
 }
 
 function replaceSnapshotFile(tmpPath: string, path: string): void {
   if (!existsSync(path)) {
-    renameSync(tmpPath, path);
-    return;
+    renameSync(tmpPath, path)
+    return
   }
 
-  if (process.platform !== "win32") {
+  if (process.platform !== 'win32') {
     // POSIX rename provides atomic replace semantics when destination exists.
-    renameSync(tmpPath, path);
-    return;
+    renameSync(tmpPath, path)
+    return
   }
 
-  const backupPath = `${path}.bak-${process.pid}-${Date.now()}`;
-  renameSync(path, backupPath);
+  const backupPath = `${path}.bak-${process.pid}-${Date.now()}`
+  renameSync(path, backupPath)
 
-  let committed = false;
+  let committed = false
   try {
-    renameSync(tmpPath, path);
-    committed = true;
+    renameSync(tmpPath, path)
+    committed = true
   } finally {
     if (committed) {
       try {
         if (existsSync(backupPath)) {
-          unlinkSync(backupPath);
+          unlinkSync(backupPath)
         }
       } catch {
         // Best-effort cleanup only.
       }
-      return;
+      return
     }
 
     try {
       if (existsSync(backupPath) && !existsSync(path)) {
-        renameSync(backupPath, path);
+        renameSync(backupPath, path)
       }
     } catch {
       // Best-effort rollback only.
@@ -280,115 +267,112 @@ function deriveSystemHealth(
   pool: Readonly<HoundPoolStats>,
 ): SystemHealth {
   if (watcher.overloaded) {
-    return "critical";
+    return 'critical'
   }
 
   if (pool.totalProcesses > 0 && pool.activeProcesses >= pool.totalProcesses) {
-    return "critical";
+    return 'critical'
   }
 
   if (watcher.alertsInWindow > 0) {
-    return "degraded";
+    return 'degraded'
   }
 
-  return "healthy";
+  return 'healthy'
 }
 
 function isSignedSnapshot(value: unknown): value is SignedSystemSnapshot {
-  if (typeof value !== "object" || value === null) {
-    return false;
+  if (typeof value !== 'object' || value === null) {
+    return false
   }
 
-  const candidate = value as Partial<SignedSystemSnapshot>;
+  const candidate = value as Partial<SignedSystemSnapshot>
   if (candidate.version !== 1) {
-    return false;
+    return false
   }
-  if (candidate.algorithm !== "HMAC-SHA256") {
-    return false;
+  if (candidate.algorithm !== 'HMAC-SHA256') {
+    return false
   }
-  if (
-    typeof candidate.signature !== "string" ||
-    candidate.signature.length === 0
-  ) {
-    return false;
+  if (typeof candidate.signature !== 'string' || candidate.signature.length === 0) {
+    return false
   }
   if (!isSystemSnapshot(candidate.payload)) {
-    return false;
+    return false
   }
 
-  return true;
+  return true
 }
 
 function isSystemSnapshot(value: unknown): value is SystemSnapshot {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const snapshot = value as {
-    generatedAt?: unknown;
-    systemHealth?: unknown;
-    quarantineMaxBytes?: unknown;
-    agent?: unknown;
-    quarantine?: unknown;
-    watcher?: unknown;
-    houndPool?: unknown;
-    rateLimiter?: unknown;
-  };
+    generatedAt?: unknown
+    systemHealth?: unknown
+    quarantineMaxBytes?: unknown
+    agent?: unknown
+    quarantine?: unknown
+    watcher?: unknown
+    houndPool?: unknown
+    rateLimiter?: unknown
+  }
 
   if (!isNonNegativeFiniteNumber(snapshot.generatedAt)) {
-    return false;
+    return false
   }
   if (!isSystemHealth(snapshot.systemHealth)) {
-    return false;
+    return false
   }
   if (!isNonNegativeInteger(snapshot.quarantineMaxBytes)) {
-    return false;
+    return false
   }
 
   if (!isAgentStats(snapshot.agent)) {
-    return false;
+    return false
   }
   if (!isQuarantineStats(snapshot.quarantine)) {
-    return false;
+    return false
   }
   if (!isWatcherSnapshot(snapshot.watcher)) {
-    return false;
+    return false
   }
   if (!isHoundPoolStats(snapshot.houndPool)) {
-    return false;
+    return false
   }
   if (!isRateLimiterStats(snapshot.rateLimiter)) {
-    return false;
+    return false
   }
 
-  return true;
+  return true
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null
 }
 
 function isSystemHealth(value: unknown): value is SystemHealth {
-  return value === "healthy" || value === "degraded" || value === "critical";
+  return value === 'healthy' || value === 'degraded' || value === 'critical'
 }
 
 function isAgentStats(value: unknown): value is AgentStats {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const stats = value as {
-    totalIntercepts?: unknown;
-    cleanCount?: unknown;
-    rateLimitedCount?: unknown;
-    validationFailures?: unknown;
-    ignoredCount?: unknown;
-    quarantinedCount?: unknown;
-    errorCount?: unknown;
-    coordinationFallbackCount?: unknown;
-    coordinationWarningCount?: unknown;
-    membraneRejectionCount?: unknown;
-  };
+    totalIntercepts?: unknown
+    cleanCount?: unknown
+    rateLimitedCount?: unknown
+    validationFailures?: unknown
+    ignoredCount?: unknown
+    quarantinedCount?: unknown
+    errorCount?: unknown
+    coordinationFallbackCount?: unknown
+    coordinationWarningCount?: unknown
+    membraneRejectionCount?: unknown
+  }
 
   return (
     isNonNegativeInteger(stats.totalIntercepts) &&
@@ -401,21 +385,21 @@ function isAgentStats(value: unknown): value is AgentStats {
     isNonNegativeInteger(stats.coordinationFallbackCount) &&
     isNonNegativeInteger(stats.coordinationWarningCount) &&
     isNonNegativeInteger(stats.membraneRejectionCount)
-  );
+  )
 }
 
 function isQuarantineStats(value: unknown): value is QuarantineStats {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const stats = value as {
-    count?: unknown;
-    bytes?: unknown;
-    droppedCount?: unknown;
-    droppedBytes?: unknown;
-    bySeverity?: unknown;
-  };
+    count?: unknown
+    bytes?: unknown
+    droppedCount?: unknown
+    droppedBytes?: unknown
+    bySeverity?: unknown
+  }
 
   return (
     isNonNegativeInteger(stats.count) &&
@@ -423,39 +407,39 @@ function isQuarantineStats(value: unknown): value is QuarantineStats {
     isNonNegativeInteger(stats.droppedCount) &&
     isNonNegativeInteger(stats.droppedBytes) &&
     isSeverityCounters(stats.bySeverity)
-  );
+  )
 }
 
 function isWatcherSnapshot(value: unknown): value is WatcherSnapshot {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const snapshot = value as {
-    uptimeMs?: unknown;
-    threats?: unknown;
-    quarantine?: unknown;
-    totalAlerts?: unknown;
-    alertsInWindow?: unknown;
-    lastAlert?: unknown;
-    overloaded?: unknown;
-    snapshotTime?: unknown;
-  };
+    uptimeMs?: unknown
+    threats?: unknown
+    quarantine?: unknown
+    totalAlerts?: unknown
+    alertsInWindow?: unknown
+    lastAlert?: unknown
+    overloaded?: unknown
+    snapshotTime?: unknown
+  }
 
   if (!isRecord(snapshot.threats) || !isRecord(snapshot.quarantine)) {
-    return false;
+    return false
   }
 
   const threats = snapshot.threats as {
-    total?: unknown;
-    byCategory?: unknown;
-    bySeverity?: unknown;
-  };
+    total?: unknown
+    byCategory?: unknown
+    bySeverity?: unknown
+  }
   const quarantine = snapshot.quarantine as {
-    count?: unknown;
-    bytes?: unknown;
-    capacityPercent?: unknown;
-  };
+    count?: unknown
+    bytes?: unknown
+    capacityPercent?: unknown
+  }
 
   return (
     isNonNegativeInteger(snapshot.uptimeMs) &&
@@ -468,69 +452,69 @@ function isWatcherSnapshot(value: unknown): value is WatcherSnapshot {
     isNonNegativeInteger(snapshot.totalAlerts) &&
     isNonNegativeInteger(snapshot.alertsInWindow) &&
     isAlertOrNull(snapshot.lastAlert) &&
-    typeof snapshot.overloaded === "boolean" &&
+    typeof snapshot.overloaded === 'boolean' &&
     isNonNegativeFiniteNumber(snapshot.snapshotTime)
-  );
+  )
 }
 
 function isAlertOrNull(value: unknown): boolean {
   if (value === null) {
-    return true;
+    return true
   }
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const alert = value as {
-    id?: unknown;
-    type?: unknown;
-    severity?: unknown;
-    message?: unknown;
-    timestamp?: unknown;
-    context?: unknown;
-  };
+    id?: unknown
+    type?: unknown
+    severity?: unknown
+    message?: unknown
+    timestamp?: unknown
+    context?: unknown
+  }
 
   if (
-    typeof alert.id !== "string" ||
+    typeof alert.id !== 'string' ||
     alert.id.length === 0 ||
     !isAlertType(alert.type) ||
     !isAlertSeverity(alert.severity) ||
-    typeof alert.message !== "string" ||
+    typeof alert.message !== 'string' ||
     alert.message.length === 0 ||
     !isNonNegativeFiniteNumber(alert.timestamp)
   ) {
-    return false;
+    return false
   }
 
   if (alert.context !== undefined && !isRecord(alert.context)) {
-    return false;
+    return false
   }
 
-  return true;
+  return true
 }
 
 function isAlertType(value: unknown): boolean {
-  return typeof value === "string" && WATCHER_ALERT_TYPE_SET.has(value);
+  return typeof value === 'string' && WATCHER_ALERT_TYPE_SET.has(value)
 }
 
 function isAlertSeverity(value: unknown): boolean {
-  return value === "info" || value === "warning" || value === "critical";
+  return value === 'info' || value === 'warning' || value === 'critical'
 }
 
 function isHoundPoolStats(value: unknown): value is HoundPoolStats {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const stats = value as {
-    activeProcesses?: unknown;
-    totalProcesses?: unknown;
-    totalActivations?: unknown;
-    totalTimeouts?: unknown;
-    totalErrors?: unknown;
-    avgProcessingMs?: unknown;
-    isolationTelemetry?: unknown;
-  };
+    activeProcesses?: unknown
+    totalProcesses?: unknown
+    totalActivations?: unknown
+    totalTimeouts?: unknown
+    totalErrors?: unknown
+    avgProcessingMs?: unknown
+    isolationTelemetry?: unknown
+  }
 
   return (
     isNonNegativeInteger(stats.activeProcesses) &&
@@ -541,112 +525,109 @@ function isHoundPoolStats(value: unknown): value is HoundPoolStats {
     isNonNegativeFiniteNumber(stats.avgProcessingMs) &&
     (stats.isolationTelemetry === undefined ||
       isProcessIsolationTelemetry(stats.isolationTelemetry))
-  );
+  )
 }
 
 function isProcessIsolationTelemetry(value: unknown): boolean {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const telemetry = value as {
-    constraints?: unknown;
-    capabilities?: unknown;
-    environmentAllowlistSize?: unknown;
-  };
+    constraints?: unknown
+    capabilities?: unknown
+    environmentAllowlistSize?: unknown
+  }
 
   return (
     isProcessConstraints(telemetry.constraints) &&
     isProcessIsolationCapabilities(telemetry.capabilities) &&
     isNonNegativeInteger(telemetry.environmentAllowlistSize)
-  );
+  )
 }
 
 function isProcessConstraints(value: unknown): boolean {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const constraints = value as {
-    maxMemoryMB?: unknown;
-    networkAccess?: unknown;
-    fileSystemWrite?: unknown;
-    childSpawn?: unknown;
-  };
+    maxMemoryMB?: unknown
+    networkAccess?: unknown
+    fileSystemWrite?: unknown
+    childSpawn?: unknown
+  }
 
   const hasValidMemory =
-    constraints.maxMemoryMB === undefined ||
-    isNonNegativeFiniteNumber(constraints.maxMemoryMB);
+    constraints.maxMemoryMB === undefined || isNonNegativeFiniteNumber(constraints.maxMemoryMB)
 
   return (
     hasValidMemory &&
     constraints.networkAccess === false &&
     constraints.fileSystemWrite === false &&
     constraints.childSpawn === false
-  );
+  )
 }
 
 function isProcessIsolationCapabilities(value: unknown): boolean {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const capabilities = value as {
-    platform?: unknown;
-    memoryLimit?: unknown;
-    processTermination?: unknown;
-    environmentIsolation?: unknown;
-    networkAccess?: unknown;
-    fileSystemWrite?: unknown;
-    childSpawn?: unknown;
-  };
+    platform?: unknown
+    memoryLimit?: unknown
+    processTermination?: unknown
+    environmentIsolation?: unknown
+    networkAccess?: unknown
+    fileSystemWrite?: unknown
+    childSpawn?: unknown
+  }
 
   return (
     isProcessPlatform(capabilities.platform) &&
     isIsolationEnforcementLevel(capabilities.memoryLimit) &&
     isIsolationEnforcementLevel(capabilities.processTermination) &&
-    capabilities.environmentIsolation === "allowlist" &&
+    capabilities.environmentIsolation === 'allowlist' &&
     isIsolationEnforcementLevel(capabilities.networkAccess) &&
     isIsolationEnforcementLevel(capabilities.fileSystemWrite) &&
     isIsolationEnforcementLevel(capabilities.childSpawn)
-  );
+  )
 }
 
 function isProcessPlatform(value: unknown): boolean {
   return (
-    value === "aix" ||
-    value === "darwin" ||
-    value === "freebsd" ||
-    value === "linux" ||
-    value === "openbsd" ||
-    value === "sunos" ||
-    value === "win32" ||
-    value === "android" ||
-    value === "haiku" ||
-    value === "cygwin" ||
-    value === "netbsd" ||
-    value === "unknown"
-  );
+    value === 'aix' ||
+    value === 'darwin' ||
+    value === 'freebsd' ||
+    value === 'linux' ||
+    value === 'openbsd' ||
+    value === 'sunos' ||
+    value === 'win32' ||
+    value === 'android' ||
+    value === 'haiku' ||
+    value === 'cygwin' ||
+    value === 'netbsd' ||
+    value === 'unknown'
+  )
 }
 
 function isIsolationEnforcementLevel(value: unknown): boolean {
-  return (
-    value === "enforced" || value === "best_effort" || value === "declarative"
-  );
+  return value === 'enforced' || value === 'best_effort' || value === 'declarative'
 }
 
 function isRateLimiterStats(value: unknown): value is RateLimiterStats {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const stats = value as {
-    sources?: unknown;
-    blocked?: unknown;
-    totalChecks?: unknown;
-    totalRejections?: unknown;
-    totalEvictions?: unknown;
-  };
+    sources?: unknown
+    blocked?: unknown
+    totalChecks?: unknown
+    totalRejections?: unknown
+    totalEvictions?: unknown
+  }
 
   return (
     isNonNegativeInteger(stats.sources) &&
@@ -654,47 +635,47 @@ function isRateLimiterStats(value: unknown): value is RateLimiterStats {
     isNonNegativeInteger(stats.totalChecks) &&
     isNonNegativeInteger(stats.totalRejections) &&
     isNonNegativeInteger(stats.totalEvictions)
-  );
+  )
 }
 
 function isSeverityCounters(value: unknown): boolean {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   const counters = value as {
-    low?: unknown;
-    medium?: unknown;
-    high?: unknown;
-    critical?: unknown;
-  };
+    low?: unknown
+    medium?: unknown
+    high?: unknown
+    critical?: unknown
+  }
 
   return (
     isNonNegativeInteger(counters.low) &&
     isNonNegativeInteger(counters.medium) &&
     isNonNegativeInteger(counters.high) &&
     isNonNegativeInteger(counters.critical)
-  );
+  )
 }
 
 function isNumericRecord(value: unknown): boolean {
   if (!isRecord(value)) {
-    return false;
+    return false
   }
 
   for (const entryValue of Object.values(value)) {
     if (!isNonNegativeInteger(entryValue)) {
-      return false;
+      return false
     }
   }
 
-  return true;
+  return true
 }
 
 function isNonNegativeFiniteNumber(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
 function isNonNegativeInteger(value: unknown): value is number {
-  return isNonNegativeFiniteNumber(value) && Number.isInteger(value);
+  return isNonNegativeFiniteNumber(value) && Number.isInteger(value)
 }

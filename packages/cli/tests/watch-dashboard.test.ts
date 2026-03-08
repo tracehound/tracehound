@@ -2,7 +2,11 @@ import { createHmac } from 'node:crypto'
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { recordTraceInspectionEntry, SYSTEM_SNAPSHOT_ENV, type SystemSnapshot } from '@tracehound/core'
+import {
+  recordTraceInspectionEntry,
+  SYSTEM_SNAPSHOT_ENV,
+  type SystemSnapshot,
+} from '@tracehound/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderDashboard, watchCommand } from '../src/commands/watch.js'
 
@@ -118,9 +122,14 @@ describe('watch dashboard rendering', () => {
     previousRegistryPath = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
 
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    setIntervalSpy = vi.spyOn(globalThis, 'setInterval').mockImplementation(() => 0 as unknown as NodeJS.Timeout)
+    setIntervalSpy = vi
+      .spyOn(globalThis, 'setInterval')
+      .mockImplementation(() => 0 as unknown as NodeJS.Timeout)
     exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-    onSpy = vi.spyOn(process, 'on').mockImplementation(((event: string, listener: (...args: unknown[]) => void) => {
+    onSpy = vi.spyOn(process, 'on').mockImplementation(((
+      event: string,
+      listener: (...args: unknown[]) => void,
+    ) => {
       if (event === 'SIGINT') {
         sigintHandler = () => listener()
       }

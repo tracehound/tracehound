@@ -27,12 +27,12 @@ Document explicit remaining risk without claiming absolute security.
 
 ## Residual Risk Register (Current)
 
-| ID    | Risk                                          | Current State                                            | Decision                                   | Owner          |
-| ----- | --------------------------------------------- | -------------------------------------------------------- | ------------------------------------------ | -------------- |
-| RR-01 | Deployment isolation misconfiguration         | Filesystem/network/syscall controls are platform-managed | **Accepted (platform responsibility)**     | Platform/SRE   |
-| RR-02 | Future unsafe logging regression              | Policy defined; enforcement checks partially automated   | Mitigate via checklist + CI lint follow-up | Security + App |
+| ID    | Risk                                          | Current State                                                               | Decision                                   | Owner          |
+| ----- | --------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------ | -------------- |
+| RR-01 | Deployment isolation misconfiguration         | Filesystem/network/syscall controls are platform-managed                    | **Accepted (platform responsibility)**     | Platform/SRE   |
+| RR-02 | Future unsafe logging regression              | Policy defined; enforcement checks partially automated                      | Mitigate via checklist + CI lint follow-up | Security + App |
 | RR-03 | Future fuzz depth drift as code evolves       | Jazzer-free invariant fuzz/corpus runs in external harness, requires upkeep | Mitigate via harness pipeline ownership    | Security       |
-| RR-04 | Secret rotation ambiguity for webhook signing | Crypto baseline identifies gap                           | Mitigate via explicit rotation runbook     | Security + Ops |
+| RR-04 | Secret rotation ambiguity for webhook signing | Crypto baseline identifies gap                                              | Mitigate via explicit rotation runbook     | Security + Ops |
 
 ## Exit Criteria
 

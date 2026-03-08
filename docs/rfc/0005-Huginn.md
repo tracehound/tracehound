@@ -2,16 +2,16 @@
 
 ## Metadata
 
-| Field            | Value                                    |
-| ---------------- | ---------------------------------------- |
-| Status           | Draft                                    |
-| Implementation Status | Planned                             |
-| Security Impact  | Medium (enrichment capability)           |
-| Operational Risk | Low (read-only integration)              |
-| Dependencies     | RFC-0000 (Core), RFC-0003 (ThreatLedger) |
-| Author           | -                                        |
-| Created          | 2024-12-27                               |
-| Updated          | 2026-03-07                               |
+| Field                 | Value                                    |
+| --------------------- | ---------------------------------------- |
+| Status                | Draft                                    |
+| Implementation Status | Planned                                  |
+| Security Impact       | Medium (enrichment capability)           |
+| Operational Risk      | Low (read-only integration)              |
+| Dependencies          | RFC-0000 (Core), RFC-0003 (ThreatLedger) |
+| Author                | -                                        |
+| Created               | 2024-12-27                               |
+| Updated               | 2026-03-07                               |
 
 ---
 

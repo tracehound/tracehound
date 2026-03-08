@@ -40,7 +40,7 @@ export function constantTimeEqual(a: string, b: string): boolean {
  */
 export function constantTimeBufferEqual(
   a: ArrayBuffer | Uint8Array,
-  b: ArrayBuffer | Uint8Array
+  b: ArrayBuffer | Uint8Array,
 ): boolean {
   const aBuf = a instanceof Uint8Array ? a : new Uint8Array(a)
   const bBuf = b instanceof Uint8Array ? b : new Uint8Array(b)

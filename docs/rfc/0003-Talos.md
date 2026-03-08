@@ -2,16 +2,16 @@
 
 ## Metadata
 
-| Field            | Value                               |
-| ---------------- | ----------------------------------- |
-| Status           | Draft                               |
-| Implementation Status | Planned                         |
-| Security Impact  | High (active response capability)   |
-| Operational Risk | Medium (external policy dependency) |
-| Dependencies     | RFC-0000 (Core)                     |
-| Author           | -                                   |
-| Created          | 2024-12-27                          |
-| Updated          | 2026-03-07                          |
+| Field                 | Value                               |
+| --------------------- | ----------------------------------- |
+| Status                | Draft                               |
+| Implementation Status | Planned                             |
+| Security Impact       | High (active response capability)   |
+| Operational Risk      | Medium (external policy dependency) |
+| Dependencies          | RFC-0000 (Core)                     |
+| Author                | -                                   |
+| Created               | 2024-12-27                          |
+| Updated               | 2026-03-07                          |
 
 ---
 

@@ -475,6 +475,3 @@ describe('ColdStorage', () => {
     })
   })
 })
-
-
-

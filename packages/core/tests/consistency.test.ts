@@ -38,7 +38,7 @@ describe('Cross-Component Consistency', () => {
       const factoryResult = factory.create(
         scent,
         { category: 'injection', severity: 'high' },
-        1_000_000
+        1_000_000,
       )
 
       // Via generateSignature
@@ -308,7 +308,7 @@ function createTestSetup(options: { maxRequests?: number } = {}) {
   const auditChain = new AuditChain()
   const quarantine = new Quarantine(
     { maxCount: 1000, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-    auditChain
+    auditChain,
   )
   const rateLimiter = createRateLimiter({
     windowMs: 60_000,

@@ -55,7 +55,7 @@ describe('Async Codec Stress Scenario', () => {
       const data = JSON.stringify({
         id: `ev-${i}`,
         attack: `payload-${i}`,
-        details: 'A'.repeat(500 + (i * 3)),
+        details: 'A'.repeat(500 + i * 3),
         timestamp: Date.now() + i,
       })
       payloads.push(new TextEncoder().encode(data))
@@ -154,7 +154,7 @@ describe('Async Codec Stress Scenario', () => {
     // Encode sync, decode async (50 times concurrently)
     const syncEncoded = encodeWithIntegrity(payload)
     const asyncDecodes = await Promise.all(
-      Array.from({ length: 50 }, () => decodeWithIntegrityAsync(syncEncoded))
+      Array.from({ length: 50 }, () => decodeWithIntegrityAsync(syncEncoded)),
     )
 
     for (const decoded of asyncDecodes) {
@@ -176,9 +176,7 @@ describe('Async Codec Stress Scenario', () => {
     }
 
     // Run sync and async in "parallel" (async fires, sync blocks during await gaps)
-    const asyncResults = await Promise.all(
-      payloads.map((p) => encodeWithIntegrityAsync(p))
-    )
+    const asyncResults = await Promise.all(payloads.map((p) => encodeWithIntegrityAsync(p)))
 
     const syncResults = payloads.map((p) => encodeWithIntegrity(p))
 
@@ -261,14 +259,16 @@ describe('Async Codec Stress Scenario', () => {
 
     // Concurrent async encode (batched)
     const concStart = performance.now()
-    await Promise.all(
-      Array.from({ length: ITERATIONS }, () => encodeWithIntegrityAsync(payload))
-    )
+    await Promise.all(Array.from({ length: ITERATIONS }, () => encodeWithIntegrityAsync(payload)))
     const concTime = performance.now() - concStart
 
     console.log(`=== Async Codec Benchmark ===`)
-    console.log(`Sequential: ${ITERATIONS} encodes in ${seqTime.toFixed(1)}ms (${(ITERATIONS / seqTime * 1000).toFixed(0)} ops/sec)`)
-    console.log(`Concurrent: ${ITERATIONS} encodes in ${concTime.toFixed(1)}ms (${(ITERATIONS / concTime * 1000).toFixed(0)} ops/sec)`)
+    console.log(
+      `Sequential: ${ITERATIONS} encodes in ${seqTime.toFixed(1)}ms (${((ITERATIONS / seqTime) * 1000).toFixed(0)} ops/sec)`,
+    )
+    console.log(
+      `Concurrent: ${ITERATIONS} encodes in ${concTime.toFixed(1)}ms (${((ITERATIONS / concTime) * 1000).toFixed(0)} ops/sec)`,
+    )
     console.log(`Speedup: ${(seqTime / concTime).toFixed(2)}x`)
     console.log(`=============================`)
 

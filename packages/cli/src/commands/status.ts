@@ -104,7 +104,10 @@ function printStatus(snapshotResult: CliSnapshotLoadResult): void {
   quarantineTable.push(
     ['Count', String(status.quarantine.count)],
     ['Usage', `${usage}%`],
-    ['Bytes', `${formatBytes(status.quarantine.bytes)} / ${formatBytes(status.quarantine.maxBytes)}`],
+    [
+      'Bytes',
+      `${formatBytes(status.quarantine.bytes)} / ${formatBytes(status.quarantine.maxBytes)}`,
+    ],
   )
   console.log(quarantineTable.toString())
   console.log()

@@ -25,12 +25,12 @@ If you discover a security vulnerability in Tracehound, please report it respons
 
 ### Response Timeline
 
-| Stage | SLA |
-| ----- | --- |
-| Acknowledgment | 48 hours |
-| Initial assessment | 5 business days |
-| Fix development | 30 days (critical), 90 days (others) |
-| Public disclosure | After fix is released |
+| Stage              | SLA                                  |
+| ------------------ | ------------------------------------ |
+| Acknowledgment     | 48 hours                             |
+| Initial assessment | 5 business days                      |
+| Fix development    | 30 days (critical), 90 days (others) |
+| Public disclosure  | After fix is released                |
 
 ### What Happens Next
 

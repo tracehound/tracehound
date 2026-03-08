@@ -36,9 +36,14 @@ export type {
 } from './evidence.js'
 export { isClean, isError, isIgnored, isQuarantined, isRateLimited } from './result.js'
 export type { InterceptResult, RuntimeEvidenceHandle } from './result.js'
-export type { Scent, ScentSource, TLSConnectionInfo, ThreatCategory, ThreatSignal } from './scent.js'
+export type {
+  Scent,
+  ScentSource,
+  TLSConnectionInfo,
+  ThreatCategory,
+  ThreatSignal,
+} from './scent.js'
 export { compareSignatures, generateSignature, validateSignature } from './signature.js'
 export type { GenerateSignatureOptions } from './signature.js'
 export { createThreatInput } from './threat.js'
 export type { Threat, ThreatInput } from './threat.js'
-

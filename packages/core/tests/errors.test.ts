@@ -190,7 +190,9 @@ describe('Error Factories', () => {
     })
 
     it('should create process IPC specific errors', () => {
-      expect(Errors.processIpcInvalidAnalysisMessage().code).toBe('PROCESS_IPC_INVALID_ANALYSIS_MESSAGE')
+      expect(Errors.processIpcInvalidAnalysisMessage().code).toBe(
+        'PROCESS_IPC_INVALID_ANALYSIS_MESSAGE',
+      )
       expect(Errors.processIpcUnknownMessageType(255).code).toBe('PROCESS_IPC_UNKNOWN_MESSAGE_TYPE')
       expect(Errors.processIpcUnknownStatusState(0).code).toBe('PROCESS_IPC_UNKNOWN_STATUS_STATE')
       expect(Errors.processIpcUnknownContentType(99).code).toBe('PROCESS_IPC_UNKNOWN_CONTENT_TYPE')

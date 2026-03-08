@@ -9,37 +9,35 @@
  * Memory Safety: TTL-based cleanup prevents memory leaks.
  */
 
-import type { RateLimitConfig } from "../types/config.js";
-import { Errors } from "../types/errors.js";
-import type { ScentSource } from "../types/scent.js";
-import { hash } from "../utils/hash.js";
+import type { RateLimitConfig } from '../types/config.js'
+import { Errors } from '../types/errors.js'
+import type { ScentSource } from '../types/scent.js'
+import { hash } from '../utils/hash.js'
 
-const MAX_SOURCE_KEY_COMPONENT_LENGTH = 256;
-const SOURCE_KEY_HEAD_LENGTH = 160;
-const SOURCE_KEY_TAIL_LENGTH = 80;
+const MAX_SOURCE_KEY_COMPONENT_LENGTH = 256
+const SOURCE_KEY_HEAD_LENGTH = 160
+const SOURCE_KEY_TAIL_LENGTH = 80
 
 type NormalizedSourceKeyComponent =
-  | { kind: "raw"; value: string }
-  | { kind: "truncated"; head: string; tail: string; length: number };
+  | { kind: 'raw'; value: string }
+  | { kind: 'truncated'; head: string; tail: string; length: number }
 
 /**
  * Bound source key component size to mitigate CPU amplification from oversized headers.
  * Keeps deterministic entropy by preserving head + tail + original length.
  */
-function normalizeSourceKeyComponent(
-  value: string | undefined,
-): NormalizedSourceKeyComponent {
+function normalizeSourceKeyComponent(value: string | undefined): NormalizedSourceKeyComponent {
   if (value === undefined || value.length === 0) {
-    return { kind: "raw", value: "" };
+    return { kind: 'raw', value: '' }
   }
 
   if (value.length <= MAX_SOURCE_KEY_COMPONENT_LENGTH) {
-    return { kind: "raw", value };
+    return { kind: 'raw', value }
   }
 
-  const head = value.slice(0, SOURCE_KEY_HEAD_LENGTH);
-  const tail = value.slice(value.length - SOURCE_KEY_TAIL_LENGTH);
-  return { kind: "truncated", head, tail, length: value.length };
+  const head = value.slice(0, SOURCE_KEY_HEAD_LENGTH)
+  const tail = value.slice(value.length - SOURCE_KEY_TAIL_LENGTH)
+  return { kind: 'truncated', head, tail, length: value.length }
 }
 
 /**
@@ -48,25 +46,25 @@ function normalizeSourceKeyComponent(
 export type RateLimitResult =
   | { allowed: true }
   | {
-      allowed: false;
+      allowed: false
       /** True if source is in block penalty period */
-      blocked: boolean;
+      blocked: boolean
       /** Milliseconds until source can retry */
-      retryAfter: number;
+      retryAfter: number
       /** Human-readable reason */
-      reason: string;
-    };
+      reason: string
+    }
 
 /**
  * Source tracking entry (composite fingerprint map).
  */
 interface SourceEntry {
   /** Request timestamps in current window */
-  timestamps: number[];
+  timestamps: number[]
   /** If blocked, when block expires */
-  blockedUntil: number | null;
+  blockedUntil: number | null
   /** Last activity timestamp for cleanup */
-  lastActivity: number;
+  lastActivity: number
 }
 
 /**
@@ -74,9 +72,9 @@ interface SourceEntry {
  */
 interface IpCeilingEntry {
   /** Request timestamps in current window (allowed requests only) */
-  timestamps: number[];
+  timestamps: number[]
   /** Last activity timestamp for cleanup */
-  lastActivity: number;
+  lastActivity: number
 }
 
 /**
@@ -94,8 +92,8 @@ function generateSourceKey(source: ScentSource): string {
     normalizeSourceKeyComponent(source.tls?.cipherSuite),
     normalizeSourceKeyComponent(source.tls?.version),
     normalizeSourceKeyComponent(source.tls?.alpn),
-  ];
-  return hash(JSON.stringify(components));
+  ]
+  return hash(JSON.stringify(components))
 }
 
 /**
@@ -106,35 +104,35 @@ export interface IRateLimiter {
    * Check if source is allowed to proceed.
    * @param source - Source identifier with extended entropy
    */
-  check(source: ScentSource): RateLimitResult;
+  check(source: ScentSource): RateLimitResult
   /**
    * Reset rate limiting state for a specific composite fingerprint.
    * @param source - Source identifier
    */
-  resetSourceFingerprint(source: ScentSource): void;
+  resetSourceFingerprint(source: ScentSource): void
   /**
    * Reset the IP-wide ceiling state for a given IP address.
    * @param ip - IP Address
    */
-  resetIpCeiling(ip: string): void;
+  resetIpCeiling(ip: string): void
   /**
    * Reset rate limiting state for a source.
    * Used for manual unblocking.
    * @param source - Source identifier
    */
-  reset(source: ScentSource): void;
+  reset(source: ScentSource): void
 
   /**
    * Clean up stale entries to prevent memory leaks.
    * Should be called periodically.
    * @returns Number of entries cleaned
    */
-  cleanup(): number;
+  cleanup(): number
 
   /**
    * Get current statistics.
    */
-  readonly stats: RateLimiterStats;
+  readonly stats: RateLimiterStats
 }
 
 /**
@@ -142,15 +140,15 @@ export interface IRateLimiter {
  */
 export interface RateLimiterStats {
   /** Total tracked sources */
-  sources: number;
+  sources: number
   /** Currently blocked sources */
-  blocked: number;
+  blocked: number
   /** Total checks performed */
-  totalChecks: number;
+  totalChecks: number
   /** Total rejections */
-  totalRejections: number;
+  totalRejections: number
   /** Total capacity evictions */
-  totalEvictions: number;
+  totalEvictions: number
 }
 
 /**
@@ -170,26 +168,26 @@ export interface RateLimiterStats {
  * - IP ceiling has no block penalty — once the window passes, requests are allowed again
  */
 export class RateLimiter implements IRateLimiter {
-  private readonly sources = new Map<string, SourceEntry>();
-  private readonly ipCeiling = new Map<string, IpCeilingEntry>();
-  private readonly config: Required<RateLimitConfig>;
-  private totalChecks = 0;
-  private totalRejections = 0;
-  private totalEvictions = 0;
+  private readonly sources = new Map<string, SourceEntry>()
+  private readonly ipCeiling = new Map<string, IpCeilingEntry>()
+  private readonly config: Required<RateLimitConfig>
+  private totalChecks = 0
+  private totalRejections = 0
+  private totalEvictions = 0
 
   constructor(config: RateLimitConfig) {
     // Validate config
     if (config.windowMs <= 0) {
-      throw Errors.invalidConfigRateLimit("windowMs must be positive");
+      throw Errors.invalidConfigRateLimit('windowMs must be positive')
     }
     if (config.maxRequests <= 0) {
-      throw Errors.invalidConfigRateLimit("maxRequests must be positive");
+      throw Errors.invalidConfigRateLimit('maxRequests must be positive')
     }
     if (config.blockDurationMs < 0) {
-      throw Errors.invalidConfigRateLimit("blockDurationMs cannot be negative");
+      throw Errors.invalidConfigRateLimit('blockDurationMs cannot be negative')
     }
     if (config.maxSources !== undefined && config.maxSources <= 0) {
-      throw Errors.invalidConfigRateLimit("maxSources must be positive");
+      throw Errors.invalidConfigRateLimit('maxSources must be positive')
     }
 
     this.config = {
@@ -197,45 +195,45 @@ export class RateLimiter implements IRateLimiter {
       maxRequests: config.maxRequests,
       blockDurationMs: config.blockDurationMs,
       maxSources: config.maxSources ?? 100_000,
-    };
+    }
   }
 
   check(source: ScentSource): RateLimitResult {
-    this.totalChecks++;
-    const now = Date.now();
-    const key = generateSourceKey(source);
-    const hasCompositeEntry = this.sources.has(key);
+    this.totalChecks++
+    const now = Date.now()
+    const key = generateSourceKey(source)
+    const hasCompositeEntry = this.sources.has(key)
 
     // --- Step 1: Existing composite entry evaluation (preserve block semantics) ---
     if (hasCompositeEntry) {
-      const compositeResult = this.evaluateExistingComposite(key, now);
+      const compositeResult = this.evaluateExistingComposite(key, now)
       if (!compositeResult.allowed) {
-        this.totalRejections++;
-        return compositeResult;
+        this.totalRejections++
+        return compositeResult
       }
     }
 
     // --- Step 2: IP-only ceiling (prevents bucket-rotation bypass via UA/TLS rotation) ---
-    const ipResult = this.evaluateIpCeiling(source.ip, now);
+    const ipResult = this.evaluateIpCeiling(source.ip, now)
     if (!ipResult.allowed) {
-      this.totalRejections++;
-      return ipResult;
+      this.totalRejections++
+      return ipResult
     }
 
     // --- Step 3: Create/evaluate composite entry only when IP ceiling allows ---
     if (!hasCompositeEntry) {
-      const compositeResult = this.evaluateComposite(key, now);
+      const compositeResult = this.evaluateComposite(key, now)
       if (!compositeResult.allowed) {
-        this.totalRejections++;
-        return compositeResult;
+        this.totalRejections++
+        return compositeResult
       }
     }
 
     // --- Both checks passed: record timestamps ---
-    this.recordCompositeTimestamp(key, now);
-    this.recordIpCeiling(source.ip, now);
+    this.recordCompositeTimestamp(key, now)
+    this.recordIpCeiling(source.ip, now)
 
-    return { allowed: true };
+    return { allowed: true }
   }
 
   /**
@@ -244,25 +242,25 @@ export class RateLimiter implements IRateLimiter {
    * Does NOT record the request timestamp — caller must call recordCompositeTimestamp.
    */
   private evaluateComposite(key: string, now: number): RateLimitResult {
-    let entry = this.sources.get(key);
+    let entry = this.sources.get(key)
     if (entry) {
       // LRU: move to back (youngest)
-      this.sources.delete(key);
-      this.sources.set(key, entry);
+      this.sources.delete(key)
+      this.sources.set(key, entry)
     } else {
       // Capacity eviction
       if (this.sources.size >= this.config.maxSources) {
-        const oldest = this.sources.keys().next().value;
+        const oldest = this.sources.keys().next().value
         if (oldest !== undefined) {
-          this.sources.delete(oldest);
-          this.totalEvictions++;
+          this.sources.delete(oldest)
+          this.totalEvictions++
         }
       }
-      entry = { timestamps: [], blockedUntil: null, lastActivity: now };
-      this.sources.set(key, entry);
+      entry = { timestamps: [], blockedUntil: null, lastActivity: now }
+      this.sources.set(key, entry)
     }
 
-    return this.evaluateCompositeEntry(entry, now);
+    return this.evaluateCompositeEntry(entry, now)
   }
 
   /**
@@ -270,24 +268,21 @@ export class RateLimiter implements IRateLimiter {
    * Preserves block state precedence without allocating new keys.
    */
   private evaluateExistingComposite(key: string, now: number): RateLimitResult {
-    const entry = this.sources.get(key);
-    if (!entry) return { allowed: true };
+    const entry = this.sources.get(key)
+    if (!entry) return { allowed: true }
 
     // LRU: move to back (youngest)
-    this.sources.delete(key);
-    this.sources.set(key, entry);
+    this.sources.delete(key)
+    this.sources.set(key, entry)
 
-    return this.evaluateCompositeEntry(entry, now);
+    return this.evaluateCompositeEntry(entry, now)
   }
 
   /**
    * Shared composite state evaluation logic.
    */
-  private evaluateCompositeEntry(
-    entry: SourceEntry,
-    now: number,
-  ): RateLimitResult {
-    entry.lastActivity = now;
+  private evaluateCompositeEntry(entry: SourceEntry, now: number): RateLimitResult {
+    entry.lastActivity = now
 
     // Check block state
     if (entry.blockedUntil !== null) {
@@ -296,44 +291,42 @@ export class RateLimiter implements IRateLimiter {
           allowed: false,
           blocked: true,
           retryAfter: entry.blockedUntil - now,
-          reason: "Source is blocked due to rate limit violation",
-        };
+          reason: 'Source is blocked due to rate limit violation',
+        }
       }
       // Block expired
-      entry.blockedUntil = null;
-      entry.timestamps = [];
+      entry.blockedUntil = null
+      entry.timestamps = []
     }
 
     // Remove timestamps outside current window
-    const windowStart = now - this.config.windowMs;
-    entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart);
+    const windowStart = now - this.config.windowMs
+    entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart)
 
     // Check if limit exceeded
     if (entry.timestamps.length >= this.config.maxRequests) {
       if (this.config.blockDurationMs > 0) {
-        entry.blockedUntil = now + this.config.blockDurationMs;
+        entry.blockedUntil = now + this.config.blockDurationMs
         return {
           allowed: false,
           blocked: true,
           retryAfter: this.config.blockDurationMs,
-          reason: "Rate limit exceeded, source blocked",
-        };
+          reason: 'Rate limit exceeded, source blocked',
+        }
       }
 
-      const oldest = entry.timestamps[0];
+      const oldest = entry.timestamps[0]
       const retryAfter =
-        oldest !== undefined
-          ? oldest + this.config.windowMs - now
-          : this.config.windowMs;
+        oldest !== undefined ? oldest + this.config.windowMs - now : this.config.windowMs
       return {
         allowed: false,
         blocked: false,
         retryAfter: Math.max(0, retryAfter),
-        reason: "Rate limit exceeded within sliding window",
-      };
+        reason: 'Rate limit exceeded within sliding window',
+      }
     }
 
-    return { allowed: true };
+    return { allowed: true }
   }
 
   /**
@@ -341,9 +334,9 @@ export class RateLimiter implements IRateLimiter {
    * Must be called only after evaluateComposite returns allowed.
    */
   private recordCompositeTimestamp(key: string, now: number): void {
-    const entry = this.sources.get(key);
+    const entry = this.sources.get(key)
     if (entry !== undefined) {
-      entry.timestamps.push(now);
+      entry.timestamps.push(now)
     }
   }
 
@@ -352,42 +345,42 @@ export class RateLimiter implements IRateLimiter {
    * Returns soft rejection (blocked: false) if IP has hit the ceiling.
    */
   private evaluateIpCeiling(ip: string, now: number): RateLimitResult {
-    const entry = this.ipCeiling.get(ip);
-    if (!entry) return { allowed: true };
+    const entry = this.ipCeiling.get(ip)
+    if (!entry) return { allowed: true }
 
     // Treat reads as activity: keep hot entries fresh in LRU and cleanup horizon.
-    this.ipCeiling.delete(ip);
-    this.ipCeiling.set(ip, entry);
-    entry.lastActivity = now;
+    this.ipCeiling.delete(ip)
+    this.ipCeiling.set(ip, entry)
+    entry.lastActivity = now
 
-    const windowStart = now - this.config.windowMs;
-    const inWindow: number[] = [];
-    let oldestInWindow: number | undefined;
+    const windowStart = now - this.config.windowMs
+    const inWindow: number[] = []
+    let oldestInWindow: number | undefined
     for (let i = 0; i < entry.timestamps.length; i += 1) {
-      const ts = entry.timestamps[i];
+      const ts = entry.timestamps[i]
       if (ts !== undefined && ts > windowStart) {
         if (oldestInWindow === undefined) {
-          oldestInWindow = ts;
+          oldestInWindow = ts
         }
-        inWindow.push(ts);
+        inWindow.push(ts)
       }
     }
-    entry.timestamps = inWindow;
+    entry.timestamps = inWindow
 
     if (inWindow.length >= this.config.maxRequests) {
       const retryAfter =
         oldestInWindow !== undefined
           ? oldestInWindow + this.config.windowMs - now
-          : this.config.windowMs;
+          : this.config.windowMs
       return {
         allowed: false,
         blocked: false,
         retryAfter: Math.max(0, retryAfter),
-        reason: "IP rate ceiling exceeded",
-      };
+        reason: 'IP rate ceiling exceeded',
+      }
     }
 
-    return { allowed: true };
+    return { allowed: true }
   }
 
   /**
@@ -395,24 +388,24 @@ export class RateLimiter implements IRateLimiter {
    * Must be called only after evaluateIpCeiling returns allowed.
    */
   private recordIpCeiling(ip: string, now: number): void {
-    let entry = this.ipCeiling.get(ip);
+    let entry = this.ipCeiling.get(ip)
     if (entry) {
       // LRU: move to back
-      this.ipCeiling.delete(ip);
-      this.ipCeiling.set(ip, entry);
+      this.ipCeiling.delete(ip)
+      this.ipCeiling.set(ip, entry)
     } else {
       if (this.ipCeiling.size >= this.config.maxSources) {
-        const oldest = this.ipCeiling.keys().next().value;
-        if (oldest !== undefined) this.ipCeiling.delete(oldest);
+        const oldest = this.ipCeiling.keys().next().value
+        if (oldest !== undefined) this.ipCeiling.delete(oldest)
         // Not counted in totalEvictions (internal ceiling map)
       }
-      entry = { timestamps: [], lastActivity: now };
-      this.ipCeiling.set(ip, entry);
+      entry = { timestamps: [], lastActivity: now }
+      this.ipCeiling.set(ip, entry)
     }
-    entry.lastActivity = now;
-    const windowStart = now - this.config.windowMs;
-    entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart);
-    entry.timestamps.push(now);
+    entry.lastActivity = now
+    const windowStart = now - this.config.windowMs
+    entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart)
+    entry.timestamps.push(now)
   }
 
   /**
@@ -423,7 +416,7 @@ export class RateLimiter implements IRateLimiter {
    * IP-wide ceiling.
    */
   resetSourceFingerprint(source: ScentSource): void {
-    this.sources.delete(generateSourceKey(source));
+    this.sources.delete(generateSourceKey(source))
   }
   /**
    * Reset the IP-wide ceiling state for a given IP address.
@@ -432,7 +425,7 @@ export class RateLimiter implements IRateLimiter {
    * composite fingerprint entries associated with the IP.
    */
   resetIpCeiling(ip: string): void {
-    this.ipCeiling.delete(ip);
+    this.ipCeiling.delete(ip)
   }
   /**
    * Reset rate limiting state for a source.
@@ -446,44 +439,42 @@ export class RateLimiter implements IRateLimiter {
    *   - resetIpCeiling(source.ip) to clear only the IP ceiling.
    */
   reset(source: ScentSource): void {
-    this.resetSourceFingerprint(source);
-    this.resetIpCeiling(source.ip);
+    this.resetSourceFingerprint(source)
+    this.resetIpCeiling(source.ip)
   }
 
   cleanup(): number {
-    const now = Date.now();
-    const staleThreshold =
-      now - this.config.windowMs - this.config.blockDurationMs;
+    const now = Date.now()
+    const staleThreshold = now - this.config.windowMs - this.config.blockDurationMs
 
-    let cleaned = 0;
+    let cleaned = 0
     for (const [key, entry] of this.sources) {
-      const isExpiredBlock =
-        entry.blockedUntil !== null && entry.blockedUntil < now;
-      const isStale = entry.lastActivity < staleThreshold;
+      const isExpiredBlock = entry.blockedUntil !== null && entry.blockedUntil < now
+      const isStale = entry.lastActivity < staleThreshold
 
       if (isStale && (entry.blockedUntil === null || isExpiredBlock)) {
-        this.sources.delete(key);
-        cleaned++;
+        this.sources.delete(key)
+        cleaned++
       }
     }
 
     // Clean stale IP ceiling entries (not counted in cleaned)
     for (const [ip, entry] of this.ipCeiling) {
       if (entry.lastActivity < staleThreshold) {
-        this.ipCeiling.delete(ip);
+        this.ipCeiling.delete(ip)
       }
     }
 
-    return cleaned;
+    return cleaned
   }
 
   get stats(): RateLimiterStats {
-    let blocked = 0;
-    const now = Date.now();
+    let blocked = 0
+    const now = Date.now()
 
     for (const entry of this.sources.values()) {
       if (entry.blockedUntil !== null && entry.blockedUntil > now) {
-        blocked++;
+        blocked++
       }
     }
 
@@ -493,7 +484,7 @@ export class RateLimiter implements IRateLimiter {
       totalChecks: this.totalChecks,
       totalRejections: this.totalRejections,
       totalEvictions: this.totalEvictions,
-    };
+    }
   }
 }
 
@@ -505,5 +496,5 @@ export class RateLimiter implements IRateLimiter {
  * @returns Rate limiter instance
  */
 export function createRateLimiter(config: RateLimitConfig): IRateLimiter {
-  return new RateLimiter(config);
+  return new RateLimiter(config)
 }

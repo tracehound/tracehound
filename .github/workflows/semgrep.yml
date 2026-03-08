@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: "41 2 * * 2"
+    - cron: '41 2 * * 2'
   workflow_dispatch:
 
 permissions:
@@ -30,7 +30,7 @@ jobs:
             p/security-audit
             p/nodejs
             p/typescript
-          generateSarif: "1"
+          generateSarif: '1'
 
       - name: Upload SARIF to GitHub code scanning
         if: always()

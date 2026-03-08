@@ -244,7 +244,9 @@ export function getTraceRegistryStats(options?: TraceRegistryOptions): TraceRegi
   }
 }
 
-export function clearTraceInspectionHistory(options?: TraceRegistryOptions): TraceRegistryClearResult {
+export function clearTraceInspectionHistory(
+  options?: TraceRegistryOptions,
+): TraceRegistryClearResult {
   const path = resolveTraceRegistryPath(options)
   const limits = resolveLimits(options)
   const removedEntries = includePendingEntries(path, readEntries(path, limits), limits).length
@@ -338,7 +340,11 @@ function enqueueRecord(
   state.queue.push(record)
 }
 
-function scheduleFlush(path: string, limits: TraceRegistryLimits, state: RegistryWriterState): void {
+function scheduleFlush(
+  path: string,
+  limits: TraceRegistryLimits,
+  state: RegistryWriterState,
+): void {
   if (state.flushing || state.blocked) {
     return
   }
@@ -485,7 +491,11 @@ function readEntries(path: string, limits: TraceRegistryLimits): TraceInspection
 
 function resolveLimits(options?: TraceRegistryOptions): TraceRegistryLimits {
   return {
-    ttlMs: coercePositiveInt(options?.ttlMs, process.env['TRACEHOUND_TRACE_ID_TTL_MS'], DEFAULT_TTL_MS),
+    ttlMs: coercePositiveInt(
+      options?.ttlMs,
+      process.env['TRACEHOUND_TRACE_ID_TTL_MS'],
+      DEFAULT_TTL_MS,
+    ),
     maxEntries: coercePositiveInt(
       options?.maxEntries,
       process.env['TRACEHOUND_TRACE_REGISTRY_MAX_ENTRIES'],

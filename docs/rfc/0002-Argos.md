@@ -510,12 +510,10 @@ const DEFAULT_CONFIG: ArgosConfig = {
 ## Known Limitations
 
 1. **Cannot detect issues preventing all JS execution**
-
    - Kernel panics, OOM killer, hardware failures
    - Mitigation: External monitoring (K8s liveness probes)
 
 2. **Ultra-short attacks (<100ms) may be partially missed**
-
    - Burst mode minimum is 100ms
    - Mitigation: Ring buffer enables retroactive analysis
 

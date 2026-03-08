@@ -38,7 +38,7 @@ export function isValidSecureId(id: string): boolean {
       }
       return acc
     },
-    ['', ''] as [string, string]
+    ['', ''] as [string, string],
   )
 
   // Validate UUID format (basic check)

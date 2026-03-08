@@ -2,16 +2,16 @@
 
 ## Title and Metadata
 
-| Field | Value |
-| --- | --- |
-| RFC | 0009 |
-| Status | Draft |
-| Author | Tracehound Engineering |
-| Created | 2026-03-03 |
-| Updated | 2026-03-03 |
-| Depends on | RFC-0000 |
-| Supersedes | None |
-| Implemented in | TBD |
+| Field          | Value                  |
+| -------------- | ---------------------- |
+| RFC            | 0009                   |
+| Status         | Draft                  |
+| Author         | Tracehound Engineering |
+| Created        | 2026-03-03             |
+| Updated        | 2026-03-03             |
+| Depends on     | RFC-0000               |
+| Supersedes     | None                   |
+| Implemented in | TBD                    |
 
 ## Motivation
 

@@ -15,9 +15,9 @@ Static analysis via ripgrep scan for:
 
 ### 1. Direct console usage
 
-| File                          | Line | Sink           | Input origin      | Risk     |
-| ----------------------------- | ---- | -------------- | ----------------- | -------- |
-| `utils/runtime.ts`            | 59   | `console.warn` | Internal only     | None     |
+| File               | Line | Sink           | Input origin  | Risk |
+| ------------------ | ---- | -------------- | ------------- | ---- |
+| `utils/runtime.ts` | 59   | `console.warn` | Internal only | None |
 
 `runtime.ts:59` logs a pre-constructed message about missing Node.js flags. The message
 is built from a hardcoded list of flag names joined with `, ` — no user-controlled data
@@ -63,12 +63,12 @@ constant map — these are internal string literals, not user input.
 
 ## Summary
 
-| Test Case                                | Result |
-| ---------------------------------------- | ------ |
-| Direct console calls log user input      | Pass   |
-| `scent.source` written to log sink       | Pass   |
-| Webhook body CRLF injection via source   | Pass   |
-| Panic reason sourced from user input     | Pass   |
-| Signature / hash fields in logs          | Pass   |
+| Test Case                              | Result |
+| -------------------------------------- | ------ |
+| Direct console calls log user input    | Pass   |
+| `scent.source` written to log sink     | Pass   |
+| Webhook body CRLF injection via source | Pass   |
+| Panic reason sourced from user input   | Pass   |
+| Signature / hash fields in logs        | Pass   |
 
 All tested paths pass. Residual consumer-side risk is covered by policy rule LOG-03.

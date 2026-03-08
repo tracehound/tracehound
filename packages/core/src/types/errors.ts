@@ -365,10 +365,15 @@ export const Errors = {
     }),
 
   processIpcUnknownMessageType: (type: number) =>
-    createError('process', 'PROCESS_IPC_UNKNOWN_MESSAGE_TYPE', `Unknown IPC message type: ${type}`, {
-      context: { type },
-      recoverable: false,
-    }),
+    createError(
+      'process',
+      'PROCESS_IPC_UNKNOWN_MESSAGE_TYPE',
+      `Unknown IPC message type: ${type}`,
+      {
+        context: { type },
+        recoverable: false,
+      },
+    ),
 
   processIpcUnknownStatusState: (stateCode: number) =>
     createError(

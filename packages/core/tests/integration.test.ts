@@ -15,7 +15,11 @@ import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter, type IRateLimiter } from '../src/core/rate-limiter.js'
 import { createScheduler, type IScheduler } from '../src/core/scheduler.js'
 import { createWatcher, type IWatcher } from '../src/core/watcher.js'
-import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
+import type {
+  CoordinationFeature,
+  CoordinationHealth,
+  CoordinationProvider,
+} from '../src/types/coordination.js'
 import type { JsonSerializable } from '../src/types/common.js'
 import type { Scent } from '../src/types/scent.js'
 
@@ -34,7 +38,7 @@ describe('Integration: Full System Flow', () => {
     auditChain = new AuditChain()
     quarantine = new Quarantine(
       { maxCount: 100, maxBytes: 1_000_000, evictionPolicy: 'priority' },
-      auditChain
+      auditChain,
     )
     rateLimiter = createRateLimiter({
       windowMs: 60_000,
@@ -127,7 +131,6 @@ describe('Integration: Full System Flow', () => {
       expect(quarantine.stats.count).toBe(1)
     })
   })
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Coordination Fail-Open Integration
@@ -263,13 +266,13 @@ describe('Integration: Full System Flow', () => {
       // Create small quarantine
       const smallQuarantine = new Quarantine(
         { maxCount: 5, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-        new AuditChain()
+        new AuditChain(),
       )
       const smallAgent = new Agent(
         { maxPayloadSize: 100_000 },
         smallQuarantine,
         createRateLimiter({ windowMs: 60_000, maxRequests: 100, blockDurationMs: 300_000 }),
-        createEvidenceFactory()
+        createEvidenceFactory(),
       )
 
       // Insert 7 items (exceeds maxCount of 5)
@@ -289,13 +292,13 @@ describe('Integration: Full System Flow', () => {
     it('eviction during active intercept does not corrupt state', () => {
       const tinyQuarantine = new Quarantine(
         { maxCount: 2, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-        new AuditChain()
+        new AuditChain(),
       )
       const tinyAgent = new Agent(
         { maxPayloadSize: 100_000 },
         tinyQuarantine,
         createRateLimiter({ windowMs: 60_000, maxRequests: 100, blockDurationMs: 300_000 }),
-        createEvidenceFactory()
+        createEvidenceFactory(),
       )
 
       // Rapid inserts
@@ -515,13 +518,13 @@ describe('Integration: Full System Flow', () => {
       // Small quarantine with byte limit
       const limitedQuarantine = new Quarantine(
         { maxCount: 1000, maxBytes: 10_000, evictionPolicy: 'priority' },
-        new AuditChain()
+        new AuditChain(),
       )
       const limitedAgent = new Agent(
         { maxPayloadSize: 100_000 },
         limitedQuarantine,
         createRateLimiter({ windowMs: 60_000, maxRequests: 1000, blockDurationMs: 300_000 }),
-        createEvidenceFactory()
+        createEvidenceFactory(),
       )
 
       // Insert many items with large payloads
@@ -540,4 +543,3 @@ describe('Integration: Full System Flow', () => {
     })
   })
 })
-

@@ -2,14 +2,14 @@
 
 ## Metadata
 
-| Field            | Value                                                |
-| ---------------- | ---------------------------------------------------- |
-| Status           | Draft                                                |
-| Security Impact  | Low (non-authoritative)                              |
-| Operational Risk | Low (bounded memory, fire-and-forget)                |
-| Dependencies     | RFC-0000 (Core)                                |
-| Author           | -                                                    |
-| Created          | 2024-12-27                                           |
+| Field            | Value                                 |
+| ---------------- | ------------------------------------- |
+| Status           | Draft                                 |
+| Security Impact  | Low (non-authoritative)               |
+| Operational Risk | Low (bounded memory, fire-and-forget) |
+| Dependencies     | RFC-0000 (Core)                       |
+| Author           | -                                     |
+| Created          | 2024-12-27                            |
 
 ---
 
@@ -515,7 +515,7 @@ scheduler.schedule(
   {
     intervalMs: 60_000, // 1 minute
     jitterMs: 10_000,
-  }
+  },
 )
 ```
 
@@ -783,7 +783,7 @@ class ThreatCorrelationAnalyzer {
     // Example: Event loop starvation + DDoS pattern
     const ddosCount = ledgerStats.byCategory.ddos
     const eventLoopStall = argoSignals.find(
-      (s) => s.axis === 'eventloop' && s.kind === 'starvation'
+      (s) => s.axis === 'eventloop' && s.kind === 'starvation',
     )
 
     if (ddosCount > 50 && eventLoopStall) {
@@ -929,7 +929,7 @@ stats(): ThreatStats {
 
 | Aspect           | Guarantee                               |
 | ---------------- | --------------------------------------- |
-| Decision-making  | NONE - Muninn is observation-only |
+| Decision-making  | NONE - Muninn is observation-only       |
 | Authorization    | Query API is read-only                  |
 | Evidence access  | NO - evidence in Quarantine, not Ledger |
 | Payload exposure | NO - only metadata, no payload          |

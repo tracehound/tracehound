@@ -225,7 +225,11 @@ describe('system snapshot freshness', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)
     process.env[SYSTEM_SNAPSHOT_ENV.MAX_AGE_MS] = '100'
-    writeFixtureSnapshotToDisk(createFixtureSnapshot(now.getTime() - 101), snapshotPath, SNAPSHOT_SECRET)
+    writeFixtureSnapshotToDisk(
+      createFixtureSnapshot(now.getTime() - 101),
+      snapshotPath,
+      SNAPSHOT_SECRET,
+    )
 
     const result = loadSystemSnapshot()
 

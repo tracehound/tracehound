@@ -6,14 +6,14 @@ paths:
   - security
 
 paths-ignore:
-  - "**/*.test.ts"
-  - "**/tests/**"
-  - "**/scenarios/**"
-  - "**/*.md"
-  - "**/*.mdx"
-  - "**/*.snap"
-  - "**/dist/**"
-  - "**/coverage/**"
+  - '**/*.test.ts'
+  - '**/tests/**'
+  - '**/scenarios/**'
+  - '**/*.md'
+  - '**/*.mdx'
+  - '**/*.snap'
+  - '**/dist/**'
+  - '**/coverage/**'
 
 queries:
   - uses: security-extended

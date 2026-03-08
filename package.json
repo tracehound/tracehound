@@ -11,10 +11,12 @@
     "test:coverage": "vitest run --coverage",
     "test:chaos": "tsx scripts/chaos/run-chaos-suite.ts",
     "verify:release": "node scripts/release/verify-publish-packages.mjs",
-    "validate:paranoid": "pnpm lint && pnpm build && pnpm test && pnpm test:coverage && pnpm test:chaos && node scripts/release/verify-publish-packages.mjs",
+    "validate:paranoid": "pnpm lint && pnpm format && pnpm build && pnpm test && pnpm test:coverage && pnpm test:chaos && node scripts/release/verify-publish-packages.mjs",
     "review:branch": "node scripts/review/pr-branch-review.mjs",
     "prelint": "pnpm --filter @tracehound/core build",
     "lint": "pnpm -r lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "clean": "pnpm -r clean"
   },
   "devDependencies": {
@@ -24,6 +26,7 @@
     "@types/node": "^25.0.9",
     "@vitest/coverage-v8": "^2.0.0",
     "express": "^4.18.2",
+    "prettier": "^3.6.2",
     "tsx": "^4.0.0",
     "typescript": "^5.3.0",
     "vitest": "^2.0.0"

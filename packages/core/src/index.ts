@@ -335,18 +335,3 @@ export type {
   WebhookConfig,
 } from './core/notification-emitter.js'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Core - Security State
-// ─────────────────────────────────────────────────────────────────────────────
-
-export { SecurityState, createSecurityState } from './core/security-state.js'
-export type {
-  ISecurityState,
-  LicenseState,
-  QuarantineStateStats,
-  RateLimitStats,
-  SecurityHistoryEntry,
-  SecuritySnapshot,
-  SecurityStateConfig,
-  SecurityStateStats,
-} from './core/security-state.js'

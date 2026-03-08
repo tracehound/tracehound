@@ -72,7 +72,6 @@ catch {
 | Agent.intercept() | HoundPool processing       |
 | Quarantine insert | Cold Storage writes        |
 | AuditChain append | Notification delivery      |
-| Rate limiting     | SecurityState snapshots    |
 
 ---
 

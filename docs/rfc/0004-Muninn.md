@@ -7,7 +7,7 @@
 | Status           | Draft                                                |
 | Security Impact  | Low (non-authoritative)                              |
 | Operational Risk | Low (bounded memory, fire-and-forget)                |
-| Dependencies     | RFC-0000 (Core), RFC-0001 (Security State Substrate) |
+| Dependencies     | RFC-0000 (Core)                                |
 | Author           | -                                                    |
 | Created          | 2024-12-27                                           |
 
@@ -93,7 +93,6 @@ Bu RFC, **decision-free, observation-only threat metadata substrate** tanımlar.
 
 ```
 RFC-0000 Agent → Muninn.record()
-RFC-0001 Security State Substrate ← Muninn (separate namespace)
 RFC-0002 Argos + Muninn → External Analytics
 ```
 
@@ -749,7 +748,7 @@ class ThreatArchiveReader {
 
 ## Integration Examples
 
-### Watcher Integration (RFC-0001)
+### Watcher Integration
 
 ```ts
 // Watcher observes Muninn stats

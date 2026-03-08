@@ -127,7 +127,6 @@ app.register(tracehoundPlugin, { agent: th.agent });
     - HoundPool     → Process-separated analysis
     - Scheduler     → Jittered background
     - Notifications → Universal events
-    - SecurityState → Unified metrics
 
 ---
 

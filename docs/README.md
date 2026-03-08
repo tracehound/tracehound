@@ -39,7 +39,6 @@ Status values in this table reflect RFC governance lifecycle, not roadmap capabi
 | RFC                                                  | Status         | Topic                               |
 | ---------------------------------------------------- | -------------- | ----------------------------------- |
 | [0000-Proposal.md](./rfc/0000-Proposal.md)           | 🔒 Locked      | Core architecture (normative)       |
-| [0001-SecurityState.md](./rfc/0001-SecurityState.md) | ✅ Implemented | Unified state substrate             |
 | [0002-Argos.md](./rfc/0002-Argos.md)                 | ⚠️ Draft | Runtime observer (separate product) |
 | [0003-Talos.md](./rfc/0003-Talos.md)                 | ⚠️ Draft | Talos — policy-driven response      |
 | [0004-Muninn.md](./rfc/0004-Muninn.md)               | ⚠️ Draft | Muninn — threat metadata substrate  |

@@ -24,8 +24,8 @@
 
 | Fact                                     | Canonical Source                                              | Value                                                                                  |
 | ---------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Current workspace version                | `package.json`                                                | `1.7.0`                                                                                |
-| Latest core changelog release            | `packages/core/CHANGELOG.md`                                  | `1.7.0` (`2026-03-07`)                                                                 |
+| Current workspace version                | `package.json`                                                | `1.8.0`                                                                                |
+| Latest core changelog release            | `packages/core/CHANGELOG.md`                                  | `1.8.0` (`2026-03-07`)                                                                 |
 | Current release character                | repo state                                                    | Docs-weighted / minimal code-change release                                            |
 | Legacy internal roadmap                  | `internal/ROADMAP.md`                                         | Deprecated; historical context only                                                    |
 | Latest harness decision baseline         | `tracehound-security-harness/test-results/v1.6.0/go-no-go.md` | Pre-soak green for `v1.6.0`; useful historical evidence, not current release authority |

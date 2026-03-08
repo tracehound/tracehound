@@ -331,6 +331,65 @@ describe('tracehoundPlugin', () => {
       expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
     })
 
+    it('captures rawBody string into ingressBytes', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        rawBody: 'raw-text' as unknown as FastifyRequest['body'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('raw-text')
+    })
+
+    it('captures rawBody Uint8Array into ingressBytes without mutation', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+      const raw = new Uint8Array([7, 8, 9])
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        rawBody: raw as unknown as FastifyRequest['body'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Array.from(scent.ingressBytes)).toEqual([7, 8, 9])
+    })
+
+    it('captures rawBody ArrayBuffer into ingressBytes', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+      const raw = new Uint8Array([10, 11, 12]).buffer
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        rawBody: raw as unknown as FastifyRequest['body'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(Array.from(scent.ingressBytes)).toEqual([10, 11, 12])
+    })
+
     it('does not populate ingressBytes from string body when rawBody is absent', () => {
       // ingressBytes is only populated from rawBody to preserve signature determinism.
       // Falling back to req.body would produce different signatures across middleware configs.
@@ -464,6 +523,53 @@ describe('tracehoundPlugin', () => {
       const scent = (agent.intercept as any).mock.calls[0][0]
       expect(scent.source.tls?.version).toBe('unknown')
     })
+
+    it('joins user-agent header arrays and falls back to unknown IP when blank', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        ip: '',
+        headers: {
+          'user-agent': ['ua-a', 'ua-b'],
+          'content-type': 'application/json',
+        } as unknown as FastifyRequest['headers'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.ip).toBe('unknown')
+      expect(scent.source.userAgent).toBe('ua-a,ua-b')
+      expect(scent.payload.headers['user-agent']).toBe('ua-a,ua-b')
+    })
+
+    it('omits source.userAgent when user-agent header is absent', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as any, { agent }, () => {})
+
+      const req = createMockReq({
+        headers: {
+          'content-type': 'application/json',
+        } as unknown as FastifyRequest['headers'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.userAgent).toBeUndefined()
+      expect(scent.payload.headers['user-agent']).toBe('')
+    })
   })
 
   it('should use custom extractScent', () => {
@@ -528,6 +634,28 @@ describe('tracehoundPlugin', () => {
 
     expect(onIntercept).toHaveBeenCalled()
     expect(next).toHaveBeenCalledWith(expected)
+  })
+
+  it('should propagate undefined error when custom onIntercept throws non-Error after reply is sent', () => {
+    const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
+    const onIntercept = vi.fn((_, __, reply: FastifyReply) => {
+      ;(reply as any).sent = true
+      throw 'non-error-throwable'
+    })
+    const fastify = createMockFastify()
+    const next = vi.fn()
+
+    tracehoundPlugin(fastify as any, { agent, onIntercept }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply() as any
+    reply.sent = false
+
+    const hookHandler = (fastify.addHook as any).mock.calls[0][1]
+    hookHandler(req, reply, next)
+
+    expect(onIntercept).toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith(undefined)
   })
 
   it('should fail open and call hookDone when intercept throws', () => {

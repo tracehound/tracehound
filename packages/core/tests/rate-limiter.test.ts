@@ -48,6 +48,15 @@ describe('RateLimiter', () => {
       )
     })
 
+    it('throws on non-positive maxSources when provided', () => {
+      expect(() => new RateLimiter({ ...config, maxSources: 0 })).toThrow(
+        'maxSources must be positive',
+      )
+      expect(() => new RateLimiter({ ...config, maxSources: -1 })).toThrow(
+        'maxSources must be positive',
+      )
+    })
+
     it('throws on negative blockDurationMs', () => {
       expect(() => new RateLimiter({ ...config, blockDurationMs: -1 })).toThrow(
         'blockDurationMs cannot be negative',
@@ -101,6 +110,30 @@ describe('RateLimiter', () => {
       if (!result.allowed) {
         expect(result.blocked).toBe(true)
       }
+    })
+
+    it('clears block state after block duration passes and allows requests again', () => {
+      vi.useFakeTimers()
+      const limiter = new RateLimiter({
+        windowMs: 500,
+        maxRequests: 1,
+        blockDurationMs: 1_000,
+      })
+
+      expect(limiter.check(createSource('block-expiry')).allowed).toBe(true)
+      const blocked = limiter.check(createSource('block-expiry'))
+      expect(blocked.allowed).toBe(false)
+      if (!blocked.allowed) {
+        expect(blocked.blocked).toBe(true)
+      }
+
+      // Advance past both block duration and IP ceiling window.
+      vi.advanceTimersByTime(1_200)
+
+      const afterExpiry = limiter.check(createSource('block-expiry'))
+      expect(afterExpiry.allowed).toBe(true)
+
+      vi.useRealTimers()
     })
 
     it('returns blocked: false when no block configured', () => {
@@ -227,6 +260,36 @@ describe('RateLimiter', () => {
       // Next request without TLS - should be blocked
       const result = limiter.check(createSource('192.168.1.1', 'curl/7.68.0'))
       expect(result.allowed).toBe(false)
+    })
+
+    it('normalizes oversized source components while keeping deterministic and distinct keys', () => {
+      const limiter = new RateLimiter({
+        ...config,
+        maxRequests: 20,
+        blockDurationMs: 0,
+      })
+      const ip = '172.16.0.10'
+      const longPrefix = 'ua-'.repeat(1200)
+
+      const longSourceA = createSource(ip, `${longPrefix}A`, {
+        cipherSuite: `${'cipher-'.repeat(400)}A`,
+        version: `${'tlsv-'.repeat(400)}A`,
+        alpn: `${'alpn-'.repeat(400)}A`,
+      })
+      const longSourceB = createSource(ip, `${longPrefix}B`, {
+        cipherSuite: `${'cipher-'.repeat(400)}B`,
+        version: `${'tlsv-'.repeat(400)}B`,
+        alpn: `${'alpn-'.repeat(400)}B`,
+      })
+
+      // Same oversized source should map deterministically to a single composite entry.
+      expect(limiter.check(longSourceA).allowed).toBe(true)
+      expect(limiter.check(longSourceA).allowed).toBe(true)
+      expect(limiter.stats.sources).toBe(1)
+
+      // Distinct oversized tails should still produce distinct composite keys.
+      expect(limiter.check(longSourceB).allowed).toBe(true)
+      expect(limiter.stats.sources).toBe(2)
     })
   })
 

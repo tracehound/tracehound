@@ -6,12 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Agent, createAgent } from '../src/core/agent.js'
 import { AuditChain } from '../src/core/audit-chain.js'
 import { createEvidenceFactory } from '../src/core/evidence-factory.js'
+import type { IEvidenceFactory } from '../src/core/evidence-factory.js'
 import type { INotificationEmitter } from '../src/core/notification-emitter.js'
 import { SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { Quarantine } from '../src/core/quarantine.js'
+import type { IRateLimiter } from '../src/core/rate-limiter.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
 import type { IWatcher } from '../src/core/watcher.js'
 import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
+import type { EvidenceHandle } from '../src/types/evidence.js'
 import type { JsonSerializable, QuarantineConfig, RateLimitConfig } from '../src/types/index.js'
 import type { Scent } from '../src/types/scent.js'
 import { Errors } from '../src/types/errors.js'
@@ -285,6 +288,120 @@ describe('Agent', () => {
         }),
       )
     })
+
+    it('emits coordination warning once per reason/provider tuple', () => {
+      const provider = {
+        providerId: 'dedupe-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+      } as unknown as CoordinationProvider
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      localAgent.getCoordinationHealth()
+      localAgent.getCoordinationHealth()
+
+      const warningCalls = (mockNotifications.emit as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter(
+        ([event, payload]) =>
+          event === 'system.panic' &&
+          typeof payload === 'object' &&
+          payload !== null &&
+          'reason' in (payload as Record<string, unknown>) &&
+          (payload as { reason?: string }).reason ===
+            SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT,
+      )
+
+      expect(warningCalls).toHaveLength(1)
+      expect(localAgent.getStats().coordinationWarningCount).toBe(1)
+    })
+
+    it('includes object error message when provider health throws non-Error object', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'object-message-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => {
+          throw { message: 'object-failure' } as { message: string }
+        },
+      }
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      localAgent.getCoordinationHealth()
+
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'system.panic',
+        expect.objectContaining({
+          reason: SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
+          context: expect.objectContaining({
+            providerId: 'object-message-provider',
+            error: 'object-failure',
+          }),
+        }),
+      )
+    })
+
+    it('omits error message when provider health throws object with non-string message', () => {
+      const provider: CoordinationProvider = {
+        providerId: 'non-string-message-provider',
+        features: new Set<CoordinationFeature>(['shared_blocklist']),
+        start: async (): Promise<void> => {},
+        stop: async (): Promise<void> => {},
+        health: (): CoordinationHealth => {
+          throw { message: 42 } as { message: number }
+        },
+      }
+
+      const localAgent = new Agent(
+        {
+          maxPayloadSize: 1_000_000,
+          coordinationProvider: provider,
+        },
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      localAgent.getCoordinationHealth()
+
+      expect(mockNotifications.emit).toHaveBeenCalledWith(
+        'system.panic',
+        expect.objectContaining({
+          reason: SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
+          context: expect.objectContaining({
+            providerId: 'non-string-message-provider',
+            error: undefined,
+          }),
+        }),
+      )
+    })
   })
   describe('intercept - clean flow', () => {
     it('returns clean when no threat signal', () => {
@@ -402,6 +519,26 @@ describe('Agent', () => {
   })
 
   describe('intercept - quarantine flow', () => {
+    function createMockEvidence(signature: string): EvidenceHandle {
+      return {
+        signature,
+        hash: `hash-${signature}`,
+        source: { ip: '127.0.0.1' },
+        severity: 'high',
+        captured: Date.now(),
+        size: 128,
+        bytes: new Uint8Array([1, 2, 3]),
+        neutralize: vi.fn(() => {
+          throw new Error('neutralize should not be called in this path')
+        }),
+        transfer: vi.fn(() => false),
+        evacuate: vi.fn(() => false),
+        get disposed() {
+          return false
+        },
+      } as unknown as EvidenceHandle
+    }
+
     it('returns quarantined for new threat', () => {
       const scent = createScent(
         { attack: 'sql injection' },
@@ -414,6 +551,118 @@ describe('Agent', () => {
         expect(result.handle).toBeDefined()
         expect(result.handle.disposed).toBe(false)
       }
+    })
+
+    it('returns ignored when quarantine insert becomes duplicate after pre-check', () => {
+      const evidence = createMockEvidence('race-duplicate-sig')
+      const rateLimiter: IRateLimiter = {
+        check: vi.fn(() => ({ allowed: true })),
+        reset: vi.fn(),
+        cleanup: vi.fn(() => 0),
+        stats: {
+          sources: 0,
+          blocked: 0,
+          totalChecks: 0,
+          totalRejections: 0,
+          totalEvictions: 0,
+        },
+      }
+      const evidenceFactory: IEvidenceFactory = {
+        create: vi.fn(() => ({
+          ok: true as const,
+          evidence,
+          signature: evidence.signature,
+        })),
+      }
+      const quarantineMock = {
+        has: vi.fn(() => false),
+        insert: vi.fn(() => ({ status: 'duplicate' as const, existing: evidence })),
+      } as unknown as Quarantine
+
+      const localAgent = new Agent(
+        agentConfig,
+        quarantineMock,
+        rateLimiter,
+        evidenceFactory,
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const result = localAgent.intercept(
+        createScent({ race: true }, { category: 'injection', severity: 'high' }),
+      )
+
+      expect(result.status).toBe('ignored')
+      if (result.status === 'ignored') {
+        expect(result.signature).toBe(evidence.signature)
+      }
+    })
+
+    it('returns ignored when quarantine drops due to pressure containment', () => {
+      const evidence = createMockEvidence('pressure-drop-sig')
+      const rateLimiter: IRateLimiter = {
+        check: vi.fn(() => ({ allowed: true })),
+        reset: vi.fn(),
+        cleanup: vi.fn(() => 0),
+        stats: {
+          sources: 0,
+          blocked: 0,
+          totalChecks: 0,
+          totalRejections: 0,
+          totalEvictions: 0,
+        },
+      }
+      const evidenceFactory: IEvidenceFactory = {
+        create: vi.fn(() => ({
+          ok: true as const,
+          evidence,
+          signature: evidence.signature,
+        })),
+      }
+      const quarantineMock = {
+        has: vi.fn(() => false),
+        insert: vi.fn(() => ({ status: 'dropped' as const, reason: 'pressure' as const })),
+      } as unknown as Quarantine
+
+      const localAgent = new Agent(
+        agentConfig,
+        quarantineMock,
+        rateLimiter,
+        evidenceFactory,
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const result = localAgent.intercept(
+        createScent({ pressure: true }, { category: 'injection', severity: 'high' }),
+      )
+
+      expect(result.status).toBe('ignored')
+      if (result.status === 'ignored') {
+        expect(result.signature).toBe(evidence.signature)
+      }
+    })
+
+    it('activates hound pool on successful quarantine insert', () => {
+      const activate = vi.fn()
+      const localAgent = new Agent(
+        agentConfig,
+        quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        { activate } as unknown as { activate: (evidence: unknown) => void },
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const result = localAgent.intercept(
+        createScent({ attack: 'hound-activation' }, { category: 'injection', severity: 'high' }),
+      )
+
+      expect(result.status).toBe('quarantined')
+      expect(activate).toHaveBeenCalledTimes(1)
     })
 
     it('rejects runtime payload egress from quarantined handle', () => {

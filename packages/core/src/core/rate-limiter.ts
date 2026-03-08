@@ -14,6 +14,28 @@ import { Errors } from "../types/errors.js";
 import type { ScentSource } from "../types/scent.js";
 import { hash } from "../utils/hash.js";
 
+const MAX_SOURCE_KEY_COMPONENT_LENGTH = 256;
+const SOURCE_KEY_HEAD_LENGTH = 160;
+const SOURCE_KEY_TAIL_LENGTH = 80;
+
+/**
+ * Bound source key component size to mitigate CPU amplification from oversized headers.
+ * Keeps deterministic entropy by preserving head + tail + original length.
+ */
+function normalizeSourceKeyComponent(value: string | undefined): string {
+  if (value === undefined || value.length === 0) {
+    return "";
+  }
+
+  if (value.length <= MAX_SOURCE_KEY_COMPONENT_LENGTH) {
+    return value;
+  }
+
+  const head = value.slice(0, SOURCE_KEY_HEAD_LENGTH);
+  const tail = value.slice(value.length - SOURCE_KEY_TAIL_LENGTH);
+  return `${head}|${tail}|len=${value.length}`;
+}
+
 /**
  * Result of a rate limit check.
  */
@@ -55,15 +77,17 @@ interface IpCeilingEntry {
  * Generate composite key from ScentSource for rate limiting.
  * Uses SHA-256 for deterministic entropy.
  *
- * SECURITY: Hash-based key prevents information leakage in logs.
+ * SECURITY:
+ * - Hash-based key prevents information leakage in logs.
+ * - Component normalization bounds per-check processing for oversized headers.
  */
 function generateSourceKey(source: ScentSource): string {
   const components = [
-    source.ip,
-    source.userAgent ?? "",
-    source.tls?.cipherSuite ?? "",
-    source.tls?.version ?? "",
-    source.tls?.alpn ?? "",
+    normalizeSourceKeyComponent(source.ip),
+    normalizeSourceKeyComponent(source.userAgent),
+    normalizeSourceKeyComponent(source.tls?.cipherSuite),
+    normalizeSourceKeyComponent(source.tls?.version),
+    normalizeSourceKeyComponent(source.tls?.alpn),
   ];
   return hash(JSON.stringify(components));
 }
@@ -77,9 +101,18 @@ export interface IRateLimiter {
    * @param source - Source identifier with extended entropy
    */
   check(source: ScentSource): RateLimitResult;
-
   /**
-   * Reset rate limit for a specific source.
+   * Reset rate limiting state for a specific composite fingerprint.
+   * @param source - Source identifier
+   */
+  resetSourceFingerprint(source: ScentSource): void;
+  /**
+   * Reset the IP-wide ceiling state for a given IP address.
+   * @param ip - IP Address
+   */
+  resetIpCeiling(ip: string): void;
+  /**
+   * Reset rate limiting state for a source.
    * Used for manual unblocking.
    * @param source - Source identifier
    */
@@ -244,7 +277,10 @@ export class RateLimiter implements IRateLimiter {
   /**
    * Shared composite state evaluation logic.
    */
-  private evaluateCompositeEntry(entry: SourceEntry, now: number): RateLimitResult {
+  private evaluateCompositeEntry(
+    entry: SourceEntry,
+    now: number,
+  ): RateLimitResult {
     entry.lastActivity = now;
 
     // Check block state
@@ -314,10 +350,19 @@ export class RateLimiter implements IRateLimiter {
     if (!entry) return { allowed: true };
 
     const windowStart = now - this.config.windowMs;
-    const inWindow = entry.timestamps.filter((ts) => ts > windowStart);
+    let inWindowCount = 0;
+    let oldestInWindow: number | undefined;
+    for (let i = 0; i < entry.timestamps.length; i++) {
+      const ts = entry.timestamps[i] as number;
+      if (ts > windowStart) {
+        if (oldestInWindow === undefined) {
+          oldestInWindow = ts;
+        }
+        inWindowCount++;
+      }
+    }
 
-    if (inWindow.length >= this.config.maxRequests) {
-      const oldestInWindow = inWindow[0];
+    if (inWindowCount >= this.config.maxRequests) {
       const retryAfter =
         oldestInWindow !== undefined
           ? oldestInWindow + this.config.windowMs - now
@@ -358,9 +403,39 @@ export class RateLimiter implements IRateLimiter {
     entry.timestamps.push(now);
   }
 
-  reset(source: ScentSource): void {
+  /**
+   * Reset rate limiting state for a specific composite fingerprint.
+   *
+   * This only clears the fine-grained per-source tracking keyed by the
+   * composite fingerprint (IP + UA + TLS, etc). It does NOT modify the
+   * IP-wide ceiling.
+   */
+  resetSourceFingerprint(source: ScentSource): void {
     this.sources.delete(generateSourceKey(source));
-    this.ipCeiling.delete(source.ip);
+  }
+  /**
+   * Reset the IP-wide ceiling state for a given IP address.
+   *
+   * This only clears the aggregate IP ceiling counter. It does NOT clear any
+   * composite fingerprint entries associated with the IP.
+   */
+  resetIpCeiling(ip: string): void {
+    this.ipCeiling.delete(ip);
+  }
+  /**
+   * Reset rate limiting state for a source.
+   *
+   * NOTE:
+   * - This is a convenience method that resets BOTH:
+   *   - the composite fingerprint entry for the provided source, and
+   *   - the IP ceiling for source.ip (affecting all fingerprints from that IP).
+   * - Callers that need granular control should prefer:
+   *   - resetSourceFingerprint(source) to clear only the composite entry, or
+   *   - resetIpCeiling(source.ip) to clear only the IP ceiling.
+   */
+  reset(source: ScentSource): void {
+    this.resetSourceFingerprint(source);
+    this.resetIpCeiling(source.ip);
   }
 
   cleanup(): number {

@@ -1,6 +1,6 @@
 name: Bug report
 description: Report a reproducible defect or regression in Tracehound.
-title: "[Bug]: "
+title: '[Bug]: '
 labels:
   - bug
 body:
@@ -29,10 +29,10 @@ body:
     attributes:
       label: Affected package
       options:
-        - "@tracehound/core"
-        - "@tracehound/express"
-        - "@tracehound/fastify"
-        - "@tracehound/cli"
+        - '@tracehound/core'
+        - '@tracehound/express'
+        - '@tracehound/fastify'
+        - '@tracehound/cli'
         - docs
         - ci/release
         - other
@@ -43,7 +43,7 @@ body:
     attributes:
       label: Affected version
       description: Package version, git ref, or container tag.
-      placeholder: "e.g. 1.7.0"
+      placeholder: 'e.g. 1.7.0'
     validations:
       required: true
   - type: textarea

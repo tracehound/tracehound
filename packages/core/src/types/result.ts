@@ -4,6 +4,7 @@
 
 import type { Severity } from './common.js'
 import type { TracehoundError } from './errors.js'
+import type { ScentSource } from './scent.js'
 
 /**
  * Runtime-safe quarantine handle.
@@ -28,6 +29,8 @@ export interface RuntimeEvidenceHandle {
   readonly severity: Severity
   /** Whether underlying evidence has been disposed. */
   readonly disposed: boolean
+  /** Source metadata for forensic enrichment. */
+  readonly source: ScentSource
 
   /**
    * Always rejected in runtime membrane path.
@@ -66,7 +69,7 @@ export type InterceptResult =
  * Type guard for quarantined result.
  */
 export function isQuarantined(
-  result: InterceptResult
+  result: InterceptResult,
 ): result is { status: 'quarantined'; handle: RuntimeEvidenceHandle } {
   return result.status === 'quarantined'
 }
@@ -75,7 +78,7 @@ export function isQuarantined(
  * Type guard for error result.
  */
 export function isError(
-  result: InterceptResult
+  result: InterceptResult,
 ): result is { status: 'error'; error: TracehoundError } {
   return result.status === 'error'
 }
@@ -91,7 +94,7 @@ export function isClean(result: InterceptResult): result is { status: 'clean' } 
  * Type guard for rate limited result.
  */
 export function isRateLimited(
-  result: InterceptResult
+  result: InterceptResult,
 ): result is { status: 'rate_limited'; retryAfter: number } {
   return result.status === 'rate_limited'
 }
@@ -100,7 +103,7 @@ export function isRateLimited(
  * Type guard for ignored result (duplicate signature).
  */
 export function isIgnored(
-  result: InterceptResult
+  result: InterceptResult,
 ): result is { status: 'ignored'; signature: string } {
   return result.status === 'ignored'
 }

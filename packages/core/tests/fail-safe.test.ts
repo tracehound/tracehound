@@ -24,7 +24,7 @@ describe('FailSafe', () => {
         expect.objectContaining({
           level: 'warning',
           reason: 'manual',
-        })
+        }),
       )
     })
 
@@ -64,7 +64,7 @@ describe('FailSafe', () => {
         expect.objectContaining({
           level: 'warning',
           reason: 'memory_threshold',
-        })
+        }),
       )
     })
 
@@ -106,7 +106,7 @@ describe('FailSafe', () => {
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
           reason: 'quarantine_capacity',
-        })
+        }),
       )
     })
   })
@@ -121,7 +121,7 @@ describe('FailSafe', () => {
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
           reason: 'error_rate',
-        })
+        }),
       )
     })
   })

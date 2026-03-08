@@ -12,7 +12,11 @@ import { createEvidenceFactory, EvidenceFactory } from '../src/core/evidence-fac
 import { Evidence } from '../src/core/evidence.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
-import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
+import type {
+  CoordinationFeature,
+  CoordinationHealth,
+  CoordinationProvider,
+} from '../src/types/coordination.js'
 import type { Scent } from '../src/types/scent.js'
 import { encodePayload } from '../src/utils/encode.js'
 import { hashBuffer } from '../src/utils/hash.js'
@@ -31,7 +35,7 @@ describe('RFC-0000 Compliance', () => {
       const scent: Scent = {
         id: 'test-1',
         payload: { suspicious: 'data', sql: "'; DROP TABLE users; --" },
-        source: '192.168.1.1',
+        source: { ip: '192.168.1.1' },
         timestamp: Date.now(),
         // No threat signal = external detector did not flag this
       }
@@ -48,7 +52,7 @@ describe('RFC-0000 Compliance', () => {
       const scent: Scent = {
         id: 'test-2',
         payload: { attack: 'sql injection' },
-        source: '192.168.1.1',
+        source: { ip: '192.168.1.1' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       }
@@ -72,7 +76,7 @@ describe('RFC-0000 Compliance', () => {
       const scent: Scent = {
         id: 'sig-test',
         payload: { test: 'data' },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -91,7 +95,7 @@ describe('RFC-0000 Compliance', () => {
       const scent: Scent = {
         id: 'sig-verify',
         payload,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -114,14 +118,14 @@ describe('RFC-0000 Compliance', () => {
       const scent1: Scent = {
         id: 'collision-1',
         payload: { data: 'payload-A' },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
       const scent2: Scent = {
         id: 'collision-2',
         payload: { data: 'payload-B' }, // Different content
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -141,14 +145,14 @@ describe('RFC-0000 Compliance', () => {
       const scent1: Scent = {
         id: 'deterministic-1',
         payload: { ...payload },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
       const scent2: Scent = {
         id: 'deterministic-2',
         payload: { level: 5, attack: 'test' }, // Same content, different key order
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -168,7 +172,7 @@ describe('RFC-0000 Compliance', () => {
       const scent: Scent = {
         id: 'category-test',
         payload,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -196,7 +200,7 @@ describe('RFC-0000 Compliance', () => {
       const scent1: Scent = {
         id: 'intent-1',
         payload,
-        source: '10.0.0.1',
+        source: { ip: '10.0.0.1' },
         timestamp: Date.now(),
         threat: { category: 'spam', severity: 'low' },
       }
@@ -204,7 +208,7 @@ describe('RFC-0000 Compliance', () => {
       const scent2: Scent = {
         id: 'intent-2',
         payload, // Same payload
-        source: '10.0.0.2', // Different source doesn't matter
+        source: { ip: '10.0.0.2' }, // Different source doesn't matter
         timestamp: Date.now() + 1000,
         threat: { category: 'spam', severity: 'low' }, // Same category
       }
@@ -222,7 +226,7 @@ describe('RFC-0000 Compliance', () => {
       const scent1: Scent = {
         id: 'new-1',
         payload: { attack: 'type-A' },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       }
@@ -230,7 +234,7 @@ describe('RFC-0000 Compliance', () => {
       const scent2: Scent = {
         id: 'new-2',
         payload: { attack: 'type-B' }, // Different payload = new intent
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       }
@@ -248,7 +252,7 @@ describe('RFC-0000 Compliance', () => {
       const scent1: Scent = {
         id: 'preserve-1',
         payload: { attack: 'first' },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       }
@@ -258,7 +262,7 @@ describe('RFC-0000 Compliance', () => {
       const scent2: Scent = {
         id: 'preserve-2',
         payload: { attack: 'second' },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       }
@@ -288,7 +292,8 @@ describe('RFC-0000 Compliance', () => {
         `injection:${hash}`,
         hash,
         'high',
-        Date.now()
+        Date.now(),
+        { ip: 'test' },
       )
 
       const record = evidence.neutralize('previous-hash')
@@ -312,7 +317,8 @@ describe('RFC-0000 Compliance', () => {
         `injection:${hash}`,
         hash,
         'high',
-        Date.now()
+        Date.now(),
+        { ip: 'test' },
       )
 
       evidence.neutralize('')
@@ -336,7 +342,7 @@ describe('RFC-0000 Compliance', () => {
       agent.intercept({
         id: 'rl-1',
         payload: { data: 'first' },
-        source: 'blocked-source',
+        source: { ip: 'blocked-source' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       })
@@ -346,7 +352,7 @@ describe('RFC-0000 Compliance', () => {
       const result = agent.intercept({
         id: 'rl-2',
         payload: { data: 'x'.repeat(10000) }, // Large payload
-        source: 'blocked-source', // Same source
+        source: { ip: 'blocked-source' }, // Same source
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       })
@@ -370,7 +376,8 @@ describe('RFC-0000 Compliance', () => {
         'injection:hash1',
         hashBuffer(encoded1.bytes),
         'high',
-        Date.now()
+        Date.now(),
+        { ip: 'test' },
       )
 
       const evidence2 = new Evidence(
@@ -378,7 +385,8 @@ describe('RFC-0000 Compliance', () => {
         'injection:hash2',
         hashBuffer(encoded2.bytes),
         'high',
-        Date.now()
+        Date.now(),
+        { ip: 'test' },
       )
 
       const record1 = evidence1.neutralize(auditChain.lastHash)
@@ -400,7 +408,8 @@ describe('RFC-0000 Compliance', () => {
         'injection:hash',
         hashBuffer(encoded.bytes),
         'high',
-        Date.now()
+        Date.now(),
+        { ip: 'test' },
       )
 
       const record = evidence.neutralize(auditChain.lastHash)
@@ -489,7 +498,7 @@ describe('RFC-0000 Compliance', () => {
       const result = agent.intercept({
         id: 'coord-rfc-throw',
         payload: { attack: 'test' },
-        source: 'rfc-source',
+        source: { ip: 'rfc-source' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       })
@@ -508,7 +517,7 @@ function createTestSetup(options: { maxRequests?: number } = {}) {
   const auditChain = new AuditChain()
   const quarantine = new Quarantine(
     { maxCount: 1000, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-    auditChain
+    auditChain,
   )
   const rateLimiter = createRateLimiter({
     windowMs: 60_000,

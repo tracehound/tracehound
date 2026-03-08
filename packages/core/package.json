@@ -1,6 +1,6 @@
 {
   "name": "@tracehound/core",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Deterministic runtime security buffer for high-velocity APIs",
   "license": "Apache-2.0",
   "author": "Erdem Arslan <me@erdem.work>",
@@ -38,6 +38,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
+    "lint:tests": "tsc --noEmit --project tsconfig.tests.json",
     "clean": "node ../../scripts/build/clean-dist.mjs dist"
   },
   "dependencies": {

@@ -140,7 +140,9 @@ async function main() {
   const selectedPackages = ALL_PACKAGES.filter((entry) => selected.includes(entry.key))
 
   if (selectedPackages.length === 0) {
-    throw new Error(`No packages selected. Available keys: ${ALL_PACKAGES.map((entry) => entry.key).join(', ')}`)
+    throw new Error(
+      `No packages selected. Available keys: ${ALL_PACKAGES.map((entry) => entry.key).join(', ')}`,
+    )
   }
 
   const outputRoot = path.resolve(outDir)

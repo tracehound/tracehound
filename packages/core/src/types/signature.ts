@@ -38,7 +38,7 @@ export interface GenerateSignatureOptions {
  */
 export function generateSignature(
   threat: ThreatInput,
-  options: GenerateSignatureOptions = {}
+  options: GenerateSignatureOptions = {},
 ): string {
   const maxSize = options.maxPayloadSize ?? DEFAULT_MAX_PAYLOAD_SIZE
 

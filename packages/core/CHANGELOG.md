@@ -2,27 +2,75 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.8.0] - 2026-03-09 - TLS Source Signals and Runtime Hardening
 
 ### Added
 
-- Quarantine TTL decay with background scheduling, deterministic decay ordering, decay batch sizing, and configurable archive failure policy.
-- Cold-storage-backed decay archival exposed through `TracehoundOptions.coldStorage` and `ITracehound.coldStorage`.
-- Raw ingress byte hashing support via optional `Scent.ingressBytes`, with Express/Fastify adapters preferring `rawBody` when available.
-- Batched Merkle sealing for `AuditChain`, including purge and decay lifecycle custody.
+- TLS source metadata support in runtime flow and adapters (`cipherSuite`, `version`, optional `alpn`) for Express and Fastify integrations.
+- Coverage-focused regression tests across core and CLI command surfaces to keep release gates green on branch-diff QA.
 
 ### Changed
 
-- Quarantine stats now expose `evictedCount`, decay/archive counters, and next-expiry metadata.
-- `ingressBytes` extraction in Express/Fastify adapters now requires `rawBody` to be set by the body-parser middleware; falling back to `req.body` was removed to preserve signature determinism.
-- Purge events now participate in audit chain continuity instead of bypassing custody logging.
-- Enhanced quarantine protocol roadmap work is now implemented in core/runtime behavior rather than tracked as a partial roadmap concept.
+- Rate limiter now enforces IP-ceiling-first behavior for new fingerprints to prevent composite map pressure under same-IP rotation attacks.
+- Source fingerprint key generation now normalizes oversized source components deterministically to reduce CPU amplification from oversized headers.
+- API documentation terminology was aligned with implementation semantics (sliding-window behavior clarity for consumers).
+
+### Security
+
+- Hardened rate-limiter anti-rotation controls:
+  - Prevents unnecessary composite entry allocation when the IP ceiling already rejects.
+  - Keeps active IP-ceiling entries hot on reject paths to reduce eviction-based bypass opportunities.
+  - Preserves distinct key space between raw and truncated source-component encodings.
+- Hardened Agent runtime behavior:
+  - Telemetry/watcher hook failures are isolated from intercept outcomes (fail-open observability path).
+  - Coordination fallback counters now track state transitions instead of inflated repeated degraded reads.
+  - Runtime evidence source exposure is fail-closed and immutable for consumer-facing handles.
+- Hardened evidence/source integrity:
+  - Evidence source metadata is captured as a snapshot, sanitized, and exposed as immutable runtime metadata.
+  - Defensive fallback to `ip: "unknown"` for invalid runtime source shapes.
+
+## [1.7.0] - 2026-03-05 - Enhanced Quarantine Protocol and Evidence Lifecycle Hardening
+
+This release delivers the roadmap scope for the Enhanced Quarantine Protocol, with core focus on deterministic evidence custody, bounded decay, and fail-open adapter behavior.
+
+### Highlights
+
+- Added TTL-driven background decay in Quarantine (`ttlMs`, `decayIntervalMs`, `decayBatchSize`).
+- Added cold-storage-backed decay archival with configurable failure policy and timeout controls.
+- Added support for raw ingress byte hashing via `Scent.ingressBytes`.
+- Added batched Merkle sealing in `AuditChain` for stronger lifecycle custody continuity.
+- Added `AbortSignal` support to `IColdStorageAdapter.write(id, payload, signal?)`.
+
+### Runtime & Behavior Changes
+
+- Quarantine stats now include richer decay/eviction visibility (`evictedCount`, archive/decay counters, next expiry metadata).
+- Express/Fastify ingress byte extraction is now deterministic and `rawBody`-based.
+- Unknown/forward-incompatible intercept statuses in adapters now fail open (no request lifecycle hangs).
+- AuditChain retention enforces strict bounds while preserving batch integrity.
+- Purge events now fully participate in audit continuity.
+
+### Security Hardening
+
+- Decay/archive race paths and timeout lifecycle handling were hardened.
+- Audit export/verification safety was strengthened to reduce accidental tampering surfaces.
+- Storage error sanitization/redaction was improved to prevent endpoint/ARN/key-like leakage.
+- Resource-bound behavior under pressure conditions was tightened.
 
 ### Breaking Changes
 
-- **`PurgeRecord.purgeTimestamp` renamed to `PurgeRecord.timestamp`** to align with all other lifecycle record types. Any code reading `record.purgeTimestamp` must be updated to `record.timestamp`.
+- `PurgeRecord.purgeTimestamp` was renamed to `PurgeRecord.timestamp`.
+- `IColdStorageAdapter.write` now accepts optional `AbortSignal`.
+- Adapter ingress byte path is now `rawBody`-only for deterministic hashing.
 
-  **Migration:** Replace all `purgeRecord.purgeTimestamp` references with `purgeRecord.timestamp`.
+### Migration Notes
+
+- Replace `purgeRecord.purgeTimestamp` with `purgeRecord.timestamp`.
+- Update custom cold storage adapters to `write(id, payload, signal?)`.
+- Ensure `rawBody` is available before Tracehound middleware/plugin execution in Express/Fastify.
+
+### Breaking Changes
+
+- None.
 
 ## [1.6.1] - 2026-03-07 - Memory Safety and Cryptographic RNG Hardening
 

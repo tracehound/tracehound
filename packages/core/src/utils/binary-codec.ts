@@ -12,13 +12,13 @@
  * - Empty payloads are VALID (originalSize=0, compressedSize>0)
  */
 
-import { promisify } from "node:util";
-import { gunzip, gunzipSync, gzip, gzipSync } from "node:zlib";
-import { constantTimeEqual } from "./compare.js";
-import { hashBuffer } from "./hash.js";
+import { promisify } from 'node:util'
+import { gunzip, gunzipSync, gzip, gzipSync } from 'node:zlib'
+import { constantTimeEqual } from './compare.js'
+import { hashBuffer } from './hash.js'
 
-const gzipAsync = promisify(gzip);
-const gunzipAsync = promisify(gunzip);
+const gzipAsync = promisify(gzip)
+const gunzipAsync = promisify(gunzip)
 
 /**
  * Hot-path codec interface.
@@ -30,7 +30,7 @@ export interface HotPathCodec {
    * Encode bytes to compressed format.
    * Used in hot-path for evidence creation.
    */
-  encode(bytes: Uint8Array): Uint8Array;
+  encode(bytes: Uint8Array): Uint8Array
 }
 
 /**
@@ -43,7 +43,7 @@ export interface ColdPathCodec extends HotPathCodec {
    * Decode compressed bytes back to original.
    * NOT used in Agent/Hound hot-path.
    */
-  decode(bytes: Uint8Array): Uint8Array;
+  decode(bytes: Uint8Array): Uint8Array
 }
 
 /**
@@ -51,15 +51,15 @@ export interface ColdPathCodec extends HotPathCodec {
  */
 export interface CodecStats {
   /** Total encode operations */
-  encodeCount: number;
+  encodeCount: number
   /** Total decode operations */
-  decodeCount: number;
+  decodeCount: number
   /** Total bytes before encoding */
-  totalInputBytes: number;
+  totalInputBytes: number
   /** Total bytes after encoding */
-  totalOutputBytes: number;
+  totalOutputBytes: number
   /** Average compression ratio */
-  compressionRatio: number;
+  compressionRatio: number
 }
 
 /**
@@ -71,27 +71,27 @@ export interface CodecStats {
  * - Pass as ColdPathCodec only to cold storage / forensics tools
  */
 export class GzipCodec implements ColdPathCodec {
-  private _encodeCount = 0;
-  private _decodeCount = 0;
-  private _totalInputBytes = 0;
-  private _totalOutputBytes = 0;
+  private _encodeCount = 0
+  private _decodeCount = 0
+  private _totalInputBytes = 0
+  private _totalOutputBytes = 0
 
   /**
    * Encode bytes using gzip compression.
    * Sync operation for hot-path performance.
    */
   encode(bytes: Uint8Array): Uint8Array {
-    this._encodeCount++;
-    this._totalInputBytes += bytes.length;
+    this._encodeCount++
+    this._totalInputBytes += bytes.length
 
     const compressed = gzipSync(bytes, {
       level: 6, // Balanced speed/compression
-    });
+    })
 
-    const result = new Uint8Array(compressed);
-    this._totalOutputBytes += result.length;
+    const result = new Uint8Array(compressed)
+    this._totalOutputBytes += result.length
 
-    return result;
+    return result
   }
 
   /**
@@ -99,20 +99,17 @@ export class GzipCodec implements ColdPathCodec {
    * ONLY for cold storage retrieval / forensics.
    */
   decode(bytes: Uint8Array): Uint8Array {
-    this._decodeCount++;
+    this._decodeCount++
 
-    const decompressed = gunzipSync(bytes);
-    return new Uint8Array(decompressed);
+    const decompressed = gunzipSync(bytes)
+    return new Uint8Array(decompressed)
   }
 
   /**
    * Get codec statistics (immutable snapshot).
    */
   get stats(): Readonly<CodecStats> {
-    const ratio =
-      this._totalInputBytes > 0
-        ? this._totalOutputBytes / this._totalInputBytes
-        : 0;
+    const ratio = this._totalInputBytes > 0 ? this._totalOutputBytes / this._totalInputBytes : 0
 
     return Object.freeze({
       encodeCount: this._encodeCount,
@@ -120,7 +117,7 @@ export class GzipCodec implements ColdPathCodec {
       totalInputBytes: this._totalInputBytes,
       totalOutputBytes: this._totalOutputBytes,
       compressionRatio: ratio,
-    });
+    })
   }
 }
 
@@ -131,11 +128,11 @@ export class GzipCodec implements ColdPathCodec {
  * @returns HotPathCodec with no decode access
  */
 export function createHotPathCodec(): HotPathCodec {
-  const codec = new GzipCodec();
+  const codec = new GzipCodec()
   // Return only HotPathCodec interface - no decode access
   return {
     encode: (bytes: Uint8Array) => codec.encode(bytes),
-  };
+  }
 }
 
 /**
@@ -145,7 +142,7 @@ export function createHotPathCodec(): HotPathCodec {
  * @returns ColdPathCodec with full access
  */
 export function createColdPathCodec(): ColdPathCodec {
-  return new GzipCodec();
+  return new GzipCodec()
 }
 
 // ============================================================================
@@ -158,7 +155,7 @@ export function createColdPathCodec(): ColdPathCodec {
  */
 export interface AsyncHotPathCodec {
   /** Async encode bytes to compressed format. */
-  encode(bytes: Uint8Array): Promise<Uint8Array>;
+  encode(bytes: Uint8Array): Promise<Uint8Array>
 }
 
 /**
@@ -168,7 +165,7 @@ export interface AsyncHotPathCodec {
  */
 export interface AsyncColdPathCodec extends AsyncHotPathCodec {
   /** Async decode compressed bytes back to original. */
-  decode(bytes: Uint8Array): Promise<Uint8Array>;
+  decode(bytes: Uint8Array): Promise<Uint8Array>
 }
 
 /**
@@ -183,24 +180,24 @@ export interface AsyncColdPathCodec extends AsyncHotPathCodec {
  * NOT for hot-path — use GzipCodec (sync) for Agent/EvidenceFactory.
  */
 export class AsyncGzipCodec implements AsyncColdPathCodec {
-  private _encodeCount = 0;
-  private _decodeCount = 0;
-  private _totalInputBytes = 0;
-  private _totalOutputBytes = 0;
+  private _encodeCount = 0
+  private _decodeCount = 0
+  private _totalInputBytes = 0
+  private _totalOutputBytes = 0
 
   /**
    * Async encode bytes using gzip compression.
    * Non-blocking — yields to event loop during compression.
    */
   async encode(bytes: Uint8Array): Promise<Uint8Array> {
-    this._encodeCount++;
-    this._totalInputBytes += bytes.length;
+    this._encodeCount++
+    this._totalInputBytes += bytes.length
 
-    const compressed = await gzipAsync(bytes, { level: 6 });
-    const result = new Uint8Array(compressed);
-    this._totalOutputBytes += result.length;
+    const compressed = await gzipAsync(bytes, { level: 6 })
+    const result = new Uint8Array(compressed)
+    this._totalOutputBytes += result.length
 
-    return result;
+    return result
   }
 
   /**
@@ -208,20 +205,17 @@ export class AsyncGzipCodec implements AsyncColdPathCodec {
    * Non-blocking — yields to event loop during decompression.
    */
   async decode(bytes: Uint8Array): Promise<Uint8Array> {
-    this._decodeCount++;
+    this._decodeCount++
 
-    const decompressed = await gunzipAsync(bytes);
-    return new Uint8Array(decompressed);
+    const decompressed = await gunzipAsync(bytes)
+    return new Uint8Array(decompressed)
   }
 
   /**
    * Get codec statistics (immutable snapshot).
    */
   get stats(): Readonly<CodecStats> {
-    const ratio =
-      this._totalInputBytes > 0
-        ? this._totalOutputBytes / this._totalInputBytes
-        : 0;
+    const ratio = this._totalInputBytes > 0 ? this._totalOutputBytes / this._totalInputBytes : 0
 
     return Object.freeze({
       encodeCount: this._encodeCount,
@@ -229,7 +223,7 @@ export class AsyncGzipCodec implements AsyncColdPathCodec {
       totalInputBytes: this._totalInputBytes,
       totalOutputBytes: this._totalOutputBytes,
       compressionRatio: ratio,
-    });
+    })
   }
 }
 
@@ -240,7 +234,7 @@ export class AsyncGzipCodec implements AsyncColdPathCodec {
  * @returns AsyncColdPathCodec with non-blocking encode/decode
  */
 export function createAsyncColdPathCodec(): AsyncColdPathCodec {
-  return new AsyncGzipCodec();
+  return new AsyncGzipCodec()
 }
 
 // ============================================================================
@@ -253,13 +247,13 @@ export function createAsyncColdPathCodec(): AsyncColdPathCodec {
  */
 export interface EncodedPayload {
   /** gzip compressed bytes */
-  readonly compressed: Uint8Array;
+  readonly compressed: Uint8Array
   /** SHA-256 hash of compressed bytes (hex) */
-  readonly hash: string;
+  readonly hash: string
   /** Original uncompressed size in bytes */
-  readonly originalSize: number;
+  readonly originalSize: number
   /** Compressed size in bytes */
-  readonly compressedSize: number;
+  readonly compressedSize: number
 }
 
 /**
@@ -268,14 +262,11 @@ export interface EncodedPayload {
 export class CodecError extends Error {
   constructor(
     message: string,
-    public readonly code:
-      | "INTEGRITY_VIOLATION"
-      | "DECODE_FAILED"
-      | "ENCODE_FAILED",
+    public readonly code: 'INTEGRITY_VIOLATION' | 'DECODE_FAILED' | 'ENCODE_FAILED',
     public readonly cause?: unknown,
   ) {
-    super(message);
-    this.name = "CodecError";
+    super(message)
+    this.name = 'CodecError'
   }
 }
 
@@ -290,16 +281,16 @@ export class CodecError extends Error {
  * @returns Encoded payload with hash
  */
 export function encodeWithIntegrity(payload: Uint8Array): EncodedPayload {
-  const compressed = gzipSync(payload, { level: 6 });
-  const compressedBytes = new Uint8Array(compressed);
-  const hash = hashBuffer(compressedBytes);
+  const compressed = gzipSync(payload, { level: 6 })
+  const compressedBytes = new Uint8Array(compressed)
+  const hash = hashBuffer(compressedBytes)
 
   return {
     compressed: compressedBytes,
     hash,
     originalSize: payload.length,
     compressedSize: compressedBytes.length,
-  };
+  }
 }
 
 /**
@@ -313,8 +304,8 @@ export function encodeWithIntegrity(payload: Uint8Array): EncodedPayload {
  * @returns true if hash matches, false if tampered
  */
 export function verify(encoded: EncodedPayload): boolean {
-  const computed = hashBuffer(encoded.compressed);
-  return constantTimeEqual(computed, encoded.hash);
+  const computed = hashBuffer(encoded.compressed)
+  return constantTimeEqual(computed, encoded.hash)
 }
 
 /**
@@ -337,24 +328,20 @@ export function decodeWithIntegrity(encoded: EncodedPayload): Uint8Array {
   }
 
   try {
-    const decompressed = gunzipSync(encoded.compressed);
-    const result = new Uint8Array(decompressed);
+    const decompressed = gunzipSync(encoded.compressed)
+    const result = new Uint8Array(decompressed)
 
     if (result.length !== encoded.originalSize) {
       throw new CodecError(
         `Decompressed size mismatch: expected ${encoded.originalSize}, got ${result.length}`,
-        "INTEGRITY_VIOLATION",
-      );
+        'INTEGRITY_VIOLATION',
+      )
     }
 
-    return result;
+    return result
   } catch (err) {
-    if (err instanceof CodecError) throw err;
-    throw new CodecError(
-      "Decompression failed - possible storage corruption",
-      "DECODE_FAILED",
-      err,
-    );
+    if (err instanceof CodecError) throw err
+    throw new CodecError('Decompression failed - possible storage corruption', 'DECODE_FAILED', err)
   }
 }
 
@@ -372,22 +359,20 @@ export function decodeWithIntegrity(encoded: EncodedPayload): Uint8Array {
  * @returns Encoded payload with hash
  * @throws CodecError if compression fails
  */
-export async function encodeWithIntegrityAsync(
-  payload: Uint8Array,
-): Promise<EncodedPayload> {
+export async function encodeWithIntegrityAsync(payload: Uint8Array): Promise<EncodedPayload> {
   try {
-    const compressed = await gzipAsync(payload, { level: 6 });
-    const compressedBytes = new Uint8Array(compressed);
-    const hash = hashBuffer(compressedBytes);
+    const compressed = await gzipAsync(payload, { level: 6 })
+    const compressedBytes = new Uint8Array(compressed)
+    const hash = hashBuffer(compressedBytes)
 
     return {
       compressed: compressedBytes,
       hash,
       originalSize: payload.length,
       compressedSize: compressedBytes.length,
-    };
+    }
   } catch (err) {
-    throw new CodecError("Async compression failed", "ENCODE_FAILED", err);
+    throw new CodecError('Async compression failed', 'ENCODE_FAILED', err)
   }
 }
 
@@ -403,9 +388,7 @@ export async function encodeWithIntegrityAsync(
  * @returns Original uncompressed bytes
  * @throws CodecError if integrity check fails or decompression fails
  */
-export async function decodeWithIntegrityAsync(
-  encoded: EncodedPayload,
-): Promise<Uint8Array> {
+export async function decodeWithIntegrityAsync(encoded: EncodedPayload): Promise<Uint8Array> {
   if (!verify(encoded)) {
     throw new CodecError(
       'Integrity check failed — payload may have been tampered with',
@@ -414,23 +397,23 @@ export async function decodeWithIntegrityAsync(
   }
 
   try {
-    const decompressed = await gunzipAsync(encoded.compressed);
-    const result = new Uint8Array(decompressed);
+    const decompressed = await gunzipAsync(encoded.compressed)
+    const result = new Uint8Array(decompressed)
 
     if (result.length !== encoded.originalSize) {
       throw new CodecError(
         `Decompressed size mismatch: expected ${encoded.originalSize}, got ${result.length}`,
-        "INTEGRITY_VIOLATION",
-      );
+        'INTEGRITY_VIOLATION',
+      )
     }
 
-    return result;
+    return result
   } catch (err) {
-    if (err instanceof CodecError) throw err;
+    if (err instanceof CodecError) throw err
     throw new CodecError(
-      "Async decompression failed - possible storage corruption",
-      "DECODE_FAILED",
+      'Async decompression failed - possible storage corruption',
+      'DECODE_FAILED',
       err,
-    );
+    )
   }
 }

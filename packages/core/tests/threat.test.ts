@@ -11,7 +11,7 @@ describe('Threat Helpers', () => {
     it('should return ThreatInput when scent has threat signal', () => {
       const scent: Scent = {
         id: 'scent-1',
-        source: 'test',
+        source: { ip: 'test' },
         payload: { data: 'test' },
         timestamp: Date.now(),
         threat: {
@@ -31,7 +31,7 @@ describe('Threat Helpers', () => {
     it('should return null when scent has no threat signal', () => {
       const scent: Scent = {
         id: 'scent-2',
-        source: 'test',
+        source: { ip: 'test' },
         payload: { data: 'clean' },
         timestamp: Date.now(),
       }
@@ -47,7 +47,7 @@ describe('Threat Helpers', () => {
       categories.forEach((category) => {
         const scent: Scent = {
           id: `scent-${category}`,
-          source: 'test',
+          source: { ip: 'test' },
           payload: { data: 'test' },
           timestamp: Date.now(),
           threat: { category, severity: 'critical' },
@@ -64,7 +64,7 @@ describe('Threat Helpers', () => {
       severities.forEach((severity) => {
         const scent: Scent = {
           id: `scent-${severity}`,
-          source: 'test',
+          source: { ip: 'test' },
           payload: { data: 'test' },
           timestamp: Date.now(),
           threat: { category: 'injection', severity },

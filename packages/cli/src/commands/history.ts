@@ -7,51 +7,49 @@ import Table from 'cli-table3'
 import { Command } from 'commander'
 import { formatBytes } from '../lib/format.js'
 
-export const historyCommand = new Command('history')
-  .description('Manage trace inspection history')
+export const historyCommand = new Command('history').description('Manage trace inspection history')
 
-historyCommand
-  .addCommand(
-    new Command('clear')
-      .description('Clear trace inspection history while preserving registry file')
-      .option('-j, --json', 'Output as JSON')
-      .action((options) => {
-        const before = getTraceRegistryStats()
-        const cleared = clearTraceInspectionHistory()
-        const after = getTraceRegistryStats()
+historyCommand.addCommand(
+  new Command('clear')
+    .description('Clear trace inspection history while preserving registry file')
+    .option('-j, --json', 'Output as JSON')
+    .action((options) => {
+      const before = getTraceRegistryStats()
+      const cleared = clearTraceInspectionHistory()
+      const after = getTraceRegistryStats()
 
-        if (options.json) {
-          console.log(
-            JSON.stringify(
-              {
-                ...cleared,
-                before: snapshot(before),
-                after: snapshot(after),
-              },
-              null,
-              2,
-            ),
-          )
-          return
-        }
-
-        const table = new Table({
-          head: ['HISTORY CLEAR', 'Value'],
-          style: { head: ['yellow'], border: ['gray'] },
-        })
-
-        table.push(
-          ['Result', cleared.success ? 'success' : 'failed'],
-          ['Path', cleared.path],
-          ['Removed Entries', String(cleared.removedEntries)],
-          ['Removed Bytes', formatBytes(cleared.removedBytes)],
-          ['Entries After', String(after.retainedEntries)],
-          ['Disk After', formatBytes(after.fileBytes)],
+      if (options.json) {
+        console.log(
+          JSON.stringify(
+            {
+              ...cleared,
+              before: snapshot(before),
+              after: snapshot(after),
+            },
+            null,
+            2,
+          ),
         )
+        return
+      }
 
-        console.log('\n' + table.toString() + '\n')
-      }),
-  )
+      const table = new Table({
+        head: ['HISTORY CLEAR', 'Value'],
+        style: { head: ['yellow'], border: ['gray'] },
+      })
+
+      table.push(
+        ['Result', cleared.success ? 'success' : 'failed'],
+        ['Path', cleared.path],
+        ['Removed Entries', String(cleared.removedEntries)],
+        ['Removed Bytes', formatBytes(cleared.removedBytes)],
+        ['Entries After', String(after.retainedEntries)],
+        ['Disk After', formatBytes(after.fileBytes)],
+      )
+
+      console.log('\n' + table.toString() + '\n')
+    }),
+)
 
 function snapshot(stats: ReturnType<typeof getTraceRegistryStats>) {
   return {
@@ -62,4 +60,3 @@ function snapshot(stats: ReturnType<typeof getTraceRegistryStats>) {
     blocked: stats.blocked,
   }
 }
-

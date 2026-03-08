@@ -2,17 +2,17 @@
 
 ## Title and Metadata
 
-| Field | Value |
-| --- | --- |
-| RFC | 0014 |
-| Status | Draft |
-| Author | Tracehound Engineering |
-| Created | 2026-03-07 |
-| Updated | 2026-03-07 |
-| Depends on | RFC-0000, RFC-0010, RFC-0011, RFC-0013 |
-| Supersedes | None |
+| Field          | Value                                           |
+| -------------- | ----------------------------------------------- |
+| RFC            | 0014                                            |
+| Status         | Draft                                           |
+| Author         | Tracehound Engineering                          |
+| Created        | 2026-03-07                                      |
+| Updated        | 2026-03-07                                      |
+| Depends on     | RFC-0000, RFC-0010, RFC-0011, RFC-0013          |
+| Supersedes     | None                                            |
 | Implemented in | `@tracehound/watchtower` (enterprise fork only) |
-| Tier | $299/mo |
+| Tier           | $299/mo                                         |
 
 ## Motivation
 
@@ -63,8 +63,8 @@ interface CoreTelemetryFrame {
     readonly integrityOk: boolean
   }
   readonly readiness: {
-    readonly coverageRatio: number        // RFC-0013 primitive
-    readonly retentionCompliant: boolean  // RFC-0013 primitive
+    readonly coverageRatio: number // RFC-0013 primitive
+    readonly retentionCompliant: boolean // RFC-0013 primitive
     readonly coldStorageSync: 'healthy' | 'degraded' | 'failed'
   }
   readonly activeModules: ReadonlyArray<string>
@@ -75,7 +75,7 @@ interface CoreTelemetryFrame {
 
 ```ts
 interface CoreConfigPush {
-  readonly version: number              // monotonic, core rejects stale pushes
+  readonly version: number // monotonic, core rejects stale pushes
   readonly quarantineThreshold: number
   readonly pressureLimits: {
     readonly elevatedAt: number
@@ -115,11 +115,11 @@ await bridge.start()
 
 **Bridge responsibilities:**
 
-| Direction | Mechanism | Description |
-| --- | --- | --- |
-| Core → Watchtower (events) | `NotificationEmitter` subscription | Quarantine events, pressure transitions, chain integrity alerts forwarded via HTTP POST |
-| Core → Watchtower (telemetry) | RFC-0013 snapshot polling | Bridge reads signed snapshot on `intervalMs` cadence, constructs `CoreTelemetryFrame`, sends to Watchtower |
-| Watchtower → Core (config) | WebSocket push | Watchtower pushes `CoreConfigPush` to bridge connection; bridge calls `tracehound.reconfigure(config)` |
+| Direction                     | Mechanism                          | Description                                                                                                |
+| ----------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Core → Watchtower (events)    | `NotificationEmitter` subscription | Quarantine events, pressure transitions, chain integrity alerts forwarded via HTTP POST                    |
+| Core → Watchtower (telemetry) | RFC-0013 snapshot polling          | Bridge reads signed snapshot on `intervalMs` cadence, constructs `CoreTelemetryFrame`, sends to Watchtower |
+| Watchtower → Core (config)    | WebSocket push                     | Watchtower pushes `CoreConfigPush` to bridge connection; bridge calls `tracehound.reconfigure(config)`     |
 
 **Design constraints:**
 
@@ -251,17 +251,17 @@ Card content is synchronized with tracehoundlabs.com (same title, summary, and f
 
 These are always present regardless of which modules are installed:
 
-| Capability | Description |
-| --- | --- |
-| Policy store | Persistent config for thresholds, retention, blocklist, escalation rules |
-| Telemetry aggregator | Receives and stores `CoreTelemetryFrame` per instance |
-| FRS dashboard | Forensic Readiness Score computed from readiness primitives |
-| Quarantine viewer | Real-time event stream; severity filter; evidence inspector |
-| AuditChain browser | Chain health, last N records, integrity violation alerts |
-| Pressure indicator | Pressure state per instance (normal / elevated / critical) |
-| Incident workflow | Per-evidence actions: archive, escalate to SIEM, dismiss, export |
-| RBAC | Role-based access control; audit log of all Watchtower actions |
-| Billing & subscription | Active modules, payment method, invoice history |
+| Capability             | Description                                                              |
+| ---------------------- | ------------------------------------------------------------------------ |
+| Policy store           | Persistent config for thresholds, retention, blocklist, escalation rules |
+| Telemetry aggregator   | Receives and stores `CoreTelemetryFrame` per instance                    |
+| FRS dashboard          | Forensic Readiness Score computed from readiness primitives              |
+| Quarantine viewer      | Real-time event stream; severity filter; evidence inspector              |
+| AuditChain browser     | Chain health, last N records, integrity violation alerts                 |
+| Pressure indicator     | Pressure state per instance (normal / elevated / critical)               |
+| Incident workflow      | Per-evidence actions: archive, escalate to SIEM, dismiss, export         |
+| RBAC                   | Role-based access control; audit log of all Watchtower actions           |
+| Billing & subscription | Active modules, payment method, invoice history                          |
 
 ### 9. Policy Engine
 
@@ -273,8 +273,8 @@ Watchtower authors policy; core executes it deterministically. The core is never
 interface EscalationRule {
   readonly trigger: 'pressure_critical' | 'chain_integrity_violation' | 'quarantine_depth_exceeded'
   readonly action: 'webhook' | 'pagerduty' | 'slack' | 'siem_export'
-  readonly target: string        // URL or channel
-  readonly throttleMs: number    // minimum interval between triggers
+  readonly target: string // URL or channel
+  readonly throttleMs: number // minimum interval between triggers
 }
 ```
 
@@ -286,12 +286,12 @@ Blocklist entries are pushed to core via `CoreConfigPush`. Core applies them as 
 
 FRS is Watchtower's composite score, computed from primitives emitted by core via `CoreTelemetryFrame.readiness`:
 
-| Metric | Weight | Source |
-| --- | --- | --- |
-| Coverage ratio | 30% | `coverageRatio` from RFC-0013 |
-| Retention compliance | 25% | `retentionCompliant` from RFC-0013 |
-| Chain integrity | 25% | `auditChain.integrityOk` from AuditChain |
-| Export capability | 20% | `coldStorageSync` + active export formats |
+| Metric               | Weight | Source                                    |
+| -------------------- | ------ | ----------------------------------------- |
+| Coverage ratio       | 30%    | `coverageRatio` from RFC-0013             |
+| Retention compliance | 25%    | `retentionCompliant` from RFC-0013        |
+| Chain integrity      | 25%    | `auditChain.integrityOk` from AuditChain  |
+| Export capability    | 20%    | `coldStorageSync` + active export formats |
 
 FRS is computed in Watchtower, never in core. Core emits raw primitives; scoring algorithm is a Watchtower concern and may evolve without core changes.
 
@@ -320,12 +320,12 @@ Each deployment is issued a signed license token at purchase:
 ```ts
 interface LicenseToken {
   readonly orgId: string
-  readonly instanceId: string        // machine fingerprint at activation time
+  readonly instanceId: string // machine fingerprint at activation time
   readonly tier: 'watchtower' | 'enterprise'
-  readonly modules: ReadonlyArray<string>  // entitled module IDs
+  readonly modules: ReadonlyArray<string> // entitled module IDs
   readonly issuedAt: number
   readonly expiresAt: number
-  readonly signature: string         // RS256, private key held by Tracehound
+  readonly signature: string // RS256, private key held by Tracehound
 }
 ```
 
@@ -358,12 +358,12 @@ Module availability is resolved from the license token at startup. A module not 
 
 ### 14. Phased Implementation
 
-| Phase | Scope |
-| --- | --- |
+| Phase         | Scope                                                                                                                                                      |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | MVP (Phase 1) | Hub core, single instance, quarantine viewer, chain browser, pressure indicator, FRS dashboard, policy config (thresholds + retention), IPC bridge to core |
-| Phase 2 | Module catalog, install/activate/uninstall flow, billing surface, incident workflow (archive, dismiss, escalate) |
-| Phase 3 | Multi-instance view, SIEM export integration, Anubis job triggers from incident workflow |
-| Phase 4 | Dependency scanner on uninstall, module signature verification, advanced escalation rules |
+| Phase 2       | Module catalog, install/activate/uninstall flow, billing surface, incident workflow (archive, dismiss, escalate)                                           |
+| Phase 3       | Multi-instance view, SIEM export integration, Anubis job triggers from incident workflow                                                                   |
+| Phase 4       | Dependency scanner on uninstall, module signature verification, advanced escalation rules                                                                  |
 
 ## Security Considerations
 

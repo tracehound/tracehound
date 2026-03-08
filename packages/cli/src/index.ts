@@ -44,4 +44,3 @@ const isMain =
 if (isMain || process.env.NODE_ENV === 'cli-run') {
   program.parse()
 }
-

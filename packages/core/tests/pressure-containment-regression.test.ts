@@ -13,7 +13,11 @@ import { AuditChain } from '../src/core/audit-chain.js'
 import { createEvidenceFactory } from '../src/core/evidence-factory.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
-import type { CoordinationFeature, CoordinationHealth, CoordinationProvider } from '../src/types/coordination.js'
+import type {
+  CoordinationFeature,
+  CoordinationHealth,
+  CoordinationProvider,
+} from '../src/types/coordination.js'
 import type { Scent } from '../src/types/scent.js'
 
 function createThreatScent(

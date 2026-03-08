@@ -173,7 +173,9 @@ export function encodeHoundMessage(message: HoundMessage): Buffer {
   offset += 1
   payload.writeUInt32BE(message.sizeBytes, offset)
 
-  return encodeMessage(payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length))
+  return encodeMessage(
+    payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length),
+  )
 }
 
 function encodeStatusState(state: HoundStatus): number {

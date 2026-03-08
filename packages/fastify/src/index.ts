@@ -4,7 +4,6 @@
  * Fastify plugin for Tracehound security buffer.
  */
 
-import { Buffer } from 'node:buffer'
 import {
   generateSecureId,
   recordTraceInspectionEntry,
@@ -12,8 +11,10 @@ import {
   type InterceptResult,
   type JsonSerializable,
   type Scent,
+  type ScentSource,
 } from '@tracehound/core'
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from 'fastify'
+import { Buffer } from 'node:buffer'
 
 /**
  * Plugin configuration options.
@@ -101,15 +102,37 @@ function extractIngressBytes(req: FastifyRequest): Uint8Array | undefined {
  */
 function defaultExtractScent(req: FastifyRequest): Scent {
   const ip = req.ip || 'unknown'
+  const rawUserAgentHeader = req.headers['user-agent'] as string | string[] | undefined
+  const userAgentHeader =
+    typeof rawUserAgentHeader === 'string'
+      ? rawUserAgentHeader
+      : Array.isArray(rawUserAgentHeader)
+        ? rawUserAgentHeader.join(',')
+        : undefined
   const query = safeClone(req.query) ?? {}
   const body = safeClone(req.body)
   const ingressBytes = extractIngressBytes(req)
+
+  // Extract TLS information if available
+  const socket = req.socket as
+    | (typeof req.socket & {
+        getCipher?: () => { name: string; version?: string } | null
+        getProtocol?: () => string | null
+        alpnProtocol?: string | false | null
+      })
+    | undefined
+  const cipher = socket?.getCipher?.() ?? undefined
+  const tlsVersion = socket?.getProtocol?.() ?? undefined
+  const alpnProtocol = socket?.alpnProtocol ?? undefined
+  const tlsAlpn =
+    typeof alpnProtocol === 'string' && alpnProtocol.length > 0 ? alpnProtocol : undefined
+
   const payload: Record<string, JsonSerializable> = {
     method: req.method,
     path: req.url,
     query,
     headers: {
-      'user-agent': req.headers['user-agent'] || '',
+      'user-agent': userAgentHeader || '',
       'content-type': req.headers['content-type'] || '',
     },
   }
@@ -118,10 +141,24 @@ function defaultExtractScent(req: FastifyRequest): Scent {
     payload['body'] = body
   }
 
+  const source: ScentSource = {
+    ip,
+    ...(userAgentHeader ? { userAgent: userAgentHeader } : {}),
+    ...(cipher
+      ? {
+          tls: {
+            cipherSuite: cipher.name,
+            version: tlsVersion || 'unknown',
+            ...(tlsAlpn ? { alpn: tlsAlpn } : {}),
+          },
+        }
+      : {}),
+  }
+
   return {
     id: generateSecureId(),
     timestamp: Date.now(),
-    source: ip,
+    source,
     payload,
     ...(ingressBytes ? { ingressBytes } : {}),
   }

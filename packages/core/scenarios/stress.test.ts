@@ -32,7 +32,7 @@ describe('Stress Test Scenario', () => {
     return {
       id: generateSecureId(),
       timestamp: Date.now(),
-      source: `attacker-${index % 100}`, // 100 unique sources
+      source: { ip: `attacker-${index % 100}` }, // 100 unique sources
       payload: {
         attack: `injection-${index}`,
         data: `payload-${index}-${'x'.repeat(100)}`, // ~100 bytes per payload
@@ -43,10 +43,10 @@ describe('Stress Test Scenario', () => {
           index % 4 === 0
             ? 'critical'
             : index % 3 === 0
-            ? 'high'
-            : index % 2 === 0
-            ? 'medium'
-            : 'low',
+              ? 'high'
+              : index % 2 === 0
+                ? 'medium'
+                : 'low',
       },
     }
   }
@@ -59,7 +59,7 @@ describe('Stress Test Scenario', () => {
         maxBytes: 100_000_000,
         evictionPolicy: 'priority',
       },
-      auditChain
+      auditChain,
     )
     const rateLimiter = createRateLimiter({
       windowMs: 60_000,
@@ -72,7 +72,7 @@ describe('Stress Test Scenario', () => {
       { maxPayloadSize: 10_000_000 },
       quarantine,
       rateLimiter,
-      evidenceFactory
+      evidenceFactory,
     ) as Agent
   })
 
@@ -117,7 +117,7 @@ describe('Stress Test Scenario', () => {
       const scent: Scent = {
         id: generateSecureId(),
         timestamp: Date.now(),
-        source: `source-${i}`,
+        source: { ip: `source-${i}` },
         payload: { attack: `low-${i}` },
         threat: { category: 'injection', severity: 'low' },
       }
@@ -128,7 +128,7 @@ describe('Stress Test Scenario', () => {
     const criticalScent: Scent = {
       id: generateSecureId(),
       timestamp: Date.now(),
-      source: 'critical-source',
+      source: { ip: 'critical-source' },
       payload: { attack: 'critical-attack' },
       threat: { category: 'injection', severity: 'critical' },
     }
@@ -155,7 +155,7 @@ describe('Stress Test Scenario', () => {
       agent.intercept({
         id: generateSecureId(),
         timestamp: Date.now(),
-        source: 'stats-test',
+        source: { ip: 'stats-test' },
         payload,
         threat: { category: 'injection', severity: 'medium' },
       })

@@ -51,7 +51,7 @@ describe('Envelope Header Corruption', () => {
     // Corrupt each magic byte individually
     for (let i = 0; i < 4; i++) {
       const corrupted = new Uint8Array(valid)
-      corrupted[i] = 0xFF
+      corrupted[i] = 0xff
       expect(unpackEnvelope(corrupted)).toBeNull()
     }
   })
@@ -80,7 +80,7 @@ describe('Envelope Header Corruption', () => {
     expect(unpackEnvelope(corrupted)).toBeNull()
 
     // Set version to max
-    view.setUint16(4, 0xFFFF, false)
+    view.setUint16(4, 0xffff, false)
     expect(unpackEnvelope(corrupted)).toBeNull()
   })
 
@@ -135,7 +135,7 @@ describe('Envelope Truncated Data', () => {
     // Add extra bytes
     const extended = new Uint8Array(valid.length + 5)
     extended.set(valid)
-    extended.set([0xFF, 0xFF, 0xFF, 0xFF, 0xFF], valid.length)
+    extended.set([0xff, 0xff, 0xff, 0xff, 0xff], valid.length)
     // compressedSize won't match: header says N bytes but actual is N+5
     expect(unpackEnvelope(extended)).toBeNull()
   })
@@ -363,7 +363,7 @@ describe('Envelope Adversarial Inputs', () => {
   })
 
   it('should reject all-0xFF buffer', () => {
-    expect(unpackEnvelope(new Uint8Array(200).fill(0xFF))).toBeNull()
+    expect(unpackEnvelope(new Uint8Array(200).fill(0xff))).toBeNull()
   })
 
   it('should reject valid magic + version but impossible sizes', () => {
@@ -375,8 +375,8 @@ describe('Envelope Adversarial Inputs', () => {
     // Valid version
     view.setUint16(4, 1, false)
     // Claim massive sizes
-    view.setUint32(6, 0xFFFFFFFF, false)
-    view.setUint32(10, 0xFFFFFFFF, false)
+    view.setUint32(6, 0xffffffff, false)
+    view.setUint32(10, 0xffffffff, false)
 
     // compressedSize says 4GB but buffer is only 78 bytes
     expect(unpackEnvelope(buf)).toBeNull()

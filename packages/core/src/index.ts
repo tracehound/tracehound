@@ -9,15 +9,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type {
-  AuditLifecycleRecord,
-  DecayRecord,
   AlertConfig,
   AuditConfig,
+  AuditLifecycleRecord,
   ColdStorageConfig,
   CoordinationFeature,
   CoordinationHealth,
   CoordinationMode,
   CoordinationProvider,
+  DecayRecord,
   DropRecord,
   ErrorState,
   EvacuateRecord,
@@ -35,12 +35,14 @@ export type {
   RuntimeConfig,
   RuntimeEvidenceHandle,
   Scent,
+  ScentSource,
   SchedulerConfig,
   Severity,
   Threat,
   ThreatCategory,
   ThreatInput,
   ThreatSignal,
+  TLSConnectionInfo,
   TracehoundConfig,
   TracehoundError,
 } from './types/index.js'
@@ -55,7 +57,7 @@ export { DEFAULT_CONFIG, mergeWithDefaults } from './types/index.js'
 // Errors
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { Errors, createError } from './types/index.js'
+export { createError, Errors } from './types/index.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Result type guards
@@ -98,14 +100,14 @@ export type { DecayResult, InsertResult, QuarantineStats } from './core/quaranti
 // Core - Rate Limiter
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { RateLimiter, createRateLimiter } from './core/rate-limiter.js'
-export type { IRateLimiter, RateLimitResult, RateLimiterStats } from './core/rate-limiter.js'
+export { createRateLimiter, RateLimiter } from './core/rate-limiter.js'
+export type { IRateLimiter, RateLimiterStats, RateLimitResult } from './core/rate-limiter.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Evidence Factory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { EvidenceFactory, createEvidenceFactory } from './core/evidence-factory.js'
+export { createEvidenceFactory, EvidenceFactory } from './core/evidence-factory.js'
 export type {
   EvidenceCreationResult,
   EvidenceFactoryOptions,
@@ -123,8 +125,13 @@ export type { AgentConfig, AgentStats, IAgent } from './core/agent.js'
 // Core - Hound Pool
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { HoundPool, createHoundPool, createMockAdapter } from './core/hound-pool.js'
-export { HOUND_PRESSURE_ERRORS, isHoundPressureError } from './core/hound-pool.js'
+export {
+  createHoundPool,
+  createMockAdapter,
+  HOUND_PRESSURE_ERRORS,
+  HoundPool,
+  isHoundPressureError,
+} from './core/hound-pool.js'
 export type {
   HoundPoolConfig,
   HoundPoolStats,
@@ -139,7 +146,7 @@ export type { HoundProcessConstraints } from './core/process-adapter.js'
 // Core - Scheduler
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { Scheduler, createScheduler } from './core/scheduler.js'
+export { createScheduler, Scheduler } from './core/scheduler.js'
 export type {
   BusyChecker,
   IScheduler,
@@ -152,7 +159,7 @@ export type {
 // Core - Watcher
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { Watcher, createWatcher } from './core/watcher.js'
+export { createWatcher, Watcher } from './core/watcher.js'
 export type {
   Alert,
   AlertSeverity,
@@ -177,6 +184,15 @@ export { hash, hashBuffer } from './utils/hash.js'
 export { generateSecureId, isValidSecureId } from './utils/id.js'
 
 export {
+  exportSystemSnapshot,
+  readSystemSnapshotFromDisk,
+  resolveSystemSnapshotPath,
+  resolveSystemSnapshotSecret,
+  SYSTEM_SNAPSHOT_ENV,
+  writeSystemSnapshotToDisk,
+} from './utils/system-snapshot.js'
+export type { SnapshotReadResult, SystemHealth, SystemSnapshot } from './utils/system-snapshot.js'
+export {
   clearTraceInspectionHistory,
   clearTraceRegistryDisk,
   findTraceInspectionEntryBySignature,
@@ -192,15 +208,6 @@ export type {
   TraceRegistryOptions,
   TraceRegistryStats,
 } from './utils/trace-registry.js'
-export {
-  exportSystemSnapshot,
-  readSystemSnapshotFromDisk,
-  resolveSystemSnapshotPath,
-  resolveSystemSnapshotSecret,
-  SYSTEM_SNAPSHOT_ENV,
-  writeSystemSnapshotToDisk,
-} from './utils/system-snapshot.js'
-export type { SnapshotReadResult, SystemHealth, SystemSnapshot } from './utils/system-snapshot.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utils - Serialization
@@ -214,7 +221,6 @@ export { serialize } from './utils/serialize.js'
 
 export {
   AsyncGzipCodec,
-  GzipCodec,
   createAsyncColdPathCodec,
   createColdPathCodec,
   createHotPathCodec,
@@ -222,6 +228,7 @@ export {
   decodeWithIntegrityAsync,
   encodeWithIntegrity,
   encodeWithIntegrityAsync,
+  GzipCodec,
   verify,
 } from './utils/binary-codec.js'
 export type {
@@ -239,7 +246,7 @@ export type { EncodeResult } from './utils/encode.js'
 // Core - Cold Storage
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { MemoryColdStorage, createMemoryColdStorage } from './core/cold-storage.js'
+export { createMemoryColdStorage, MemoryColdStorage } from './core/cold-storage.js'
 export type {
   ColdStorageReadResult,
   ColdStorageWriteResult,
@@ -252,7 +259,7 @@ export type {
 // Core - S3 Cold Storage
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { S3ColdStorage, createS3ColdStorage } from './core/s3-cold-storage.js'
+export { createS3ColdStorage, S3ColdStorage } from './core/s3-cold-storage.js'
 export type { S3ColdStorageConfig, S3LikeClient } from './core/s3-cold-storage.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -280,7 +287,7 @@ export type {
 // Core - Lane Queue
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { DEFAULT_LANE_CONFIG, LaneQueue, createLaneQueue } from './core/lane-queue.js'
+export { createLaneQueue, DEFAULT_LANE_CONFIG, LaneQueue } from './core/lane-queue.js'
 export type {
   Alert as LaneAlert,
   LaneConfig,
@@ -292,7 +299,7 @@ export type {
 // Core - Fail-Safe
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { DEFAULT_FAIL_SAFE_CONFIG, FailSafe, createFailSafe } from './core/fail-safe.js'
+export { createFailSafe, DEFAULT_FAIL_SAFE_CONFIG, FailSafe } from './core/fail-safe.js'
 export type {
   FailSafeConfig,
   PanicCallback,
@@ -306,19 +313,19 @@ export type {
 // Core - Tracehound Factory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { createTracehound } from './core/tracehound.js'
-export type { ITracehound, TracehoundOptions } from './core/tracehound.js'
 export {
   formatHoundErrorReason,
   formatHoundTimeoutReason,
   SYSTEM_PANIC_REASONS,
 } from './core/operational-events.js'
+export { createTracehound } from './core/tracehound.js'
+export type { ITracehound, TracehoundOptions } from './core/tracehound.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Core - Notification Emitter
 // ─────────────────────────────────────────────────────────────────────────────
 
-export { NotificationEmitter, createNotificationEmitter } from './core/notification-emitter.js'
+export { createNotificationEmitter, NotificationEmitter } from './core/notification-emitter.js'
 export type {
   EventCallback,
   EventType,
@@ -334,4 +341,3 @@ export type {
   TracehoundEvent,
   WebhookConfig,
 } from './core/notification-emitter.js'
-

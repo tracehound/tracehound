@@ -12,7 +12,7 @@ function createScent(payload: JsonSerializable): Scent {
   return {
     id: 'test-id',
     payload,
-    source: '127.0.0.1',
+    source: { ip: '127.0.0.1' },
     timestamp: Date.now(),
   }
 }

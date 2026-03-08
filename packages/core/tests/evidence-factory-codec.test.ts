@@ -13,7 +13,7 @@ describe('EvidenceFactory with Codec', () => {
   const createScent = (payload: JsonSerializable): Scent => ({
     id: 'test-scent',
     payload,
-    source: 'test',
+    source: { ip: 'test' },
     timestamp: Date.now(),
   })
 
@@ -108,7 +108,7 @@ describe('EvidenceFactory with Codec', () => {
         id: 'raw-scent',
         payload: { normalized: true },
         ingressBytes: raw,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -136,7 +136,7 @@ describe('EvidenceFactory with Codec', () => {
         id: 'array-buffer-scent',
         payload: { normalized: true },
         ingressBytes: raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength),
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -155,7 +155,7 @@ describe('EvidenceFactory with Codec', () => {
         id: 'oversized-ingress',
         payload: { normalized: true },
         ingressBytes: raw.buffer.slice(0),
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -164,6 +164,26 @@ describe('EvidenceFactory with Codec', () => {
       expect(result.ok).toBe(false)
       if (!result.ok) {
         expect(result.error.code).toBe('AGENT_PAYLOAD_TOO_LARGE')
+      }
+    })
+
+    it('preserves zero-length ingress via deterministic sentinel bytes', () => {
+      const factory = createEvidenceFactory()
+      const scent: Scent = {
+        id: 'empty-ingress',
+        payload: { normalized: true },
+        ingressBytes: new Uint8Array(0),
+        source: { ip: 'test' },
+        timestamp: Date.now(),
+      }
+
+      const result = factory.create(scent, { category: 'spam', severity: 'low' }, 1_000_000)
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        const sentinelSize = new TextEncoder().encode('{"__th_empty_ingress":true}').byteLength
+        expect(result.size).toBe(sentinelSize)
+        expect(result.size).toBeGreaterThan(0)
       }
     })
 
@@ -176,7 +196,11 @@ describe('EvidenceFactory with Codec', () => {
         },
       })
 
-      const result = factory.create(createScent({ payload: true }), { category: 'spam', severity: 'low' }, 1_000_000)
+      const result = factory.create(
+        createScent({ payload: true }),
+        { category: 'spam', severity: 'low' },
+        1_000_000,
+      )
 
       expect(result.ok).toBe(false)
       if (!result.ok) {

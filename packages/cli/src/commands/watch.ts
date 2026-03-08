@@ -63,7 +63,9 @@ export function getSnapshot(): CliSnapshotLoadResult {
   return loadSystemSnapshot()
 }
 
-function toDashboardSnapshot(snapshotResult: Extract<CliSnapshotLoadResult, { ok: true }>): Snapshot {
+function toDashboardSnapshot(
+  snapshotResult: Extract<CliSnapshotLoadResult, { ok: true }>,
+): Snapshot {
   const snapshot = snapshotResult.snapshot
   const totalProcesses = snapshot.houndPool.totalProcesses
   const recentThreats = listTraceInspectionEntries(5).map((entry) => {

@@ -2,13 +2,13 @@
 
 ## Title and Metadata
 
-| Field | Value |
-| --- | --- |
-| RFC | 0013 |
-| Status | Draft |
-| Author | Core Maintainers |
-| Created | 2026-03-05 |
-| Depends on | RFC-0000, RFC-0011, RFC-0008 |
+| Field          | Value                                                                                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| RFC            | 0013                                                                                                                                                                                                                                             |
+| Status         | Draft                                                                                                                                                                                                                                            |
+| Author         | Core Maintainers                                                                                                                                                                                                                                 |
+| Created        | 2026-03-05                                                                                                                                                                                                                                       |
+| Depends on     | RFC-0000, RFC-0011, RFC-0008                                                                                                                                                                                                                     |
 | Implemented in | `packages/core/src/core/tracehound.ts`, `packages/core/src/utils/system-snapshot.ts`, `packages/core/src/core/hound-process.ts`, `packages/core/src/core/hound-ipc.ts`, `packages/core/src/core/hound-pool.ts`, `packages/cli/src/commands/*.ts` |
 
 ## Motivation
@@ -146,13 +146,17 @@ Acceptance checks:
 ## Alternatives Considered
 
 1. Runtime daemon IPC channel (named pipe/UDS) for CLI
+
 - Rejected for patch wave due complexity and rollout risk.
 
 2. Inline fast-check decision path in Agent
+
 - Rejected due RFC-0000 decision-free invariant.
 
 3. Per-instance random snapshot secret default
+
 - Rejected because multi-process operational tooling needs deterministic verification source.
 
 4. Claiming strict Windows ACL enforcement in Node-only path
+
 - Rejected; only best-effort is possible without host-level controls.

@@ -18,19 +18,20 @@ describe('hound-process entrypoint', () => {
     const stdinHandlers = new Map<string, (arg?: unknown) => void>()
     const written: Buffer[] = []
 
-    const stdinOnSpy = vi
-      .spyOn(process.stdin, 'on')
-      .mockImplementation(((event: string, handler: (arg?: unknown) => void) => {
-        stdinHandlers.set(event, handler)
-        return process.stdin
-      }) as typeof process.stdin.on)
+    const stdinOnSpy = vi.spyOn(process.stdin, 'on').mockImplementation(((
+      event: string,
+      handler: (arg?: unknown) => void,
+    ) => {
+      stdinHandlers.set(event, handler)
+      return process.stdin
+    }) as typeof process.stdin.on)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-    const stdoutSpy = vi
-      .spyOn(process.stdout, 'write')
-      .mockImplementation(((chunk: string | Uint8Array) => {
-        written.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-        return true
-      }) as typeof process.stdout.write)
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      chunk: string | Uint8Array,
+    ) => {
+      written.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      return true
+    }) as typeof process.stdout.write)
 
     try {
       await import('../src/core/hound-process.js')
@@ -69,25 +70,27 @@ describe('hound-process entrypoint', () => {
     const processHandlers = new Map<string, (arg?: unknown) => void>()
     const written: Buffer[] = []
 
-    const stdinOnSpy = vi
-      .spyOn(process.stdin, 'on')
-      .mockImplementation(((event: string, handler: (arg?: unknown) => void) => {
-        stdinHandlers.set(event, handler)
-        return process.stdin
-      }) as typeof process.stdin.on)
-    const processOnSpy = vi
-      .spyOn(process, 'on')
-      .mockImplementation(((event: string, handler: (arg?: unknown) => void) => {
-        processHandlers.set(event, handler)
-        return process
-      }) as typeof process.on)
+    const stdinOnSpy = vi.spyOn(process.stdin, 'on').mockImplementation(((
+      event: string,
+      handler: (arg?: unknown) => void,
+    ) => {
+      stdinHandlers.set(event, handler)
+      return process.stdin
+    }) as typeof process.stdin.on)
+    const processOnSpy = vi.spyOn(process, 'on').mockImplementation(((
+      event: string,
+      handler: (arg?: unknown) => void,
+    ) => {
+      processHandlers.set(event, handler)
+      return process
+    }) as typeof process.on)
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-    const stdoutSpy = vi
-      .spyOn(process.stdout, 'write')
-      .mockImplementation(((chunk: string | Uint8Array) => {
-        written.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-        return true
-      }) as typeof process.stdout.write)
+    const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+      chunk: string | Uint8Array,
+    ) => {
+      written.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+      return true
+    }) as typeof process.stdout.write)
 
     try {
       await import('../src/core/hound-process.js')

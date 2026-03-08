@@ -3,6 +3,7 @@
  */
 
 import type { Severity } from './common.js'
+import type { ScentSource } from './scent.js'
 
 /**
  * Record of a neutralized evidence.
@@ -64,7 +65,7 @@ export interface PurgeRecord {
   /** Minimal scent snapshot (hash only, not full payload) */
   scent: {
     id: string
-    source: string
+    source: ScentSource
     timestamp: number
     payloadHash: string
     payloadSize: number
@@ -173,6 +174,8 @@ export interface EvidenceHandle {
   readonly disposed: boolean
   /** Whether stored bytes are compressed */
   readonly compressed: boolean
+  /** Source metadata for forensic enrichment */
+  readonly source: ScentSource
 
   /**
    * Transfer ownership of bytes.

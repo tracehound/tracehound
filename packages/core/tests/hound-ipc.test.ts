@@ -341,7 +341,10 @@ describe('HoundIPC', () => {
 
     it('should throw on unknown status state code', () => {
       const payload = Buffer.from([0x01, 0x00]) // status with invalid state code
-      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      const arrayBuffer = payload.buffer.slice(
+        payload.byteOffset,
+        payload.byteOffset + payload.byteLength,
+      )
       expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Unknown.*status/i)
     })
 
@@ -358,7 +361,10 @@ describe('HoundIPC', () => {
       offset += 1
       payload.writeUInt32BE(10, offset)
 
-      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      const arrayBuffer = payload.buffer.slice(
+        payload.byteOffset,
+        payload.byteOffset + payload.byteLength,
+      )
       expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Unknown.*content/i)
     })
 
@@ -373,7 +379,10 @@ describe('HoundIPC', () => {
       offset += 1
       payload.writeUInt32BE(10, offset)
 
-      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      const arrayBuffer = payload.buffer.slice(
+        payload.byteOffset,
+        payload.byteOffset + payload.byteLength,
+      )
       expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*analysis/i)
     })
 
@@ -390,7 +399,10 @@ describe('HoundIPC', () => {
       offset += 1
       payload.writeUInt32BE(10, offset)
 
-      const arrayBuffer = payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength)
+      const arrayBuffer = payload.buffer.slice(
+        payload.byteOffset,
+        payload.byteOffset + payload.byteLength,
+      )
       expect(() => decodeHoundMessage(arrayBuffer)).toThrow(/Invalid.*analysis/i)
     })
   })

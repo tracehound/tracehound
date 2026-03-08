@@ -1,12 +1,44 @@
 /**
  * Rate Limiter - sliding window with per-source tracking and cleanup.
  *
- * SECURITY: Prevents pool exhaustion DoS by early rejection.
+ * SECURITY: Two-tier rate limiting prevents DoS and bucket-rotation bypass.
+ *   - Composite fingerprint (IP + UA + TLS): fine-grained tracking with block semantics.
+ *   - IP-only ceiling: caps total requests from one IP regardless of how many
+ *     distinct fingerprints the sender presents. New composite entries are not
+ *     created when the IP ceiling already rejects the request.
  * Memory Safety: TTL-based cleanup prevents memory leaks.
  */
 
 import type { RateLimitConfig } from '../types/config.js'
 import { Errors } from '../types/errors.js'
+import type { ScentSource } from '../types/scent.js'
+import { hash } from '../utils/hash.js'
+
+const MAX_SOURCE_KEY_COMPONENT_LENGTH = 256
+const SOURCE_KEY_HEAD_LENGTH = 160
+const SOURCE_KEY_TAIL_LENGTH = 80
+
+type NormalizedSourceKeyComponent =
+  | { kind: 'raw'; value: string }
+  | { kind: 'truncated'; head: string; tail: string; length: number }
+
+/**
+ * Bound source key component size to mitigate CPU amplification from oversized headers.
+ * Keeps deterministic entropy by preserving head + tail + original length.
+ */
+function normalizeSourceKeyComponent(value: string | undefined): NormalizedSourceKeyComponent {
+  if (value === undefined || value.length === 0) {
+    return { kind: 'raw', value: '' }
+  }
+
+  if (value.length <= MAX_SOURCE_KEY_COMPONENT_LENGTH) {
+    return { kind: 'raw', value }
+  }
+
+  const head = value.slice(0, SOURCE_KEY_HEAD_LENGTH)
+  const tail = value.slice(value.length - SOURCE_KEY_TAIL_LENGTH)
+  return { kind: 'truncated', head, tail, length: value.length }
+}
 
 /**
  * Result of a rate limit check.
@@ -24,7 +56,7 @@ export type RateLimitResult =
     }
 
 /**
- * Source tracking entry.
+ * Source tracking entry (composite fingerprint map).
  */
 interface SourceEntry {
   /** Request timestamps in current window */
@@ -36,21 +68,59 @@ interface SourceEntry {
 }
 
 /**
+ * IP ceiling entry (IP-only map, no block semantics).
+ */
+interface IpCeilingEntry {
+  /** Request timestamps in current window (allowed requests only) */
+  timestamps: number[]
+  /** Last activity timestamp for cleanup */
+  lastActivity: number
+}
+
+/**
+ * Generate composite key from ScentSource for rate limiting.
+ * Uses SHA-256 for deterministic entropy.
+ *
+ * SECURITY:
+ * - Hash-based key prevents information leakage in logs.
+ * - Component normalization bounds per-check processing for oversized headers.
+ */
+function generateSourceKey(source: ScentSource): string {
+  const components: NormalizedSourceKeyComponent[] = [
+    normalizeSourceKeyComponent(source.ip),
+    normalizeSourceKeyComponent(source.userAgent),
+    normalizeSourceKeyComponent(source.tls?.cipherSuite),
+    normalizeSourceKeyComponent(source.tls?.version),
+    normalizeSourceKeyComponent(source.tls?.alpn),
+  ]
+  return hash(JSON.stringify(components))
+}
+
+/**
  * Rate limiter interface per RFC-0000.
  */
 export interface IRateLimiter {
   /**
    * Check if source is allowed to proceed.
-   * @param source - Source identifier (IP, API key, etc.)
+   * @param source - Source identifier with extended entropy
    */
-  check(source: string): RateLimitResult
-
+  check(source: ScentSource): RateLimitResult
   /**
-   * Reset rate limit for a specific source.
+   * Reset rate limiting state for a specific composite fingerprint.
+   * @param source - Source identifier
+   */
+  resetSourceFingerprint(source: ScentSource): void
+  /**
+   * Reset the IP-wide ceiling state for a given IP address.
+   * @param ip - IP Address
+   */
+  resetIpCeiling(ip: string): void
+  /**
+   * Reset rate limiting state for a source.
    * Used for manual unblocking.
    * @param source - Source identifier
    */
-  reset(source: string): void
+  reset(source: ScentSource): void
 
   /**
    * Clean up stale entries to prevent memory leaks.
@@ -85,18 +155,21 @@ export interface RateLimiterStats {
  * Sliding window rate limiter implementation.
  *
  * Algorithm:
- * 1. Maintain list of request timestamps per source
- * 2. On check, remove timestamps outside window
- * 3. If count >= maxRequests, reject and optionally block
- * 4. Otherwise, record timestamp and allow
+ * 1. If composite entry exists: evaluate block/window state first
+ * 2. Evaluate IP-only ceiling
+ * 3. If IP ceiling rejects: return soft rejection (no penalty block)
+ * 4. If composite entry does not exist and IP allows: create/evaluate composite entry
+ * 5. Record timestamp in both maps and allow
  *
  * Block State:
- * - After maxRequests exceeded, source enters blockDurationMs penalty
+ * - After maxRequests exceeded, composite entry enters blockDurationMs penalty
  * - During block, all requests rejected with blocked: true
  * - After block expires, source can accumulate requests again
+ * - IP ceiling has no block penalty — once the window passes, requests are allowed again
  */
 export class RateLimiter implements IRateLimiter {
   private readonly sources = new Map<string, SourceEntry>()
+  private readonly ipCeiling = new Map<string, IpCeilingEntry>()
   private readonly config: Required<RateLimitConfig>
   private totalChecks = 0
   private totalRejections = 0
@@ -125,54 +198,105 @@ export class RateLimiter implements IRateLimiter {
     }
   }
 
-  check(source: string): RateLimitResult {
+  check(source: ScentSource): RateLimitResult {
     this.totalChecks++
     const now = Date.now()
+    const key = generateSourceKey(source)
+    const hasCompositeEntry = this.sources.has(key)
 
-    // Get or create source entry
-    let entry = this.sources.get(source)
+    // --- Step 1: Existing composite entry evaluation (preserve block semantics) ---
+    if (hasCompositeEntry) {
+      const compositeResult = this.evaluateExistingComposite(key, now)
+      if (!compositeResult.allowed) {
+        this.totalRejections++
+        return compositeResult
+      }
+    }
+
+    // --- Step 2: IP-only ceiling (prevents bucket-rotation bypass via UA/TLS rotation) ---
+    const ipResult = this.evaluateIpCeiling(source.ip, now)
+    if (!ipResult.allowed) {
+      this.totalRejections++
+      return ipResult
+    }
+
+    // --- Step 3: Create/evaluate composite entry only when IP ceiling allows ---
+    if (!hasCompositeEntry) {
+      const compositeResult = this.evaluateComposite(key, now)
+      if (!compositeResult.allowed) {
+        this.totalRejections++
+        return compositeResult
+      }
+    }
+
+    // --- Both checks passed: record timestamps ---
+    this.recordCompositeTimestamp(key, now)
+    this.recordIpCeiling(source.ip, now)
+
+    return { allowed: true }
+  }
+
+  /**
+   * Evaluate composite fingerprint entry.
+   * Handles LRU eviction, block state, and window count.
+   * Does NOT record the request timestamp — caller must call recordCompositeTimestamp.
+   */
+  private evaluateComposite(key: string, now: number): RateLimitResult {
+    let entry = this.sources.get(key)
     if (entry) {
-      // LRU Eviction Logic: Push to the back of the Map (youngest)
-      this.sources.delete(source)
-      this.sources.set(source, entry)
+      // LRU: move to back (youngest)
+      this.sources.delete(key)
+      this.sources.set(key, entry)
     } else {
-      // Capacity Bound check
+      // Capacity eviction
       if (this.sources.size >= this.config.maxSources) {
-        // Evict oldest (O(1)) from front of Map
-        const oldestSource = this.sources.keys().next().value
-        if (oldestSource !== undefined) {
-          this.sources.delete(oldestSource)
+        const oldest = this.sources.keys().next().value
+        if (oldest !== undefined) {
+          this.sources.delete(oldest)
           this.totalEvictions++
         }
       }
-
-      entry = {
-        timestamps: [],
-        blockedUntil: null,
-        lastActivity: now,
-      }
-      this.sources.set(source, entry)
+      entry = { timestamps: [], blockedUntil: null, lastActivity: now }
+      this.sources.set(key, entry)
     }
 
-    // Update last activity
+    return this.evaluateCompositeEntry(entry, now)
+  }
+
+  /**
+   * Evaluate existing composite fingerprint entry only (no creation).
+   * Preserves block state precedence without allocating new keys.
+   */
+  private evaluateExistingComposite(key: string, now: number): RateLimitResult {
+    const entry = this.sources.get(key)
+    if (!entry) return { allowed: true }
+
+    // LRU: move to back (youngest)
+    this.sources.delete(key)
+    this.sources.set(key, entry)
+
+    return this.evaluateCompositeEntry(entry, now)
+  }
+
+  /**
+   * Shared composite state evaluation logic.
+   */
+  private evaluateCompositeEntry(entry: SourceEntry, now: number): RateLimitResult {
     entry.lastActivity = now
 
-    // Check if currently blocked
+    // Check block state
     if (entry.blockedUntil !== null) {
       if (now < entry.blockedUntil) {
-        // Still blocked
-        this.totalRejections++
         return {
           allowed: false,
           blocked: true,
           retryAfter: entry.blockedUntil - now,
           reason: 'Source is blocked due to rate limit violation',
         }
-      } else {
-        // Block expired, clear it
-        entry.blockedUntil = null
-        entry.timestamps = []
       }
+      // Block expired
+      entry.blockedUntil = null
+      entry.timestamps = []
     }
 
     // Remove timestamps outside current window
@@ -181,9 +305,6 @@ export class RateLimiter implements IRateLimiter {
 
     // Check if limit exceeded
     if (entry.timestamps.length >= this.config.maxRequests) {
-      this.totalRejections++
-
-      // Apply block if configured
       if (this.config.blockDurationMs > 0) {
         entry.blockedUntil = now + this.config.blockDurationMs
         return {
@@ -194,14 +315,9 @@ export class RateLimiter implements IRateLimiter {
         }
       }
 
-      // No block, just sliding window rejection
-      const oldestInWindow = entry.timestamps[0]
-      // Defensive check (should never happen since length >= maxRequests)
+      const oldest = entry.timestamps[0]
       const retryAfter =
-        oldestInWindow !== undefined
-          ? oldestInWindow + this.config.windowMs - now
-          : this.config.windowMs
-
+        oldest !== undefined ? oldest + this.config.windowMs - now : this.config.windowMs
       return {
         allowed: false,
         blocked: false,
@@ -210,31 +326,142 @@ export class RateLimiter implements IRateLimiter {
       }
     }
 
-    // Allow and record timestamp
-    entry.timestamps.push(now)
     return { allowed: true }
   }
 
-  reset(source: string): void {
-    this.sources.delete(source)
+  /**
+   * Record an allowed request in the composite fingerprint map.
+   * Must be called only after evaluateComposite returns allowed.
+   */
+  private recordCompositeTimestamp(key: string, now: number): void {
+    const entry = this.sources.get(key)
+    if (entry !== undefined) {
+      entry.timestamps.push(now)
+    }
+  }
+
+  /**
+   * Evaluate IP-only ceiling (read-only, no state changes).
+   * Returns soft rejection (blocked: false) if IP has hit the ceiling.
+   */
+  private evaluateIpCeiling(ip: string, now: number): RateLimitResult {
+    const entry = this.ipCeiling.get(ip)
+    if (!entry) return { allowed: true }
+
+    // Treat reads as activity: keep hot entries fresh in LRU and cleanup horizon.
+    this.ipCeiling.delete(ip)
+    this.ipCeiling.set(ip, entry)
+    entry.lastActivity = now
+
+    const windowStart = now - this.config.windowMs
+    const inWindow: number[] = []
+    let oldestInWindow: number | undefined
+    for (let i = 0; i < entry.timestamps.length; i += 1) {
+      const ts = entry.timestamps[i]
+      if (ts !== undefined && ts > windowStart) {
+        if (oldestInWindow === undefined) {
+          oldestInWindow = ts
+        }
+        inWindow.push(ts)
+      }
+    }
+    entry.timestamps = inWindow
+
+    if (inWindow.length >= this.config.maxRequests) {
+      const retryAfter =
+        oldestInWindow !== undefined
+          ? oldestInWindow + this.config.windowMs - now
+          : this.config.windowMs
+      return {
+        allowed: false,
+        blocked: false,
+        retryAfter: Math.max(0, retryAfter),
+        reason: 'IP rate ceiling exceeded',
+      }
+    }
+
+    return { allowed: true }
+  }
+
+  /**
+   * Record an allowed request in the IP ceiling map.
+   * Must be called only after evaluateIpCeiling returns allowed.
+   */
+  private recordIpCeiling(ip: string, now: number): void {
+    let entry = this.ipCeiling.get(ip)
+    if (entry) {
+      // LRU: move to back
+      this.ipCeiling.delete(ip)
+      this.ipCeiling.set(ip, entry)
+    } else {
+      if (this.ipCeiling.size >= this.config.maxSources) {
+        const oldest = this.ipCeiling.keys().next().value
+        if (oldest !== undefined) this.ipCeiling.delete(oldest)
+        // Not counted in totalEvictions (internal ceiling map)
+      }
+      entry = { timestamps: [], lastActivity: now }
+      this.ipCeiling.set(ip, entry)
+    }
+    entry.lastActivity = now
+    const windowStart = now - this.config.windowMs
+    entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart)
+    entry.timestamps.push(now)
+  }
+
+  /**
+   * Reset rate limiting state for a specific composite fingerprint.
+   *
+   * This only clears the fine-grained per-source tracking keyed by the
+   * composite fingerprint (IP + UA + TLS, etc). It does NOT modify the
+   * IP-wide ceiling.
+   */
+  resetSourceFingerprint(source: ScentSource): void {
+    this.sources.delete(generateSourceKey(source))
+  }
+  /**
+   * Reset the IP-wide ceiling state for a given IP address.
+   *
+   * This only clears the aggregate IP ceiling counter. It does NOT clear any
+   * composite fingerprint entries associated with the IP.
+   */
+  resetIpCeiling(ip: string): void {
+    this.ipCeiling.delete(ip)
+  }
+  /**
+   * Reset rate limiting state for a source.
+   *
+   * NOTE:
+   * - This is a convenience method that resets BOTH:
+   *   - the composite fingerprint entry for the provided source, and
+   *   - the IP ceiling for source.ip (affecting all fingerprints from that IP).
+   * - Callers that need granular control should prefer:
+   *   - resetSourceFingerprint(source) to clear only the composite entry, or
+   *   - resetIpCeiling(source.ip) to clear only the IP ceiling.
+   */
+  reset(source: ScentSource): void {
+    this.resetSourceFingerprint(source)
+    this.resetIpCeiling(source.ip)
   }
 
   cleanup(): number {
     const now = Date.now()
-    // Stale threshold: no activity for window + block duration
     const staleThreshold = now - this.config.windowMs - this.config.blockDurationMs
 
     let cleaned = 0
-    for (const [source, entry] of this.sources) {
-      // Remove if:
-      // 1. Not blocked AND last activity older than stale threshold
-      // 2. OR blocked but block already expired AND stale
+    for (const [key, entry] of this.sources) {
       const isExpiredBlock = entry.blockedUntil !== null && entry.blockedUntil < now
       const isStale = entry.lastActivity < staleThreshold
 
       if (isStale && (entry.blockedUntil === null || isExpiredBlock)) {
-        this.sources.delete(source)
+        this.sources.delete(key)
         cleaned++
+      }
+    }
+
+    // Clean stale IP ceiling entries (not counted in cleaned)
+    for (const [ip, entry] of this.ipCeiling) {
+      if (entry.lastActivity < staleThreshold) {
+        this.ipCeiling.delete(ip)
       }
     }
 

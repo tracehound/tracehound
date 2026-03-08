@@ -15,8 +15,13 @@ import {
   type HoundResult,
   type IHoundPool,
 } from '../src/core/hound-pool.js'
+import type { ScentSource } from '../src/types/scent.js'
 import { encodePayload } from '../src/utils/encode.js'
 import { hashBuffer } from '../src/utils/hash.js'
+
+const defaultSource: ScentSource = {
+  ip: '127.0.0.1',
+}
 
 describe('HoundPool', () => {
   let pool: IHoundPool
@@ -50,6 +55,7 @@ describe('HoundPool', () => {
       hash,
       'high',
       Date.now(),
+      defaultSource,
     )
   }
 
@@ -137,9 +143,7 @@ describe('HoundPool', () => {
       expect(pool.stats.activeProcesses).toBe(3)
       expect(pool.stats.totalActivations).toBe(5)
       // 2 dropped = 2 error results
-      expect(results.filter((r) => r.error === HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED).length).toBe(
-        2,
-      )
+      expect(results.filter((r) => r.error === HOUND_PRESSURE_ERRORS.POOL_EXHAUSTED).length).toBe(2)
     })
   })
 
@@ -621,7 +625,9 @@ describe('HoundPool', () => {
       pool.onResult((result) => results.push(result))
       pool.shutdown()
 
-      const internals = pool as unknown as { emitResult: (result: HoundResult) => void }
+      const internals = pool as unknown as {
+        emitResult: (result: HoundResult) => void
+      }
       internals.emitResult({
         signature: 'post-shutdown',
         status: 'error',

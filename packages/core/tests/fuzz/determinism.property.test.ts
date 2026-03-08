@@ -16,7 +16,7 @@ describe('Fuzz Invariant: Determinism', () => {
         severity: threat.severity,
         scent: {
           id: 'determinism-a',
-          source: 'fuzz',
+          source: { ip: 'fuzz' },
           timestamp: 1,
           payload,
         },

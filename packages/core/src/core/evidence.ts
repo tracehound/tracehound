@@ -7,6 +7,7 @@
 import type { Severity } from '../types/common.js'
 import { Errors } from '../types/errors.js'
 import type { EvacuateRecord, EvidenceHandle, NeutralizationRecord } from '../types/evidence.js'
+import type { ScentSource } from '../types/scent.js'
 import { hashBuffer } from '../utils/hash.js'
 import { generateSecureId } from '../utils/id.js'
 
@@ -19,6 +20,7 @@ export class Evidence implements EvidenceHandle {
   private _disposed: boolean = false
   private readonly _compressed: boolean
   private readonly _now: () => number
+  private readonly _source: ScentSource
 
   constructor(
     bytes: ArrayBuffer,
@@ -26,17 +28,18 @@ export class Evidence implements EvidenceHandle {
     private readonly _expectedHash: string,
     private readonly _severity: Severity,
     private readonly _captured: number,
+    source: ScentSource,
     compressed: boolean = false,
     now: () => number = Date.now,
   ) {
     // Validate bytes type
     if (!(bytes instanceof ArrayBuffer)) {
-      throw Errors.invalidBytesType()
+      throw Errors.evidenceInvalidBytes()
     }
 
     // Validate non-empty
     if (bytes.byteLength === 0) {
-      throw Errors.emptyEvidence()
+      throw Errors.evidenceEmpty()
     }
 
     // Verify hash matches bytes ONLY for uncompressed evidence
@@ -44,13 +47,14 @@ export class Evidence implements EvidenceHandle {
     if (!compressed) {
       const actualHash = hashBuffer(bytes)
       if (actualHash !== _expectedHash) {
-        throw Errors.hashMismatch(_expectedHash, actualHash)
+        throw Errors.evidenceHashMismatch(_expectedHash, actualHash)
       }
     }
 
     this._bytes = bytes
     this._compressed = compressed
     this._now = now
+    this._source = snapshotSourceMetadata(source)
   }
 
   // ─── Getters ────────────────────────────────────────────────────────────────
@@ -88,6 +92,10 @@ export class Evidence implements EvidenceHandle {
 
   get compressed(): boolean {
     return this._compressed
+  }
+
+  get source(): ScentSource {
+    return this._source
   }
 
   // ─── Operations ─────────────────────────────────────────────────────────────
@@ -165,4 +173,36 @@ export class Evidence implements EvidenceHandle {
 
     return record
   }
+}
+
+function snapshotSourceMetadata(source: ScentSource): ScentSource {
+  const ip = typeof source.ip === 'string' && source.ip.length > 0 ? source.ip : 'unknown'
+  const userAgent =
+    typeof source.userAgent === 'string' && source.userAgent.length > 0
+      ? source.userAgent
+      : undefined
+
+  const tlsSource = source.tls
+  const tls =
+    tlsSource && typeof tlsSource === 'object'
+      ? Object.freeze({
+          cipherSuite:
+            typeof tlsSource.cipherSuite === 'string' && tlsSource.cipherSuite.length > 0
+              ? tlsSource.cipherSuite
+              : 'unknown',
+          version:
+            typeof tlsSource.version === 'string' && tlsSource.version.length > 0
+              ? tlsSource.version
+              : 'unknown',
+          ...(typeof tlsSource.alpn === 'string' && tlsSource.alpn.length > 0
+            ? { alpn: tlsSource.alpn }
+            : {}),
+        })
+      : undefined
+
+  return Object.freeze({
+    ip,
+    ...(userAgent !== undefined ? { userAgent } : {}),
+    ...(tls !== undefined ? { tls } : {}),
+  })
 }

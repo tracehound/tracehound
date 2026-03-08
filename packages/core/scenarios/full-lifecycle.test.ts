@@ -33,7 +33,7 @@ describe('Full Lifecycle Scenario', () => {
     return {
       id: generateSecureId(),
       timestamp: Date.now(),
-      source: '192.168.1.100',
+      source: { ip: '192.168.1.100' },
       payload,
       threat,
     }
@@ -43,7 +43,7 @@ describe('Full Lifecycle Scenario', () => {
     auditChain = new AuditChain()
     quarantine = new Quarantine(
       { maxCount: 100, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-      auditChain
+      auditChain,
     )
     const rateLimiter = createRateLimiter({
       windowMs: 60_000,
@@ -56,7 +56,7 @@ describe('Full Lifecycle Scenario', () => {
       { maxPayloadSize: 1_000_000 },
       quarantine,
       rateLimiter,
-      evidenceFactory
+      evidenceFactory,
     ) as Agent
   })
 
@@ -71,7 +71,7 @@ describe('Full Lifecycle Scenario', () => {
   it('should quarantine threats', () => {
     const scent = createScent(
       { action: 'sql_injection', payload: "'; DROP TABLE users; --" },
-      { category: 'injection', severity: 'critical' }
+      { category: 'injection', severity: 'critical' },
     )
     const result = agent.intercept(scent)
 
@@ -127,7 +127,7 @@ describe('Full Lifecycle Scenario', () => {
   it('should purge evidence with reason', () => {
     const scent = createScent(
       { action: 'timeout_attack' },
-      { category: 'ddos', severity: 'medium' }
+      { category: 'ddos', severity: 'medium' },
     )
     const result = agent.intercept(scent)
 
@@ -157,7 +157,7 @@ describe('Full Lifecycle Scenario', () => {
     // Create new evidence
     const scent2 = createScent(
       { action: 'new_attack' },
-      { category: 'injection', severity: 'high' }
+      { category: 'injection', severity: 'high' },
     )
     const factory = createEvidenceFactory()
     const newEvidenceResult = factory.create(scent2, scent2.threat!, 1_000_000)

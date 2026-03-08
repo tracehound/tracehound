@@ -63,9 +63,15 @@ function createRealisticMockS3(opts: MockS3Options = {}): S3LikeClient & {
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
   return {
-    get objects() { return objects },
-    get writeCount() { return writeCount },
-    get readCount() { return readCount },
+    get objects() {
+      return objects
+    },
+    get writeCount() {
+      return writeCount
+    },
+    get readCount() {
+      return readCount
+    },
 
     async putObject(params) {
       writeCount++
@@ -138,10 +144,10 @@ describe('Cold Storage Pipeline Scenario', () => {
           index % 4 === 0
             ? 'critical'
             : index % 3 === 0
-            ? 'high'
-            : index % 2 === 0
-            ? 'medium'
-            : 'low',
+              ? 'high'
+              : index % 2 === 0
+                ? 'medium'
+                : 'low',
       },
     }
   }
@@ -150,7 +156,7 @@ describe('Cold Storage Pipeline Scenario', () => {
     auditChain = new AuditChain()
     quarantine = new Quarantine(
       { maxCount: 200, maxBytes: 50_000_000, evictionPolicy: 'priority' },
-      auditChain
+      auditChain,
     )
     const rateLimiter = createRateLimiter({
       windowMs: 60_000,
@@ -163,7 +169,7 @@ describe('Cold Storage Pipeline Scenario', () => {
       { maxPayloadSize: 10_000_000 },
       quarantine,
       rateLimiter,
-      evidenceFactory
+      evidenceFactory,
     ) as Agent
   })
 
@@ -271,21 +277,25 @@ describe('Cold Storage Pipeline Scenario', () => {
 
     // Writes
     for (let i = 0; i < 20; i++) {
-      ops.push((async () => {
-        const raw = new TextEncoder().encode(`new-evidence-${i}`)
-        const encoded = await encodeWithIntegrityAsync(raw)
-        const result = await storage.write(`new-${i}`, encoded)
-        expect(result.success).toBe(true)
-      })())
+      ops.push(
+        (async () => {
+          const raw = new TextEncoder().encode(`new-evidence-${i}`)
+          const encoded = await encodeWithIntegrityAsync(raw)
+          const result = await storage.write(`new-${i}`, encoded)
+          expect(result.success).toBe(true)
+        })(),
+      )
     }
 
     // Reads
     for (let i = 0; i < 10; i++) {
-      ops.push((async () => {
-        const result = await storage.read(`existing-${i}`)
-        expect(result.success).toBe(true)
-        expect(verify(result.payload!)).toBe(true)
-      })())
+      ops.push(
+        (async () => {
+          const result = await storage.read(`existing-${i}`)
+          expect(result.success).toBe(true)
+          expect(verify(result.payload!)).toBe(true)
+        })(),
+      )
     }
 
     await Promise.all(ops)

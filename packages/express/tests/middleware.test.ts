@@ -2,9 +2,9 @@
  * Express middleware tests.
  */
 
-import { Buffer } from 'node:buffer'
 import type { IAgent, InterceptResult } from '@tracehound/core'
 import type { NextFunction, Request, Response } from 'express'
+import { Buffer } from 'node:buffer'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { tracehound } from '../src/index.js'
 
@@ -82,7 +82,10 @@ describe('tracehound middleware', () => {
   })
 
   it('should return 413 for payload_too_large result', () => {
-    const agent = createMockAgent({ status: 'payload_too_large', limit: 1000000 })
+    const agent = createMockAgent({
+      status: 'payload_too_large',
+      limit: 1000000,
+    })
     const middleware = tracehound({ agent })
     const res = createMockRes()
 
@@ -166,7 +169,12 @@ describe('tracehound middleware', () => {
   it('should return 500 for error result', () => {
     const agent = createMockAgent({
       status: 'error',
-      error: { state: 'agent', code: 'TEST', message: 'fail', recoverable: false },
+      error: {
+        state: 'agent',
+        code: 'TEST',
+        message: 'fail',
+        recoverable: false,
+      },
     })
     const middleware = tracehound({ agent })
     const res = createMockRes()
@@ -195,7 +203,10 @@ describe('tracehound middleware', () => {
 
       expect(agent.intercept).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: '10.0.0.1',
+          source: expect.objectContaining({
+            ip: '10.0.0.1',
+            userAgent: 'test-agent',
+          }),
           payload: expect.objectContaining({
             method: 'POST',
             path: '/api/data',
@@ -296,8 +307,70 @@ describe('tracehound middleware', () => {
       expect(scent.ingressBytes).toBeUndefined()
     })
 
+    it('populates source.tls when TLS socket methods are available', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+      const req = createMockReq({
+        socket: {
+          remoteAddress: '127.0.0.1',
+          getCipher: () => ({ name: 'TLS_AES_256_GCM_SHA384' }),
+          getProtocol: () => 'TLSv1.3',
+          alpnProtocol: 'h2',
+        } as unknown as Request['socket'],
+      })
+
+      middleware(req, createMockRes(), next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.tls).toEqual({
+        cipherSuite: 'TLS_AES_256_GCM_SHA384',
+        version: 'TLSv1.3',
+        alpn: 'h2',
+      })
+    })
+
+    it('omits alpn from source.tls when alpnProtocol is false', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+      const req = createMockReq({
+        socket: {
+          remoteAddress: '127.0.0.1',
+          getCipher: () => ({ name: 'TLS_AES_256_GCM_SHA384' }),
+          getProtocol: () => 'TLSv1.3',
+          alpnProtocol: false,
+        } as unknown as Request['socket'],
+      })
+
+      middleware(req, createMockRes(), next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.tls?.cipherSuite).toBe('TLS_AES_256_GCM_SHA384')
+      expect(scent.source.tls?.alpn).toBeUndefined()
+    })
+
+    it('falls back to "unknown" version when getProtocol returns null', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const middleware = tracehound({ agent })
+      const req = createMockReq({
+        socket: {
+          remoteAddress: '127.0.0.1',
+          getCipher: () => ({ name: 'TLS_AES_256_GCM_SHA384' }),
+          getProtocol: () => null,
+          alpnProtocol: false,
+        } as unknown as Request['socket'],
+      })
+
+      middleware(req, createMockRes(), next)
+
+      const scent = (agent.intercept as any).mock.calls[0][0]
+      expect(scent.source.tls?.version).toBe('unknown')
+    })
+
     it('should use defaultOnIntercept when result is blocked', () => {
-      const agent = createMockAgent({ status: 'rate_limited', retryAfter: 2000 })
+      const agent = createMockAgent({
+        status: 'rate_limited',
+        retryAfter: 2000,
+      })
       const middleware = tracehound({ agent })
       const res = createMockRes()
 
@@ -308,7 +381,9 @@ describe('tracehound middleware', () => {
     })
 
     it('fails open for unexpected intercept statuses by continuing the middleware chain', () => {
-      const agent = createMockAgent({ status: 'unexpected' } as unknown as InterceptResult)
+      const agent = createMockAgent({
+        status: 'unexpected',
+      } as unknown as InterceptResult)
       const middleware = tracehound({ agent })
       const res = createMockRes()
 
@@ -324,7 +399,7 @@ describe('tracehound middleware', () => {
     const customScent = {
       id: 'test-id',
       timestamp: Date.now(),
-      source: 'custom',
+      source: { ip: 'custom' },
       payload: { custom: true },
     }
     const extractScent = vi.fn().mockReturnValue(customScent)

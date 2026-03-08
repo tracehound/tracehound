@@ -22,6 +22,8 @@ import type { Quarantine } from './quarantine.js'
 import type { IRateLimiter, RateLimitResult } from './rate-limiter.js'
 import type { IWatcher } from './watcher.js'
 
+const UNKNOWN_RUNTIME_SOURCE: RuntimeEvidenceHandle['source'] = Object.freeze({ ip: 'unknown' })
+
 /**
  * Agent configuration (subset of TracehoundConfig).
  */
@@ -110,6 +112,7 @@ export class Agent implements IAgent {
   }
 
   private readonly emittedCoordinationWarnings = new Set<string>()
+  private lastCoordinationFallbackKey: string | null = null
 
   constructor(
     private readonly config: AgentConfig,
@@ -135,9 +138,11 @@ export class Agent implements IAgent {
       if (!rateResult.allowed) {
         this.stats.rateLimitedCount++
         const retryAfter = (rateResult as Extract<RateLimitResult, { allowed: false }>).retryAfter
-        this.notifications?.emit('rate_limit.exceeded', {
-          source: scent.source,
-          retryAfterMs: retryAfter,
+        this.runTelemetryHook(() => {
+          this.notifications?.emit('rate_limit.exceeded', {
+            source: scent.source,
+            retryAfterMs: retryAfter,
+          })
         })
         return { status: 'rate_limited', retryAfter }
       }
@@ -149,17 +154,16 @@ export class Agent implements IAgent {
         this.stats.cleanCount++
         return { status: 'clean' }
       }
+      const threat = scent.threat
 
       // Record threat in Watcher (observability) - before any further processing
-      this.watcher?.recordThreat(scent.threat.category, scent.threat.severity)
+      this.runTelemetryHook(() => {
+        this.watcher?.recordThreat(threat.category, threat.severity)
+      })
 
       // Step 3: Create evidence via factory
       // Factory handles: validation, encoding, hashing, signature generation
-      const creationResult = this.evidenceFactory.create(
-        scent,
-        scent.threat,
-        this.config.maxPayloadSize,
-      )
+      const creationResult = this.evidenceFactory.create(scent, threat, this.config.maxPayloadSize)
 
       if (!creationResult.ok) {
         // Check if it's a payload size error
@@ -222,18 +226,24 @@ export class Agent implements IAgent {
 
       // Emit observability events - fire-and-forget, must not throw
       const qStats = this.quarantine.stats
-      this.notifications?.emit('threat.detected', {
-        scentId: scent.id,
-        category: scent.threat.category,
-        severity: scent.threat.severity,
-        source: scent.source,
+      this.runTelemetryHook(() => {
+        this.notifications?.emit('threat.detected', {
+          scentId: scent.id,
+          category: threat.category,
+          severity: threat.severity,
+          source: scent.source,
+        })
       })
-      this.notifications?.emit('evidence.quarantined', {
-        signature,
-        severity: scent.threat.severity,
-        sizeBytes: qStats.bytes,
+      this.runTelemetryHook(() => {
+        this.notifications?.emit('evidence.quarantined', {
+          signature,
+          severity: threat.severity,
+          sizeBytes: qStats.bytes,
+        })
       })
-      this.watcher?.updateQuarantine(qStats.count, qStats.bytes, this.quarantine.maxBytes)
+      this.runTelemetryHook(() => {
+        this.watcher?.updateQuarantine(qStats.count, qStats.bytes, this.quarantine.maxBytes)
+      })
 
       // Success
       this.stats.quarantinedCount++
@@ -263,6 +273,7 @@ export class Agent implements IAgent {
   getCoordinationHealth(): CoordinationHealth {
     const provider = this.config.coordinationProvider as Partial<CoordinationProvider> | undefined
     if (!provider) {
+      this.trackCoordinationFallbackTransition(null)
       return {
         mode: 'local',
         lastSyncAt: null,
@@ -274,7 +285,7 @@ export class Agent implements IAgent {
     const providerId = this.resolveProviderId(provider)
 
     if (typeof provider.health !== 'function') {
-      this.stats.coordinationFallbackCount++
+      this.trackCoordinationFallbackTransition(`invalid_contract:${providerId}`)
       this.emitCoordinationWarning(
         'invalid_contract',
         providerId,
@@ -286,7 +297,7 @@ export class Agent implements IAgent {
     try {
       const healthCandidate = provider.health() as unknown
       if (!this.isValidCoordinationHealth(healthCandidate)) {
-        this.stats.coordinationFallbackCount++
+        this.trackCoordinationFallbackTransition(`invalid_contract:${providerId}`)
         this.emitCoordinationWarning(
           'invalid_contract',
           providerId,
@@ -297,7 +308,9 @@ export class Agent implements IAgent {
 
       const health = healthCandidate
       if (health.mode === 'degraded') {
-        this.stats.coordinationFallbackCount++
+        this.trackCoordinationFallbackTransition(`degraded:${providerId}`)
+      } else {
+        this.trackCoordinationFallbackTransition(null)
       }
 
       return {
@@ -307,7 +320,7 @@ export class Agent implements IAgent {
         provider: health.provider,
       }
     } catch (error: unknown) {
-      this.stats.coordinationFallbackCount++
+      this.trackCoordinationFallbackTransition(`health_failure:${providerId}`)
       this.emitCoordinationWarning('health_failure', providerId, error)
       return this.toDegradedHealth(providerId)
     }
@@ -327,9 +340,11 @@ export class Agent implements IAgent {
     readonly captured: number
     readonly severity: RuntimeEvidenceHandle['severity']
     readonly disposed: boolean
+    readonly source: RuntimeEvidenceHandle['source']
   }): RuntimeEvidenceHandle {
     const signature = evidence.signature
     const agent = this
+    const sourceSnapshot = this.createRuntimeSourceSnapshot(evidence.source)
 
     const handle = {} as RuntimeEvidenceHandle
 
@@ -362,6 +377,10 @@ export class Agent implements IAgent {
         get: (): boolean => evidence.disposed,
         enumerable: true,
       },
+      source: {
+        get: (): RuntimeEvidenceHandle['source'] => sourceSnapshot,
+        enumerable: true,
+      },
       bytes: {
         get: (): never => agent.rejectRuntimePayloadEgress('bytes', signature),
         enumerable: false,
@@ -391,14 +410,16 @@ export class Agent implements IAgent {
   ): never {
     this.stats.membraneRejectionCount++
 
-    this.notifications?.emit('system.panic', {
-      level: 'warning',
-      reason: SYSTEM_PANIC_REASONS.MEMBRANE_PAYLOAD_EGRESS_BLOCKED,
-      context: {
-        operation,
-        signature,
-        code: 'RUNTIME_MEMBRANE_VIOLATION',
-      },
+    this.runTelemetryHook(() => {
+      this.notifications?.emit('system.panic', {
+        level: 'warning',
+        reason: SYSTEM_PANIC_REASONS.MEMBRANE_PAYLOAD_EGRESS_BLOCKED,
+        context: {
+          operation,
+          signature,
+          code: 'RUNTIME_MEMBRANE_VIOLATION',
+        },
+      })
     })
 
     throw Errors.runtimeMembraneViolation(operation)
@@ -433,17 +454,39 @@ export class Agent implements IAgent {
     this.emittedCoordinationWarnings.add(dedupeKey)
     this.stats.coordinationWarningCount++
 
-    this.notifications?.emit('system.panic', {
-      level: 'warning',
-      reason:
-        reason === 'invalid_contract'
-          ? SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT
-          : SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
-      context: {
-        providerId,
-        error: this.getErrorMessage(error),
-      },
+    this.runTelemetryHook(() => {
+      this.notifications?.emit('system.panic', {
+        level: 'warning',
+        reason:
+          reason === 'invalid_contract'
+            ? SYSTEM_PANIC_REASONS.COORDINATION_INVALID_CONTRACT
+            : SYSTEM_PANIC_REASONS.COORDINATION_HEALTH_FAILURE,
+        context: {
+          providerId,
+          error: this.getErrorMessage(error),
+        },
+      })
     })
+  }
+
+  private runTelemetryHook(hook: () => void): void {
+    try {
+      hook()
+    } catch {
+      // Telemetry hooks are best-effort and must never change runtime outcomes.
+    }
+  }
+
+  private trackCoordinationFallbackTransition(nextKey: string | null): void {
+    if (nextKey === null) {
+      this.lastCoordinationFallbackKey = null
+      return
+    }
+
+    if (this.lastCoordinationFallbackKey !== nextKey) {
+      this.stats.coordinationFallbackCount++
+      this.lastCoordinationFallbackKey = nextKey
+    }
   }
 
   private getErrorMessage(error: unknown): string | undefined {
@@ -494,6 +537,65 @@ export class Agent implements IAgent {
 
   private isNonNegativeFiniteNumber(value: unknown): value is number {
     return typeof value === 'number' && Number.isFinite(value) && value >= 0
+  }
+
+  private createRuntimeSourceSnapshot(source: unknown): RuntimeEvidenceHandle['source'] {
+    if (!this.isRuntimeSource(source)) {
+      return UNKNOWN_RUNTIME_SOURCE
+    }
+
+    const tls =
+      source.tls !== undefined
+        ? Object.freeze({
+            cipherSuite: source.tls.cipherSuite,
+            version: source.tls.version,
+            ...(source.tls.alpn !== undefined ? { alpn: source.tls.alpn } : {}),
+          })
+        : undefined
+
+    return Object.freeze({
+      ip: source.ip,
+      ...(source.userAgent !== undefined ? { userAgent: source.userAgent } : {}),
+      ...(tls !== undefined ? { tls } : {}),
+    })
+  }
+
+  private isRuntimeSource(value: unknown): value is RuntimeEvidenceHandle['source'] {
+    if (typeof value !== 'object' || value === null) {
+      return false
+    }
+
+    const candidate = value as Partial<RuntimeEvidenceHandle['source']>
+    if (typeof candidate.ip !== 'string' || candidate.ip.length === 0) {
+      return false
+    }
+
+    if (candidate.userAgent !== undefined && typeof candidate.userAgent !== 'string') {
+      return false
+    }
+
+    if (candidate.tls === undefined) {
+      return true
+    }
+
+    if (typeof candidate.tls !== 'object' || candidate.tls === null) {
+      return false
+    }
+
+    if (
+      typeof candidate.tls.cipherSuite !== 'string' ||
+      candidate.tls.cipherSuite.length === 0 ||
+      typeof candidate.tls.version !== 'string' ||
+      candidate.tls.version.length === 0
+    ) {
+      return false
+    }
+
+    if (candidate.tls.alpn !== undefined && typeof candidate.tls.alpn !== 'string') {
+      return false
+    }
+
+    return true
   }
 }
 

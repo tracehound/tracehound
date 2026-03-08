@@ -87,7 +87,9 @@ type ThreatStats = ConnectedThreatStats | DisconnectedThreatStats
 function getTraceRegistrySnapshot(): TraceRegistrySnapshot {
   const registry = getTraceRegistryStats()
   const fileUsagePct =
-    registry.maxFileBytes > 0 ? Number(((registry.fileBytes / registry.maxFileBytes) * 100).toFixed(2)) : 0
+    registry.maxFileBytes > 0
+      ? Number(((registry.fileBytes / registry.maxFileBytes) * 100).toFixed(2))
+      : 0
 
   return {
     path: registry.path,
@@ -163,7 +165,7 @@ function printStats(stats: ThreatStats): void {
     ['🔴 Critical', String(stats.bySeverity.critical)],
     ['🟠 High', String(stats.bySeverity.high)],
     ['🟡 Medium', String(stats.bySeverity.medium)],
-    ['🟢 Low', String(stats.bySeverity.low)]
+    ['🟢 Low', String(stats.bySeverity.low)],
   )
   console.log(severityTable.toString())
   console.log()
@@ -176,7 +178,7 @@ function printStats(stats: ThreatStats): void {
   categoryTable.push(
     ['💉 Injection', String(stats.byCategory.injection)],
     ['🌊 DDoS', String(stats.byCategory.ddos)],
-    ['❓ Other', String(stats.byCategory.other)]
+    ['❓ Other', String(stats.byCategory.other)],
   )
   console.log(categoryTable.toString())
   console.log()
@@ -190,7 +192,7 @@ function printStats(stats: ThreatStats): void {
     ['🔒 Quarantined', String(stats.outcomes.quarantined)],
     ['⏱️  Rate Limited', String(stats.outcomes.rateLimited)],
     ['✅ Clean', String(stats.outcomes.clean)],
-    ['⏭️  Ignored', String(stats.outcomes.ignored)]
+    ['⏭️  Ignored', String(stats.outcomes.ignored)],
   )
   console.log(outcomesTable.toString())
   console.log()
@@ -213,10 +215,7 @@ function printTraceRegistry(traceRegistry: TraceRegistrySnapshot): void {
       'Disk Usage',
       `${formatBytes(traceRegistry.fileBytes)} / ${formatBytes(traceRegistry.maxFileBytes)} (${traceRegistry.fileUsagePct.toFixed(2)}%)`,
     ],
-    [
-      'Queue Depth',
-      `${traceRegistry.queueDepth} / ${traceRegistry.maxQueueEntries}`,
-    ],
+    ['Queue Depth', `${traceRegistry.queueDepth} / ${traceRegistry.maxQueueEntries}`],
     ['Dropped (in-memory)', String(traceRegistry.droppedCount)],
     ['Writes Blocked', traceRegistry.blocked ? 'yes' : 'no'],
     ['Retention TTL', formatDurationMs(traceRegistry.ttlMs)],

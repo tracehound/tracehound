@@ -91,7 +91,7 @@ export const DEFAULT_TRUST_BOUNDARY: Required<TrustBoundaryConfig> = {
  * Merge partial trust boundary with defaults.
  */
 export function mergeTrustBoundary(
-  partial?: Partial<TrustBoundaryConfig>
+  partial?: Partial<TrustBoundaryConfig>,
 ): Required<TrustBoundaryConfig> {
   if (!partial) return { ...DEFAULT_TRUST_BOUNDARY }
 

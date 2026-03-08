@@ -180,7 +180,8 @@ class Tracehound implements ITracehound {
       typeof options.quarantine?.ttlMs === 'number' &&
       options.quarantine.ttlMs > 0 &&
       options.quarantine.archiveOnDecay !== false
-    this.coldStorage = options.coldStorage ?? (shouldProvisionDefaultColdStorage ? createMemoryColdStorage() : null)
+    this.coldStorage =
+      options.coldStorage ?? (shouldProvisionDefaultColdStorage ? createMemoryColdStorage() : null)
 
     const quarantineDependencies =
       this.coldStorage === null
@@ -375,8 +376,7 @@ class Tracehound implements ITracehound {
     // tick, so recovery checks must run in a microtask.
     queueMicrotask(() => {
       const stats = this.houndPool.stats
-      const hasHeadroom =
-        stats.totalProcesses === 0 || stats.activeProcesses < stats.totalProcesses
+      const hasHeadroom = stats.totalProcesses === 0 || stats.activeProcesses < stats.totalProcesses
       if (hasHeadroom) {
         this.watcher.setOverloaded(false)
       }

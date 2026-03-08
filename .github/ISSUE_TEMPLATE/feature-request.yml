@@ -1,6 +1,6 @@
 name: Feature request
 description: Propose a new capability or improvement for Tracehound.
-title: "[Feature]: "
+title: '[Feature]: '
 labels:
   - enhancement
 body:
@@ -24,10 +24,10 @@ body:
     attributes:
       label: Requested scope
       options:
-        - "@tracehound/core"
-        - "@tracehound/express"
-        - "@tracehound/fastify"
-        - "@tracehound/cli"
+        - '@tracehound/core'
+        - '@tracehound/express'
+        - '@tracehound/fastify'
+        - '@tracehound/cli'
         - docs
         - ci/release
         - architecture/rfc

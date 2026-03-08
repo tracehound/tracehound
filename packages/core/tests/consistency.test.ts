@@ -30,7 +30,7 @@ describe('Cross-Component Consistency', () => {
       const scent: Scent = {
         id: 'consistency-1',
         payload,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -38,7 +38,7 @@ describe('Cross-Component Consistency', () => {
       const factoryResult = factory.create(
         scent,
         { category: 'injection', severity: 'high' },
-        1_000_000
+        1_000_000,
       )
 
       // Via generateSignature
@@ -61,7 +61,7 @@ describe('Cross-Component Consistency', () => {
       const scent: Scent = {
         id: 'hash-consistency',
         payload,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
       }
 
@@ -90,7 +90,7 @@ describe('Cross-Component Consistency', () => {
       const scent: Scent = {
         id: 'aq-consistency',
         payload: { attack: 'test' },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       }
@@ -112,7 +112,7 @@ describe('Cross-Component Consistency', () => {
       const scent1: Scent = {
         id: 'dup-1',
         payload,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'spam', severity: 'low' },
       }
@@ -120,7 +120,7 @@ describe('Cross-Component Consistency', () => {
       const scent2: Scent = {
         id: 'dup-2',
         payload, // Same payload
-        source: 'other',
+        source: { ip: 'other' },
         timestamp: Date.now(),
         threat: { category: 'spam', severity: 'low' },
       }
@@ -150,7 +150,7 @@ describe('Cross-Component Consistency', () => {
         const result = agent.intercept({
           id: `count-${expectedCount}`,
           payload,
-          source: 'test',
+          source: { ip: 'test' },
           timestamp: Date.now(),
           threat: { category: 'injection', severity: 'high' },
         })
@@ -178,7 +178,7 @@ describe('Cross-Component Consistency', () => {
         agent.intercept({
           id: `rl-${i}`,
           payload: { data: i },
-          source: 'same-source',
+          source: { ip: 'same-source' },
           timestamp: Date.now(),
         })
       }
@@ -206,7 +206,7 @@ describe('Cross-Component Consistency', () => {
         const result = agent.intercept({
           id: `audit-${i}`,
           payload: { threat: i },
-          source: 'test',
+          source: { ip: 'test' },
           timestamp: Date.now(),
           threat: { category: 'malware', severity: 'high' },
         })
@@ -230,7 +230,7 @@ describe('Cross-Component Consistency', () => {
       const result = agent.intercept({
         id: 'audit-match',
         payload: { sensitive: 'data' },
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
       })
@@ -260,7 +260,7 @@ describe('Cross-Component Consistency', () => {
       const result = agent.intercept({
         id: 'size-check',
         payload,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'spam', severity: 'low' },
       })
@@ -279,7 +279,7 @@ describe('Cross-Component Consistency', () => {
       const result = agent.intercept({
         id: 'hash-verify',
         payload,
-        source: 'test',
+        source: { ip: 'test' },
         timestamp: Date.now(),
         threat: { category: 'ddos', severity: 'high' },
       })
@@ -308,7 +308,7 @@ function createTestSetup(options: { maxRequests?: number } = {}) {
   const auditChain = new AuditChain()
   const quarantine = new Quarantine(
     { maxCount: 1000, maxBytes: 10_000_000, evictionPolicy: 'priority' },
-    auditChain
+    auditChain,
   )
   const rateLimiter = createRateLimiter({
     windowMs: 60_000,

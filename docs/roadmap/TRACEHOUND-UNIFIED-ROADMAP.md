@@ -142,20 +142,17 @@ Examples of low-value work from this point:
 
 ---
 
-## 8. Completed and Historical Roadmap Documents
+## 8. Completed Implementation Records
 
 These documents are not active execution plans:
 
 1. [ENHANCED-QUARANTINE-PROTOCOL.md](./ENHANCED-QUARANTINE-PROTOCOL.md) - Completed implementation record
-2. [RESILIENCE-EDGE-V2.md](./RESILIENCE-EDGE-V2.md) - Archived reference
-3. [PILOT-PROGRAM-2026.md](./PILOT-PROGRAM-2026.md) - Archived reference
-4. [SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md](./SPRINT-BOOTSTRAP-GOVERNANCE-PACK.md) - Archived reference
 
 Usage rule:
 
-1. Completed records document what shipped; archived references document ideas and historical constraints.
+1. Completed records document what shipped.
 2. Do not treat their phases, sprints, or timelines as active commitments.
-3. If a direction becomes active again, restate it here instead of reviving an old sub-roadmap.
+3. If a direction becomes active again, restate it here instead of reviving an old document.
 
 ---
 

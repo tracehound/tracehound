@@ -236,7 +236,9 @@ export class Quarantine {
       status: 'purged',
       reason,
       scent: {
-        id: evidence.scentId,
+        // Fall back to signature when scentId is absent (e.g. legacy/custom handles)
+        // to preserve audit traceability.
+        id: evidence.scentId || signature,
         source: evidence.source,
         timestamp: evidence.captured,
         payloadHash: hash,
@@ -784,7 +786,7 @@ function sanitizeStorageError(error: string): string {
     .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, '[key]')
     // Redact generic high-entropy tokens (32+ hex or base64 chars) to prevent
     // credential/secret exfiltration via error messages.
-    .replace(/\b[A-Za-z0-9+/]{32,}\b/g, '[token]')
+    .replace(/\b[A-Za-z0-9+/_-]{32,}={0,2}(?![\w-])/g, '[token]')
 
   const sanitized = redacted.trim() || 'storage write failed'
 

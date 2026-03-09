@@ -166,8 +166,9 @@ export interface EvidenceHandle {
   readonly hash: string
   /** Threat signature */
   readonly signature: string
-  /** Original scent ID that produced this evidence */
-  readonly scentId: string
+  /** Original scent ID that produced this evidence. May be absent on legacy
+   *  handles or custom implementations — consumers must treat this as optional. */
+  readonly scentId?: string
   /** Capture timestamp */
   readonly captured: number
   /** Threat severity */

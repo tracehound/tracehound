@@ -24,8 +24,8 @@ import {
   DEFAULT_CONSTRAINTS,
   getProcessIsolationTelemetry,
   type HoundHandle,
-  type HoundProcessIsolationTelemetry,
   type HoundProcessConstraints,
+  type HoundProcessIsolationTelemetry,
   type IHoundProcessAdapter,
 } from './process-adapter.js'
 
@@ -169,7 +169,7 @@ export interface IHoundPool {
   /**
    * Register result handler.
    * Internal use only - NOT exposed to Agent.
-   * Silently drops the handler if the capacity limit is reached.
+   * Silently drops the handler (with a warn message) if the capacity limit is reached.
    */
   onResult(handler: (result: HoundResult) => void): void
 

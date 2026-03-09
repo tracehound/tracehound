@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { type Mock, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   NotificationEmitter,
   createNotificationEmitter,
@@ -207,6 +207,7 @@ describe('NotificationEmitter', () => {
 
       afterEach(() => {
         vi.useRealTimers()
+        vi.unstubAllGlobals()
       })
 
       it('dispatches webhooks on event emit', async () => {

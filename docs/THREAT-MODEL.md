@@ -1,48 +1,105 @@
-# Tracehound Threat Model & Liability Boundary
+# Tracehound Threat Model
 
-This document outlines the deterministic security boundaries, predictable failure modes, and legal/liability constraints of the Tracehound Resilience Edge. It is designed for Security Operations Centers (SOC), Chief Information Security Officers (CISO), and Enterprise Engineering teams to establish a crystalline understanding of the product's operational behavior under extreme duress.
+This document describes the implemented threat boundary of Tracehound core and its adapters. It focuses on what the runtime is designed to preserve, what it intentionally does not do, and which residual risks remain.
 
-## 1. Clear Liability Boundary ("What Tracehound Is Not")
+---
 
-To establish enterprise credibility, Tracehound strictly defines its operational and legal boundaries. **Tracehound operates as a deterministic network and payload containment substrate. It does NOT make business-logic security decisions.**
+## 1. What Tracehound Is Not
 
-### 1.1 Out of Scope & Zero Liability
+Tracehound is a deterministic runtime evidence buffer. It is not:
 
-- **Business Logic Flaws:** Tracehound cannot detect or prevent Insecure Direct Object References (IDOR), Broken Access Control, or authorization bypasses inherent to the host application's architecture.
-- **Data Governance (GDPR/KVKK):** Tracehound does not automatically scrub Custom Personal Identifiable Information (PII) beyond standard predefined fields (e.g., Credit Cards, SSNs). The host application assumes all legal liability for ensuring customized data redactions are configured within Tracehound's `FilterConfig` before forensic logs reach the `AuditChain`.
-- **Operating System Vulnerabilities:** Tracehound is an App-Level Buffer (Node.js/V8). It assumes no liability for kernel-level escalations, Docker container escapes, or underlying OS zero-day exploits.
+1. a semantic detection engine
+2. a business-logic authorization layer
+3. a kernel, container, or VM isolation boundary
+4. a guarantee of lossless downstream delivery
 
-## 2. Predictable Failure Modes
+Tracehound consumes externally produced threat signals. It does not decide whether traffic is malicious on its own.
 
-Security products must fail predictably without escalating the crisis. Tracehound guarantees the following failure behaviors when subjected to algorithmic or volumetric pressure (DoS/DDoS):
+---
 
-### 2.1 The "Hard Shedding" Principle (Memory Overrun)
+## 2. Assets and Trust Boundaries
 
-- **Trigger:** A massive volumetric attack causes the in-memory Quarantine Ring Buffer to exceed its hardcoded deterministic limit (e.g., 50MB).
-- **Failure Mode:** Tracehound completely aborts forensic archiving. It prioritizes host application survival by dropping all new malicious payloads from the log. It strictly increments a lightweight `dropped_events` integer.
-- **Result:** Loss of forensic data (SOC Blind Spot), but zero risk of NodeJS Out-of-Memory (OOM) crashes.
+### 2.1 Protected runtime properties
 
-### 2.2 The "Graceful Drain" Principle (Stream Exhaustion)
+Tracehound is designed to preserve:
 
-- **Trigger:** An attacker bypasses framework limits and streams a multi-gigabyte payload (e.g., 10GB `multipart/form-data`) to exhaust V8 memory via ReDoS or buffer blooming.
-- **Failure Mode:** Tracehound intercepts the `http.IncomingMessage` stream. Once the byte limit is breached, it forcefully drains the remaining stream bytes directly into the void (to prevent OS backlog) and immediately emits a standard `HTTP/1.1 413 Payload Too Large` to the client.
-- **Result:** The client connection is gracefully terminated without destroying the underlying socket abruptly (preventing client-side exponential retry amplification storms).
+1. deterministic intercept behavior
+2. bounded evidence retention in quarantine
+3. tamper-evident audit records within the local trust boundary
+4. host survivability when Tracehound itself fails internally
 
-## 3. Bounded Blast Radius (Host Survivability)
+### 2.2 Important boundaries
 
-A core tenet of Tracehound's architecture (Axiom 1) is: **If Tracehound crashes or throws an exception, the host application MUST survive.**
+1. Raw payload bytes remain inside the quarantine boundary.
+2. Adapters are thin wrappers and should not add policy decisions.
+3. Notifications and webhooks are auxiliary control-plane paths, not part of the request hot path.
+4. Child-process separation reduces blast radius, but it is not a claim of absolute OS-enforced sandboxing.
 
-### 3.1 Unhandled Execution Panics
+---
 
-If a sub-module within Tracehound (e.g., the parser or regex engine) experiences a critical bug or infinite loop:
+## 3. Predictable Failure Modes
 
-- Tracehound operates under an isolated temporal sandbox (Finite State Machine limitations).
-- If the temporal threshold is breached, the execution is forcefully aborted.
-- The request is immediately rejected (Fail-Closed) or passed (Fail-Open) based strictly on the static `tracehound.routes.yml` configuration. The host Node.js event loop is never allowed to hang indefinitely.
+### 3.1 Internal Tracehound failure
 
-### 3.2 Storage/Disk Saturation (`ENOSPC`)
+If Tracehound fails internally during intercept processing, `agent.intercept()` returns `status: 'error'`.
 
-If the SIEM/Log streaming endpoint (e.g., Datadog, AWS S3) goes offline, on-disk WAL (Write-Ahead-Logs) will NOT fill up the host volume and crash the system.
+Default adapter behavior:
 
-- Tracehound heavily favors Memory-First Ring Buffers in production configurations (specifically for Serverless/Ephemeral environments).
-- If Disk-based WAL is explicitly enabled, it contains a hard `quota_bytes` limit. Upon breach, older logs are aggressively purged to prevent underlying Database or file-system corruption on the host.
+1. Express and Fastify pass the request through by default.
+2. Applications may opt into custom `onIntercept` handling when they explicitly own the response contract.
+
+### 3.2 Capacity pressure
+
+When bounded stores or queues fill up:
+
+1. quarantine uses deterministic eviction
+2. notification subscribers may drop oldest queued events
+3. webhook delivery may drop queued jobs or reject unsafe destinations
+
+This behavior favors host stability over lossless auxiliary delivery.
+
+### 3.3 Downstream sink failure
+
+Cold storage, notifications, and webhook sinks are not allowed to turn Tracehound into a blocking dependency for request handling.
+
+---
+
+## 4. Residual Risks
+
+### 4.1 Fail-open blind spot
+
+Fail-open preserves availability, but an attacker may benefit from a temporary analysis blind spot if they can push Tracehound into internal error states.
+
+### 4.2 Upstream parser risk
+
+Tracehound receives already-extracted `Scent` data. If the framework or body parser fails before Tracehound sees the request, that failure is outside Tracehound's protection boundary.
+
+### 4.3 Privileged host compromise
+
+A privileged attacker on the host can interfere with local files, processes, and memory. Tracehound does not claim immunity against privileged-host compromise.
+
+### 4.4 Operator-controlled integrations
+
+Webhook targets, archival sinks, and surrounding logging pipelines are part of the deployment environment. Misconfiguration in those systems can still create operational or compliance risk outside core runtime guarantees.
+
+---
+
+## 5. Data and Compliance Notes
+
+Tracehound's design limits raw payload egress from quarantine, but compliance posture is still deployment-specific.
+
+This repository does not currently expose:
+
+1. a route-policy DSL
+2. a built-in `FilterConfig` surface
+3. automatic custom PII redaction guarantees for arbitrary application fields
+
+Teams remain responsible for upstream parsing policy, downstream retention policy, and environment-specific compliance controls.
+
+---
+
+## Related Documents
+
+- [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md)
+- [SECURITY-ASSURANCE.md](./SECURITY-ASSURANCE.md)
+- [LOCAL-STATE-SEMANTICS.md](./LOCAL-STATE-SEMANTICS.md)

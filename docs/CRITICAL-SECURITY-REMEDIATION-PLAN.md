@@ -178,6 +178,8 @@ Recommended branch:
 
 ### Phase 4: Cryptographic Comparison Compliance Sweep
 
+Status: Completed on 2026-03-10.
+
 Objective: eliminate remaining direct equality in security-sensitive hash/signature checks.
 
 Scope:
@@ -202,6 +204,8 @@ Recommended branch:
 1. `security/constant-time-compare-sweep`
 
 ### Phase 5: Documentation Truth Correction
+
+Status: Completed on 2026-03-10.
 
 Objective: remove overclaims and align operator/security docs to verified runtime behavior.
 

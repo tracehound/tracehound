@@ -8,6 +8,7 @@ import type { Severity } from '../types/common.js'
 import { Errors } from '../types/errors.js'
 import type { EvacuateRecord, EvidenceHandle, NeutralizationRecord } from '../types/evidence.js'
 import type { ScentSource } from '../types/scent.js'
+import { constantTimeEqual } from '../utils/compare.js'
 import { hashBuffer } from '../utils/hash.js'
 import { generateSecureId } from '../utils/id.js'
 
@@ -47,7 +48,7 @@ export class Evidence implements EvidenceHandle {
     // For compressed evidence, hash is of uncompressed content (per RFC)
     if (!compressed) {
       const actualHash = hashBuffer(bytes)
-      if (actualHash !== _expectedHash) {
+      if (!constantTimeEqual(actualHash, _expectedHash)) {
         throw Errors.evidenceHashMismatch(_expectedHash, actualHash)
       }
     }

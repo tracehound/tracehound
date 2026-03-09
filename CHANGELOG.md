@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.8.1] - Unreleased - PR #23 Follow-up Fixes and Release Gate Hardening
+## [1.8.1] - Security QA & Docs Alignment
 
 This patch release packages the post-`v1.8.0` correctness fixes, release-gate coverage recovery, and documentation alignment work needed before the next remediation branch begins. No breaking changes are intended in this patch.
 

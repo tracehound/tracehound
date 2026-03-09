@@ -154,6 +154,10 @@ describe('FailSafe', () => {
       }
 
       fs.panic('warning', 'lowest-severity')
+      expect(fs.history.some((event) => event.context.details === 'lowest-severity')).toBe(false)
+      expect(fs.lastPanic?.level).toBe('warning')
+      expect(fs.lastPanic?.context.details).toBe('lowest-severity')
+
       fs.panic('emergency', 'latest-emergency')
 
       expect(fs.history.length).toBe(100)

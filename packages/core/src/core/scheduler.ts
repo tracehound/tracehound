@@ -7,6 +7,8 @@
  * - No blocking of hot-path
  */
 
+import { randomInt } from 'node:crypto'
+
 /**
  * Scheduled task definition.
  */
@@ -126,6 +128,7 @@ interface TaskState {
  * Tick Scheduler implementation.
  */
 export class Scheduler implements IScheduler {
+  private static readonly MAX_SCHEDULED_TASKS = 256
   private readonly tasks: Map<string, TaskState> = new Map()
   private tickTimeoutId: ReturnType<typeof setTimeout> | null = null
   private busyChecker: BusyChecker = () => false
@@ -165,6 +168,12 @@ export class Scheduler implements IScheduler {
   }
 
   schedule(task: ScheduledTask): void {
+    if (this.tasks.size >= Scheduler.MAX_SCHEDULED_TASKS) {
+      console.warn(
+        `[tracehound] Scheduler task limit (${Scheduler.MAX_SCHEDULED_TASKS}) reached, task "${task.id}" dropped`,
+      )
+      return
+    }
     this.tasks.set(task.id, {
       task,
       lastExecuted: 0,
@@ -196,8 +205,8 @@ export class Scheduler implements IScheduler {
   private scheduleTick(): void {
     if (!this._running) return
 
-    // Apply jitter to interval
-    const jitter = Math.random() * this.config.jitterMs
+    // Apply jitter to interval using crypto-strength RNG (CLAUDE.md: no Math.random in forensic paths)
+    const jitter = this.config.jitterMs > 0 ? randomInt(0, Math.ceil(this.config.jitterMs) + 1) : 0
     const delay = this.config.tickInterval + jitter
 
     this.tickTimeoutId = setTimeout(() => {

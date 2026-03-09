@@ -30,6 +30,7 @@ export class Evidence implements EvidenceHandle {
     private readonly _captured: number,
     source: ScentSource,
     compressed: boolean = false,
+    private readonly _scentId: string = '',
     now: () => number = Date.now,
   ) {
     // Validate bytes type
@@ -76,6 +77,10 @@ export class Evidence implements EvidenceHandle {
 
   get signature(): string {
     return this._signature
+  }
+
+  get scentId(): string {
+    return this._scentId
   }
 
   get captured(): number {

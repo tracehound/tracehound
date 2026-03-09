@@ -125,6 +125,7 @@ export class EvidenceFactory implements IEvidenceFactory {
         scent.timestamp,
         scent.source,
         compressed,
+        scent.id,
       )
 
       return {

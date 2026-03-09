@@ -88,6 +88,8 @@ export const DEFAULT_LANE_CONFIG: LaneQueueConfig = {
  * Lane Queue implementation.
  */
 export class LaneQueue {
+  private static readonly MAX_HANDLERS = 32
+
   private lanes: Map<Severity, Alert[]> = new Map([
     ['critical', []],
     ['high', []],
@@ -150,8 +152,13 @@ export class LaneQueue {
    *
    * @param handler - Function to call for each alert
    */
-  onAlert(handler: (alert: Alert) => void): void {
+  onAlert(handler: (alert: Alert) => void): boolean {
+    if (this.handlers.length >= LaneQueue.MAX_HANDLERS) {
+      console.warn('[tracehound] LaneQueue handlers capacity reached, handler dropped')
+      return false
+    }
     this.handlers.push(handler)
+    return true
   }
 
   /**

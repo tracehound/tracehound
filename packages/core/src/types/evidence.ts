@@ -166,6 +166,8 @@ export interface EvidenceHandle {
   readonly hash: string
   /** Threat signature */
   readonly signature: string
+  /** Original scent ID that produced this evidence */
+  readonly scentId: string
   /** Capture timestamp */
   readonly captured: number
   /** Threat severity */

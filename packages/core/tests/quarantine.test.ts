@@ -332,6 +332,24 @@ describe('Quarantine', () => {
       expect(quarantine.purge('missing', 'panic')).toBeNull()
     })
 
+    it('should record original scent ID in purge record, not evidence signature', () => {
+      const originalScentId = 'scent-original-id-abc123'
+      const size = 64
+      const bytes = new ArrayBuffer(size)
+      const view = new Uint8Array(bytes)
+      for (let i = 0; i < size; i++) view[i] = i
+      const contentHash = hashBuffer(bytes)
+      // Pass scentId as 8th arg (after compressed=false)
+      const evidence = new Evidence(bytes, 'injection:sig-scent-test', contentHash, 'high', Date.now(), { ip: '1.2.3.4' }, false, originalScentId)
+      quarantine.insert(evidence)
+
+      const record = quarantine.purge('injection:sig-scent-test', 'timeout')
+
+      expect(record).not.toBeNull()
+      expect(record!.scent.id).toBe(originalScentId)
+      expect(record!.scent.id).not.toBe(record!.signature)
+    })
+
     it('best-effort purges already disposed evidence still present in quarantine', () => {
       const disposed = createDisposedEvidence('sig-disposed', 'medium')
       quarantine.insert(disposed)

@@ -236,8 +236,8 @@ export class Quarantine {
       status: 'purged',
       reason,
       scent: {
-        id: evidence.signature, // Using signature as proxy for scent ID
-        source: evidence.source, // ScentSource from evidence handle
+        id: evidence.scentId,
+        source: evidence.source,
         timestamp: evidence.captured,
         payloadHash: hash,
         payloadSize: size,
@@ -782,9 +782,13 @@ function sanitizeStorageError(error: string): string {
     .replace(/https?:\/\/\S+/gi, '[endpoint]')
     .replace(/arn:[a-z0-9:/_\-]+/gi, '[arn]')
     .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, '[key]')
+    // Redact generic high-entropy tokens (32+ hex or base64 chars) to prevent
+    // credential/secret exfiltration via error messages.
+    .replace(/\b[A-Za-z0-9+/]{32,}\b/g, '[token]')
 
   const sanitized = redacted.trim() || 'storage write failed'
 
-  // Truncate after redaction to prevent log injection via oversized strings
+  // Truncate after redaction to prevent log injection via oversized strings.
+  // Fixed length (120) prevents length-based side-channel inference.
   return sanitized.slice(0, 120)
 }

@@ -441,6 +441,7 @@ describe('Evidence', () => {
         1000,
         defaultSource,
         false,
+        '',
         () => 4242,
       )
       const record = evidence.evacuate('s3://bucket/path')

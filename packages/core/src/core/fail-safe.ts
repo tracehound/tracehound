@@ -235,10 +235,18 @@ export class FailSafe {
    * @param event - Panic event
    */
   trigger(event: PanicEvent): void {
-    // Add to history
+    // Add to history with severity-weighted eviction.
+    // Evict the lowest-severity entry first to preserve critical/emergency events.
     this.panicHistory.push(event)
     if (this.panicHistory.length > this.maxHistory) {
-      this.panicHistory.shift()
+      const severityRank: Record<PanicLevel, number> = { warning: 0, critical: 1, emergency: 2 }
+      let evictIdx = 0
+      for (let i = 1; i < this.panicHistory.length; i++) {
+        if (severityRank[this.panicHistory[i]!.level] < severityRank[this.panicHistory[evictIdx]!.level]) {
+          evictIdx = i
+        }
+      }
+      this.panicHistory.splice(evictIdx, 1)
     }
 
     // Fire callbacks (non-blocking)

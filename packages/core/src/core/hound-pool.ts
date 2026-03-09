@@ -169,8 +169,10 @@ export interface IHoundPool {
   /**
    * Register result handler.
    * Internal use only - NOT exposed to Agent.
+   *
+   * @returns true if registered, false if capacity limit reached (handler dropped)
    */
-  onResult(handler: (result: HoundResult) => void): void
+  onResult(handler: (result: HoundResult) => void): boolean
 
   /**
    * Shutdown all processes.
@@ -202,6 +204,8 @@ interface ProcessState {
  * Uses child process isolation per RFC-0000 amendment.
  */
 export class HoundPool implements IHoundPool {
+  private static readonly MAX_RESULT_HANDLERS = 64
+
   private readonly processes: Map<string, ProcessState> = new Map()
   private readonly pendingQueue: Evidence[] = []
   private readonly resultHandlers: Array<(result: HoundResult) => void> = []
@@ -341,8 +345,13 @@ export class HoundPool implements IHoundPool {
     })
   }
 
-  onResult(handler: (result: HoundResult) => void): void {
+  onResult(handler: (result: HoundResult) => void): boolean {
+    if (this.resultHandlers.length >= HoundPool.MAX_RESULT_HANDLERS) {
+      console.warn('[tracehound] HoundPool resultHandlers capacity reached, handler dropped')
+      return false
+    }
     this.resultHandlers.push(handler)
+    return true
   }
 
   shutdown(): void {

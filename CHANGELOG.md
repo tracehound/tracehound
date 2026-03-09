@@ -68,10 +68,6 @@ This release delivers the roadmap scope for the Enhanced Quarantine Protocol, wi
 - Update custom cold storage adapters to `write(id, payload, signal?)`.
 - Ensure `rawBody` is available before Tracehound middleware/plugin execution in Express/Fastify.
 
-### Breaking Changes
-
-- None.
-
 ## [1.6.1] - 2026-03-07 - Memory Safety and Cryptographic RNG Hardening
 
 ## Release Notes

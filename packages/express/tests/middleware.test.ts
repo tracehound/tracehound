@@ -166,7 +166,7 @@ describe('tracehound middleware', () => {
     expect(traceId).toEqual(expect.any(String))
     expect(traceId).not.toBe(signature)
   })
-  it('should return 500 for error result', () => {
+  it('should fail open and call next when result is error', () => {
     const agent = createMockAgent({
       status: 'error',
       error: {
@@ -181,10 +181,9 @@ describe('tracehound middleware', () => {
 
     middleware(createMockReq(), res, next)
 
-    expect(res.status).toHaveBeenCalledWith(500)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'Internal Server Error' }),
-    )
+    expect(next).toHaveBeenCalled()
+    expect(res.status).not.toHaveBeenCalled()
+    expect(res.json).not.toHaveBeenCalled()
   })
 
   describe('default handlers', () => {
@@ -424,6 +423,32 @@ describe('tracehound middleware', () => {
 
     expect(onIntercept).toHaveBeenCalledWith({ status: 'rate_limited', retryAfter: 1000 }, req, res)
     expect(next).toHaveBeenCalled()
+  })
+
+  it('should preserve custom error handling when onIntercept sends a response', () => {
+    const agent = createMockAgent({
+      status: 'error',
+      error: {
+        state: 'agent',
+        code: 'TEST',
+        message: 'fail',
+        recoverable: false,
+      },
+    })
+    const onIntercept = vi.fn((_, __, res: Response) => {
+      ;(res as unknown as { headersSent: boolean }).headersSent = true
+      res.status(500).json({ error: 'custom failure' })
+    })
+    const middleware = tracehound({ agent, onIntercept })
+    const res = createMockRes()
+    ;(res as unknown as { headersSent: boolean }).headersSent = false
+
+    middleware(createMockReq(), res, next)
+
+    expect(onIntercept).toHaveBeenCalled()
+    expect(res.status).toHaveBeenCalledWith(500)
+    expect(res.json).toHaveBeenCalledWith({ error: 'custom failure' })
+    expect(next).not.toHaveBeenCalled()
   })
 
   it('should propagate error when custom onIntercept throws after headers are sent', () => {

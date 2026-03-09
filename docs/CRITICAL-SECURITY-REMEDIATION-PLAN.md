@@ -3,7 +3,7 @@
 > **Status:** Active
 > **Created:** 2026-03-09
 > **Scope:** Verified remediation plan for critical and high-priority security, memory, performance, and documentation-truth gaps
-> **Execution Model:** This branch adds planning only. Remediation implementation starts in follow-up branches after this document is merged.
+> **Execution Model:** Active tracking document. Remediation phases are closed incrementally with code, tests, and docs evidence.
 
 ---
 
@@ -91,6 +91,8 @@ Exit criteria:
 
 ### Phase 1: Restore Fail-Open Adapter Semantics
 
+Status: Completed on 2026-03-10.
+
 Objective: make default adapter behavior match the normative fail-open contract.
 
 Scope:
@@ -117,6 +119,8 @@ Recommended branch:
 1. `security/fail-open-default-adapters`
 
 ### Phase 2: Bound Notification and Subscriber Resource Usage
+
+Status: Completed on 2026-03-10.
 
 Objective: remove unbounded memory and async amplification in the notification plane.
 

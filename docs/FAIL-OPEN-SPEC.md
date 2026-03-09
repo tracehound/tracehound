@@ -42,6 +42,14 @@ try {
 **Caller responsibility:** Check `status === 'error'` and decide action.
 **Default recommendation:** Pass traffic through, log the error.
 
+### 1.1 Official Adapter Default
+
+The official Express and Fastify adapters treat `status === 'error'` as pass-through by default.
+
+1. If no custom intercept handler is configured, the adapter does not emit a terminal `500`.
+2. If a custom intercept handler is configured, the adapter preserves that handler's response semantics.
+3. If a custom handler throws after response start, the adapter delegates to the framework error pipeline.
+
 ---
 
 ### 2. FailSafe Panic System

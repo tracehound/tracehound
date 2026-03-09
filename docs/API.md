@@ -197,8 +197,30 @@ const stats = th.agent.getStats()
 
 1. `payload_too_large` outcomes map to graceful HTTP `413`.
 2. Oversized handling avoids destructive socket reset semantics by default.
-3. Adapter interception errors are fail-open before response start.
-4. If a custom intercept handler throws after headers are sent, adapters delegate to framework error pipelines.
+3. `InterceptResult.status === 'error'` is pass-through by default before response start.
+4. Custom `onIntercept` handlers may still emit a terminal response for `error` if they explicitly write one.
+5. If a custom intercept handler throws after headers are sent, adapters delegate to framework error pipelines.
+
+Recommended `onIntercept` pattern:
+
+```ts
+tracehound({
+  agent: th.agent,
+  onIntercept(result, req, res) {
+    if (result.status === 'error' && !res.headersSent) {
+      res.status(200).json({
+        ok: true,
+        tracehound: {
+          degraded: true,
+          code: result.error.code,
+        },
+      })
+    }
+  },
+})
+```
+
+Use this only when the application owns that route's response contract. Otherwise, keep the default silent pass-through and surface Tracehound failures through operator channels.
 
 ### Quarantine (`th.quarantine`)
 
@@ -328,6 +350,20 @@ th.notifications.on('system.panic', (payload) => {
     // exact timeout match for known signature
   }
 })
+```
+
+Notification delivery is bounded:
+
+1. Async subscribers use a fixed-size queue with deterministic oldest-drop behavior for slow consumers.
+2. Webhook delivery uses bounded inflight workers and a bounded backlog queue.
+3. Drop counters and queue depth are exposed through `th.notifications.stats`.
+
+```ts
+const notificationStats = th.notifications.stats
+console.log(notificationStats.droppedSubscriberEvents)
+console.log(notificationStats.droppedWebhookDeliveries)
+console.log(notificationStats.queuedWebhookDeliveries)
+console.log(notificationStats.inflightWebhookDeliveries)
 ```
 
 `system.panic` reason patterns used by runtime:

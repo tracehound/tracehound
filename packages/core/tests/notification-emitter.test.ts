@@ -127,6 +127,24 @@ describe('NotificationEmitter', () => {
       expect(result.value.payload).toEqual({ delayed: true })
       await iterator.return?.()
     })
+
+    it('drops oldest queued subscriber events when the slow-consumer queue is full', async () => {
+      emitter = new NotificationEmitter({ subscriberQueueLimit: 2 })
+      const subscription = emitter.subscribe()
+      const iterator = subscription[Symbol.asyncIterator]()
+
+      emitter.emit('threat.detected', { id: 1 })
+      emitter.emit('threat.detected', { id: 2 })
+      emitter.emit('threat.detected', { id: 3 })
+
+      const first = await iterator.next()
+      const second = await iterator.next()
+
+      expect(first.value.payload).toEqual({ id: 2 })
+      expect(second.value.payload).toEqual({ id: 3 })
+      expect(emitter.stats.droppedSubscriberEvents).toBe(1)
+      await iterator.return?.()
+    })
   })
 
   describe('webhook registration', () => {
@@ -304,6 +322,38 @@ describe('NotificationEmitter', () => {
 
         expect(mockFetch).toHaveBeenCalledTimes(2)
       })
+
+      it('bounds webhook inflight work and queue backlog under burst emission', async () => {
+        emitter = new NotificationEmitter({ webhookMaxInflight: 1, webhookQueueLimit: 1 })
+        let releaseFirst: (() => void) | null = null
+        mockFetch.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              if (!releaseFirst) {
+                releaseFirst = () => resolve({ ok: true, status: 200 })
+                return
+              }
+              resolve({ ok: true, status: 200 })
+            }),
+        )
+
+        emitter.registerWebhook({ url: 'https://bounded.queue/test' })
+
+        emitter.emit('threat.detected', { id: 1 })
+        emitter.emit('threat.detected', { id: 2 })
+        emitter.emit('threat.detected', { id: 3 })
+
+        expect(emitter.stats.inflightWebhookDeliveries).toBe(1)
+        expect(emitter.stats.queuedWebhookDeliveries).toBe(1)
+        expect(emitter.stats.droppedWebhookDeliveries).toBe(1)
+
+        releaseFirst?.()
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).toHaveBeenCalledTimes(2)
+        expect(emitter.stats.inflightWebhookDeliveries).toBe(0)
+        expect(emitter.stats.queuedWebhookDeliveries).toBe(0)
+      })
     })
   })
 
@@ -331,6 +381,20 @@ describe('NotificationEmitter', () => {
       emitter.on('rate_limit.exceeded', () => {})
 
       expect(emitter.stats.activeCallbacks).toBe(3)
+    })
+
+    it('exposes bounded notification configuration and counters', () => {
+      emitter = new NotificationEmitter({
+        subscriberQueueLimit: 2,
+        webhookQueueLimit: 3,
+        webhookMaxInflight: 1,
+      })
+
+      expect(emitter.stats.subscriberQueueLimit).toBe(2)
+      expect(emitter.stats.webhookQueueLimit).toBe(3)
+      expect(emitter.stats.webhookMaxInflight).toBe(1)
+      expect(emitter.stats.droppedSubscriberEvents).toBe(0)
+      expect(emitter.stats.droppedWebhookDeliveries).toBe(0)
     })
   })
 

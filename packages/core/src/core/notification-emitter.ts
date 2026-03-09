@@ -104,6 +104,9 @@ export interface WebhookConfig {
 }
 
 const MIN_SECRET_LENGTH = 16
+const DEFAULT_SUBSCRIBER_QUEUE_LIMIT = 64
+const DEFAULT_WEBHOOK_QUEUE_LIMIT = 256
+const DEFAULT_WEBHOOK_MAX_INFLIGHT = 4
 
 function isAllowedWebhookUrl(url: string): boolean {
   try {
@@ -133,6 +136,22 @@ function isAllowedWebhookUrl(url: string): boolean {
 
 interface RegisteredWebhook extends WebhookConfig {
   id: string
+}
+
+export interface NotificationEmitterOptions {
+  subscriberQueueLimit?: number
+  webhookQueueLimit?: number
+  webhookMaxInflight?: number
+}
+
+interface SubscriberEntry {
+  events: EventType[] | null
+  push: (event: TracehoundEvent) => void
+}
+
+interface WebhookDispatchJob {
+  webhook: RegisteredWebhook
+  event: TracehoundEvent
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -189,6 +208,13 @@ export interface NotificationEmitterStats {
   activeCallbacks: number
   activeSubscribers: number
   activeWebhooks: number
+  subscriberQueueLimit: number
+  droppedSubscriberEvents: number
+  queuedWebhookDeliveries: number
+  inflightWebhookDeliveries: number
+  webhookQueueLimit: number
+  webhookMaxInflight: number
+  droppedWebhookDeliveries: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -200,14 +226,30 @@ export interface NotificationEmitterStats {
  */
 export class NotificationEmitter implements INotificationEmitter {
   private callbacks = new Map<EventType, Set<EventCallback>>()
-  private subscribers: Array<{
-    events: EventType[] | null
-    push: (event: TracehoundEvent) => void
-  }> = []
+  private subscribers: SubscriberEntry[] = []
   private webhooks = new Map<string, RegisteredWebhook>()
+  private readonly subscriberQueueLimit: number
+  private readonly webhookQueueLimit: number
+  private readonly webhookMaxInflight: number
+  private readonly webhookQueue: WebhookDispatchJob[] = []
+  private activeWebhookDispatches = 0
 
   private _totalEmitted = 0
   private _byType = new Map<EventType, number>()
+  private _droppedSubscriberEvents = 0
+  private _droppedWebhookDeliveries = 0
+
+  constructor(options: NotificationEmitterOptions = {}) {
+    this.subscriberQueueLimit = normalizeBound(
+      options.subscriberQueueLimit,
+      DEFAULT_SUBSCRIBER_QUEUE_LIMIT,
+    )
+    this.webhookQueueLimit = normalizeBound(options.webhookQueueLimit, DEFAULT_WEBHOOK_QUEUE_LIMIT)
+    this.webhookMaxInflight = normalizeBound(
+      options.webhookMaxInflight,
+      DEFAULT_WEBHOOK_MAX_INFLIGHT,
+    )
+  }
 
   on<T = unknown>(event: EventType, callback: EventCallback<T>): void {
     let set = this.callbacks.get(event)
@@ -240,6 +282,10 @@ export class NotificationEmitter implements INotificationEmitter {
           resolve = null
           r({ value: event, done: false })
         } else {
+          if (queue.length >= self.subscriberQueueLimit) {
+            queue.shift()
+            self._droppedSubscriberEvents++
+          }
           queue.push(event)
         }
       },
@@ -327,9 +373,7 @@ export class NotificationEmitter implements INotificationEmitter {
     // Dispatch webhooks (async, fire-and-forget)
     for (const [, webhook] of this.webhooks) {
       if (!webhook.events || webhook.events.length === 0 || webhook.events.includes(type)) {
-        this.dispatchWebhook(webhook, event).catch(() => {
-          // Silently ignore webhook errors
-        })
+        this.enqueueWebhookDispatch(webhook, event)
       }
     }
   }
@@ -346,10 +390,49 @@ export class NotificationEmitter implements INotificationEmitter {
       activeCallbacks: Array.from(this.callbacks.values()).reduce((sum, set) => sum + set.size, 0),
       activeSubscribers: this.subscribers.length,
       activeWebhooks: this.webhooks.size,
+      subscriberQueueLimit: this.subscriberQueueLimit,
+      droppedSubscriberEvents: this._droppedSubscriberEvents,
+      queuedWebhookDeliveries: this.webhookQueue.length,
+      inflightWebhookDeliveries: this.activeWebhookDispatches,
+      webhookQueueLimit: this.webhookQueueLimit,
+      webhookMaxInflight: this.webhookMaxInflight,
+      droppedWebhookDeliveries: this._droppedWebhookDeliveries,
     }
   }
 
   // ─── Private Methods ─────────────────────────────────────────────────────────
+
+  private enqueueWebhookDispatch(webhook: RegisteredWebhook, event: TracehoundEvent): void {
+    if (this.webhookQueue.length >= this.webhookQueueLimit) {
+      this._droppedWebhookDeliveries++
+      return
+    }
+
+    this.webhookQueue.push({ webhook, event })
+    this.drainWebhookQueue()
+  }
+
+  private drainWebhookQueue(): void {
+    while (
+      this.activeWebhookDispatches < this.webhookMaxInflight &&
+      this.webhookQueue.length > 0
+    ) {
+      const job = this.webhookQueue.shift()
+      if (!job) {
+        return
+      }
+
+      this.activeWebhookDispatches++
+      this.dispatchWebhook(job.webhook, job.event)
+        .catch(() => {
+          // Silently ignore webhook errors
+        })
+        .finally(() => {
+          this.activeWebhookDispatches--
+          this.drainWebhookQueue()
+        })
+    }
+  }
 
   private async dispatchWebhook(webhook: RegisteredWebhook, event: TracehoundEvent): Promise<void> {
     const body = JSON.stringify(event)
@@ -410,6 +493,18 @@ export class NotificationEmitter implements INotificationEmitter {
 /**
  * Create a Notification Emitter instance.
  */
-export function createNotificationEmitter(): INotificationEmitter {
-  return new NotificationEmitter()
+export function createNotificationEmitter(options: NotificationEmitterOptions = {}): INotificationEmitter {
+  return new NotificationEmitter(options)
+}
+
+function normalizeBound(value: number | undefined, fallback: number): number {
+  if (value === undefined) {
+    return fallback
+  }
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return fallback
+  }
+
+  return Math.floor(value)
 }

@@ -213,7 +213,7 @@ describe('tracehoundPlugin', () => {
     expect(destroy).not.toHaveBeenCalled()
   })
 
-  it('should return 500 for error result', async () => {
+  it('should fail open and call hookDone when result is error', async () => {
     const agent = createMockAgent({
       status: 'error',
       error: {
@@ -229,14 +229,14 @@ describe('tracehoundPlugin', () => {
 
     const req = createMockReq()
     const reply = createMockReply()
+    const next = vi.fn()
 
     const hookHandler = fastify.addHook.mock.calls[0][1]
-    hookHandler(req, reply, () => {})
+    hookHandler(req, reply, next)
 
-    expect(reply.status).toHaveBeenCalledWith(500)
-    expect(reply.send).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'Internal Server Error' }),
-    )
+    expect(next).toHaveBeenCalled()
+    expect(reply.status).not.toHaveBeenCalled()
+    expect(reply.send).not.toHaveBeenCalled()
   })
 
   it('should pass through for ignored result', async () => {
@@ -625,6 +625,36 @@ describe('tracehoundPlugin', () => {
       reply,
     )
     expect(next).toHaveBeenCalled()
+  })
+
+  it('should preserve custom error handling when onIntercept sends a response', () => {
+    const agent = createMockAgent({
+      status: 'error',
+      error: {
+        state: 'agent',
+        code: 'ERR',
+        message: 'fail',
+        recoverable: false,
+      },
+    })
+    const onIntercept = vi.fn((_, __, reply: FastifyReply) => {
+      reply.status(500).send({ error: 'custom failure' })
+    })
+    const fastify = createMockFastify()
+    const next = vi.fn()
+
+    tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, onIntercept }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = fastify.addHook.mock.calls[0][1]
+    hookHandler(req, reply, next)
+
+    expect(onIntercept).toHaveBeenCalled()
+    expect(reply.status).toHaveBeenCalledWith(500)
+    expect(reply.send).toHaveBeenCalledWith({ error: 'custom failure' })
+    expect(next).not.toHaveBeenCalled()
   })
 
   it('should propagate error when custom onIntercept throws after reply is sent', () => {

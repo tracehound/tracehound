@@ -214,9 +214,7 @@ function defaultOnIntercept(
       break
 
     case 'error':
-      reply.status(500).send({
-        error: 'Internal Server Error',
-      })
+      // Default adapter behavior is fail-open for internal Tracehound errors.
       break
 
     default:

@@ -205,9 +205,7 @@ function defaultOnIntercept(
       break
 
     case 'error':
-      res.status(500).json({
-        error: 'Internal Server Error',
-      })
+      // Default adapter behavior is fail-open for internal Tracehound errors.
       break
 
     default:
@@ -265,8 +263,7 @@ export function tracehound(options: TracehoundMiddlewareOptions): RequestHandler
       const isDefaultTerminalStatus =
         result.status === 'rate_limited' ||
         result.status === 'payload_too_large' ||
-        result.status === 'quarantined' ||
-        result.status === 'error'
+        result.status === 'quarantined'
 
       interceptHandler(result, req, res)
 

@@ -1,10 +1,36 @@
 import { randomBytes } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { lookup } from 'node:dns/promises'
 import {
   NotificationEmitter,
   createNotificationEmitter,
   type TracehoundEvent,
 } from '../src/core/notification-emitter.js'
+
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(),
+}))
+
+async function drainMicrotasks(iterations = 8): Promise<void> {
+  for (let i = 0; i < iterations; i++) {
+    await Promise.resolve()
+  }
+}
+
+async function waitForCondition(
+  predicate: () => boolean,
+  message: string,
+  iterations = 16,
+): Promise<void> {
+  for (let i = 0; i < iterations; i++) {
+    if (predicate()) {
+      return
+    }
+    await drainMicrotasks()
+  }
+
+  throw new Error(message)
+}
 
 describe('NotificationEmitter', () => {
   let emitter: NotificationEmitter
@@ -213,14 +239,27 @@ describe('NotificationEmitter', () => {
       ).not.toThrow()
     })
 
+    it('rejects malformed webhook URLs', () => {
+      expect(() => emitter.registerWebhook({ url: 'not-a-url' })).toThrow(/private\/internal/)
+    })
+
+    it('rejects localhost hostnames with trailing dot notation', () => {
+      expect(() => emitter.registerWebhook({ url: 'https://localhost./hook' })).toThrow(
+        /private\/internal/,
+      )
+    })
+
     describe('dispatch', () => {
       let mockFetch: Mock
+      let lookupMock: Mock
 
       beforeEach(() => {
         vi.useFakeTimers()
         mockFetch = vi.fn()
         vi.stubGlobal('fetch', mockFetch)
         mockFetch.mockResolvedValue({ ok: true, status: 200 })
+        lookupMock = vi.mocked(lookup) as unknown as Mock
+        lookupMock.mockResolvedValue([{ address: '93.184.216.34', family: 4 }])
       })
 
       afterEach(() => {
@@ -241,6 +280,8 @@ describe('NotificationEmitter', () => {
           expect.objectContaining({
             method: 'POST',
             body: expect.stringContaining('threat.detected'),
+            redirect: 'error',
+            signal: expect.any(AbortSignal),
           }),
         )
       })
@@ -323,6 +364,53 @@ describe('NotificationEmitter', () => {
         expect(mockFetch).toHaveBeenCalledTimes(2)
       })
 
+      it('rejects unsupported protocols at registration', () => {
+        expect(() => emitter.registerWebhook({ url: 'ftp://example.com/hook' })).toThrow(
+          /private\/internal/,
+        )
+      })
+
+      it('blocks webhook delivery when DNS resolves to a private address', async () => {
+        lookupMock.mockResolvedValue([{ address: '127.0.0.1', family: 4 }])
+        emitter.registerWebhook({ url: 'https://public-name.example/hook' })
+
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
+      })
+
+      it('rejects credentialed webhook URLs at registration', () => {
+        expect(() => emitter.registerWebhook({ url: 'https://user:pass@example.com/hook' })).toThrow(
+          /private\/internal/,
+        )
+      })
+
+      it('aborts slow webhook requests after the timeout window', async () => {
+        let capturedSignal: AbortSignal | null = null
+        mockFetch.mockImplementation(
+          (_url: string, init?: { signal?: AbortSignal }) =>
+            new Promise((_resolve, _reject) => {
+              capturedSignal = init?.signal ?? null
+            }),
+        )
+
+        emitter.registerWebhook({
+          url: 'https://timeout.example/hook',
+          retry: { maxAttempts: 1, delayMs: 1 },
+        })
+        emitter.emit('threat.detected', {})
+
+        await waitForCondition(
+          () => capturedSignal !== null,
+          'expected webhook dispatch to start before timeout assertion',
+        )
+        expect(capturedSignal?.aborted).toBe(false)
+        await vi.advanceTimersByTimeAsync(5_000)
+        expect(capturedSignal?.aborted).toBe(true)
+      })
+
       it('bounds webhook inflight work and queue backlog under burst emission', async () => {
         emitter = new NotificationEmitter({ webhookMaxInflight: 1, webhookQueueLimit: 1 })
         let releaseFirst: (() => void) | null = null
@@ -347,8 +435,15 @@ describe('NotificationEmitter', () => {
         expect(emitter.stats.queuedWebhookDeliveries).toBe(1)
         expect(emitter.stats.droppedWebhookDeliveries).toBe(1)
 
+        await waitForCondition(
+          () => releaseFirst !== null && mockFetch.mock.calls.length === 1,
+          'expected first webhook delivery to enter fetch before release',
+        )
         releaseFirst?.()
-        await vi.runAllTimersAsync()
+        await waitForCondition(
+          () => mockFetch.mock.calls.length === 2,
+          'expected queued webhook delivery to drain after inflight completion',
+        )
 
         expect(mockFetch).toHaveBeenCalledTimes(2)
         expect(emitter.stats.inflightWebhookDeliveries).toBe(0)
@@ -395,6 +490,7 @@ describe('NotificationEmitter', () => {
       expect(emitter.stats.webhookMaxInflight).toBe(1)
       expect(emitter.stats.droppedSubscriberEvents).toBe(0)
       expect(emitter.stats.droppedWebhookDeliveries).toBe(0)
+      expect(emitter.stats.rejectedWebhookDeliveries).toBe(0)
     })
   })
 

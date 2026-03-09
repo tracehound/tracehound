@@ -356,12 +356,20 @@ Notification delivery is bounded:
 
 1. Async subscribers use a fixed-size queue with deterministic oldest-drop behavior for slow consumers.
 2. Webhook delivery uses bounded inflight workers and a bounded backlog queue.
-3. Drop counters and queue depth are exposed through `th.notifications.stats`.
+3. Webhook delivery rejects loopback, RFC1918, link-local, metadata-service, credentialed, malformed, and redirecting destinations.
+4. Drop counters, rejection counters, and queue depth are exposed through `th.notifications.stats`.
+
+Webhook registration is intentionally opinionated:
+
+1. Embedded URL credentials such as `https://user:pass@example.com/hook` are rejected.
+2. If the receiver requires authentication, pass it through explicit headers such as `Authorization`, not through the URL authority section.
+3. This keeps secrets out of URL logs, config dumps, and ambiguous client/proxy parsing paths.
 
 ```ts
 const notificationStats = th.notifications.stats
 console.log(notificationStats.droppedSubscriberEvents)
 console.log(notificationStats.droppedWebhookDeliveries)
+console.log(notificationStats.rejectedWebhookDeliveries)
 console.log(notificationStats.queuedWebhookDeliveries)
 console.log(notificationStats.inflightWebhookDeliveries)
 ```

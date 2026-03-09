@@ -149,6 +149,8 @@ Recommended branch:
 
 ### Phase 3: Harden Webhook SSRF Controls
 
+Status: Completed on 2026-03-10.
+
 Objective: upgrade webhook delivery from denylist validation to a defensible outbound policy.
 
 Scope:

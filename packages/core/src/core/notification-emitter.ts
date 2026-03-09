@@ -9,6 +9,7 @@
 
 import { generateSecureId } from '../utils/id.js'
 import { Errors } from '../types/errors.js'
+import { isIP } from 'node:net'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Event Types
@@ -88,7 +89,7 @@ export interface LicenseExpiredPayload {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface WebhookConfig {
-  /** Webhook URL */
+  /** Webhook URL. Embedded credentials are rejected; pass auth via headers instead. */
   url: string
   /** Events to subscribe to (empty = all) */
   events?: EventType[]
@@ -107,27 +108,28 @@ const MIN_SECRET_LENGTH = 16
 const DEFAULT_SUBSCRIBER_QUEUE_LIMIT = 64
 const DEFAULT_WEBHOOK_QUEUE_LIMIT = 256
 const DEFAULT_WEBHOOK_MAX_INFLIGHT = 4
+const WEBHOOK_REQUEST_TIMEOUT_MS = 5_000
 
 function isAllowedWebhookUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
-    const hostname = parsed.hostname.toLowerCase()
-    if (hostname === '169.254.169.254' || hostname === 'metadata.google.internal') return false
-    if (hostname === '::1' || hostname === '[::1]') return false
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') return false
-    const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-    if (ipv4Match) {
-      const [, a, b] = ipv4Match
-      const first = parseInt(a!, 10)
-      const second = parseInt(b!, 10)
-      if (first === 10) return false
-      if (first === 172 && second >= 16 && second <= 31) return false
-      if (first === 192 && second === 168) return false
-      if (first === 127) return false
-      if (first === 169 && second === 254) return false
-    }
-    if (hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('fe80'))
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return false
+    }
+    if (parsed.username.length > 0 || parsed.password.length > 0) {
+      return false
+    }
+
+    const hostname = normalizeHostname(parsed.hostname)
+    if (isBlockedHostname(hostname)) {
+      return false
+    }
+
+    const ipFamily = isIP(hostname)
+    if (ipFamily !== 0) {
+      return !isBlockedIpAddress(hostname)
+    }
+
     return true
   } catch {
     return false
@@ -215,6 +217,7 @@ export interface NotificationEmitterStats {
   webhookQueueLimit: number
   webhookMaxInflight: number
   droppedWebhookDeliveries: number
+  rejectedWebhookDeliveries: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -238,6 +241,7 @@ export class NotificationEmitter implements INotificationEmitter {
   private _byType = new Map<EventType, number>()
   private _droppedSubscriberEvents = 0
   private _droppedWebhookDeliveries = 0
+  private _rejectedWebhookDeliveries = 0
 
   constructor(options: NotificationEmitterOptions = {}) {
     this.subscriberQueueLimit = normalizeBound(
@@ -397,6 +401,7 @@ export class NotificationEmitter implements INotificationEmitter {
       webhookQueueLimit: this.webhookQueueLimit,
       webhookMaxInflight: this.webhookMaxInflight,
       droppedWebhookDeliveries: this._droppedWebhookDeliveries,
+      rejectedWebhookDeliveries: this._rejectedWebhookDeliveries,
     }
   }
 
@@ -435,6 +440,12 @@ export class NotificationEmitter implements INotificationEmitter {
   }
 
   private async dispatchWebhook(webhook: RegisteredWebhook, event: TracehoundEvent): Promise<void> {
+    const destinationAllowed = await this.isWebhookDestinationAllowed(webhook.url)
+    if (!destinationAllowed) {
+      this._rejectedWebhookDeliveries++
+      return
+    }
+
     const body = JSON.stringify(event)
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -453,12 +464,21 @@ export class NotificationEmitter implements INotificationEmitter {
     const delayMs = webhook.retry?.delayMs ?? 1000
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_REQUEST_TIMEOUT_MS)
+      if (typeof timeoutId.unref === 'function') {
+        timeoutId.unref()
+      }
+
       try {
         const response = await fetch(webhook.url, {
           method: 'POST',
           headers,
           body,
+          redirect: 'error',
+          signal: controller.signal,
         })
+        this.discardResponseBody(response)
 
         if (response.ok) {
           return
@@ -477,12 +497,65 @@ export class NotificationEmitter implements INotificationEmitter {
           continue
         }
         // Max attempts reached, give up silently
+      } finally {
+        clearTimeout(timeoutId)
       }
     }
   }
 
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  private discardResponseBody(response: Response): void {
+    void response.body?.cancel().catch(() => {
+      // Ignore cancel errors; body is never consumed in webhook mode.
+    })
+  }
+
+  private async isWebhookDestinationAllowed(url: string): Promise<boolean> {
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      return false
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return false
+    }
+
+    if (parsed.username.length > 0 || parsed.password.length > 0) {
+      return false
+    }
+
+    const normalizedHostname = normalizeHostname(parsed.hostname)
+    if (isBlockedHostname(normalizedHostname)) {
+      return false
+    }
+
+    const ipFamily = isIP(normalizedHostname)
+    if (ipFamily !== 0) {
+      return !isBlockedIpAddress(normalizedHostname)
+    }
+
+    try {
+      const { lookup } = await import('node:dns/promises')
+      const resolved = await lookup(normalizedHostname, { all: true, verbatim: true })
+      if (resolved.length === 0) {
+        return false
+      }
+
+      for (const entry of resolved) {
+        if (isBlockedIpAddress(entry.address)) {
+          return false
+        }
+      }
+
+      return true
+    } catch {
+      return false
+    }
   }
 }
 
@@ -507,4 +580,75 @@ function normalizeBound(value: number | undefined, fallback: number): number {
   }
 
   return Math.floor(value)
+}
+
+function normalizeHostname(hostname: string): string {
+  let normalized = hostname.toLowerCase()
+  if (normalized.startsWith('[') && normalized.endsWith(']')) {
+    normalized = normalized.slice(1, -1)
+  }
+  normalized = normalized.replace(/\.+$/, '')
+  return normalized
+}
+
+function isBlockedHostname(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    hostname === 'metadata.google.internal' ||
+    hostname === '0.0.0.0'
+  )
+}
+
+function isBlockedIpAddress(address: string): boolean {
+  const normalized = normalizeHostname(address)
+
+  if (normalized.startsWith('::ffff:')) {
+    return isBlockedIpAddress(normalized.slice(7))
+  }
+
+  const family = isIP(normalized)
+  if (family === 4) {
+    return isBlockedIpv4(normalized)
+  }
+  if (family === 6) {
+    return isBlockedIpv6(normalized)
+  }
+
+  return true
+}
+
+function isBlockedIpv4(address: string): boolean {
+  const parts = address.split('.').map((part) => parseInt(part, 10))
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return true
+  }
+
+  const [a, b] = parts
+  if (a === undefined || b === undefined) {
+    return true
+  }
+
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  )
+}
+
+function isBlockedIpv6(address: string): boolean {
+  return (
+    address === '::' ||
+    address === '::1' ||
+    address === '0:0:0:0:0:0:0:1' ||
+    address.startsWith('fc') ||
+    address.startsWith('fd') ||
+    address.startsWith('fe8') ||
+    address.startsWith('fe9') ||
+    address.startsWith('fea') ||
+    address.startsWith('feb')
+  )
 }

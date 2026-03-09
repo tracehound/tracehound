@@ -147,8 +147,10 @@ describe('Scheduler', () => {
 
     it('should allow rescheduling an existing task ID even when at capacity', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const original = vi.fn()
 
-      for (let i = 0; i < 256; i++) {
+      scheduler.schedule({ id: 'task-cap-0', execute: original, intervalMs: 100 })
+      for (let i = 1; i < 256; i++) {
         scheduler.schedule({ id: `task-cap-${i}`, execute: () => {}, intervalMs: 100 })
       }
 
@@ -157,6 +159,11 @@ describe('Scheduler', () => {
       scheduler.schedule({ id: 'task-cap-0', execute: updated, intervalMs: 200 })
       expect(scheduler.stats.scheduledTasks).toBe(256)
       expect(consoleSpy).not.toHaveBeenCalled()
+
+      scheduler.start()
+      vi.advanceTimersByTime(250)
+      expect(updated).toHaveBeenCalled()
+      expect(original).not.toHaveBeenCalled()
 
       consoleSpy.mockRestore()
     })

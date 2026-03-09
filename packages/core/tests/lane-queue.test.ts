@@ -91,6 +91,30 @@ describe('LaneQueue', () => {
       expect(smallQueue.stats.dropped).toBe(1)
     })
 
+    it('should handle drop_lowest overflow by evicting the lowest non-empty lane first', () => {
+      const dropLowestQueue = createLaneQueue({
+        lanes: {
+          critical: { maxSize: 1, rateLimit: 0 },
+          high: { maxSize: 1, rateLimit: 0 },
+          medium: { maxSize: 1, rateLimit: 0 },
+          low: { maxSize: 1, rateLimit: 0 },
+        },
+        overflow: 'drop_lowest',
+      })
+
+      dropLowestQueue.enqueue(createAlert('low', 'l1'))
+      dropLowestQueue.enqueue(createAlert('high', 'h1'))
+      const result = dropLowestQueue.enqueue(createAlert('high', 'h2'))
+
+      expect(result).toBe(true)
+      expect(dropLowestQueue.stats.dropped).toBe(1)
+      expect(dropLowestQueue.stats.counts.low).toBe(0)
+      expect(dropLowestQueue.stats.counts.high).toBe(2)
+      expect(dropLowestQueue.dequeue()?.id).toBe('h1')
+      expect(dropLowestQueue.dequeue()?.id).toBe('h2')
+      expect(dropLowestQueue.dequeue()).toBeUndefined()
+    })
+
     it('should handle reject overflow', () => {
       const rejectQueue = createLaneQueue({
         lanes: {
@@ -108,6 +132,42 @@ describe('LaneQueue', () => {
       expect(result).toBe(false)
       expect(rejectQueue.stats.dropped).toBe(1)
     })
+
+    it('should reject when drop_oldest cannot free space from an empty lane', () => {
+      const invalidQueue = createLaneQueue({
+        lanes: {
+          critical: { maxSize: -1, rateLimit: 0 },
+          high: { maxSize: -1, rateLimit: 0 },
+          medium: { maxSize: -1, rateLimit: 0 },
+          low: { maxSize: -1, rateLimit: 0 },
+        },
+        overflow: 'drop_oldest',
+      })
+
+      const result = invalidQueue.enqueue(createAlert('high', 'invalid-drop-oldest'))
+
+      expect(result).toBe(false)
+      expect(invalidQueue.stats.dropped).toBe(1)
+      expect(invalidQueue.size).toBe(0)
+    })
+
+    it('should reject when drop_lowest cannot free space from any lane', () => {
+      const invalidQueue = createLaneQueue({
+        lanes: {
+          critical: { maxSize: -1, rateLimit: 0 },
+          high: { maxSize: -1, rateLimit: 0 },
+          medium: { maxSize: -1, rateLimit: 0 },
+          low: { maxSize: -1, rateLimit: 0 },
+        },
+        overflow: 'drop_lowest',
+      })
+
+      const result = invalidQueue.enqueue(createAlert('critical', 'invalid-drop-lowest'))
+
+      expect(result).toBe(false)
+      expect(invalidQueue.stats.dropped).toBe(1)
+      expect(invalidQueue.size).toBe(0)
+    })
   })
 
   describe('handlers', () => {
@@ -120,6 +180,26 @@ describe('LaneQueue', () => {
       queue.flush()
 
       expect(handler).toHaveBeenCalledTimes(2)
+    })
+
+    it('should drop handlers beyond the fixed capacity', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const handler = vi.fn()
+
+      for (let i = 0; i < 32; i++) {
+        queue.onAlert(() => {})
+      }
+
+      queue.onAlert(handler)
+      queue.enqueue(createAlert('critical', 'critical-capacity'))
+      queue.flush()
+
+      expect(handler).not.toHaveBeenCalled()
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[tracehound] LaneQueue handlers capacity reached, handler dropped',
+      )
+
+      warnSpy.mockRestore()
     })
   })
 })

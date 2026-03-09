@@ -10,10 +10,9 @@ import { Errors } from '../types/errors.js'
  */
 function isProtoDisabled(): boolean {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const obj = {} as any
-    // If __proto__ throws, flag is set correctly
-    void obj.__proto__
+    // Use Reflect.get to probe __proto__ without bypassing TypeScript's type system.
+    // If --disable-proto=throw is active, this throws at runtime.
+    void Reflect.get({}, '__proto__')
     return false
   } catch {
     return true

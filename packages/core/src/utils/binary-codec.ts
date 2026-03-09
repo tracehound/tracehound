@@ -82,14 +82,15 @@ export class GzipCodec implements ColdPathCodec {
    */
   encode(bytes: Uint8Array): Uint8Array {
     this._encodeCount++
-    this._totalInputBytes += bytes.length
+    // Cap at MAX_SAFE_INTEGER to prevent silent precision loss on long-running instances.
+    this._totalInputBytes = Math.min(this._totalInputBytes + bytes.length, Number.MAX_SAFE_INTEGER)
 
     const compressed = gzipSync(bytes, {
       level: 6, // Balanced speed/compression
     })
 
     const result = new Uint8Array(compressed)
-    this._totalOutputBytes += result.length
+    this._totalOutputBytes = Math.min(this._totalOutputBytes + result.length, Number.MAX_SAFE_INTEGER)
 
     return result
   }
@@ -191,11 +192,11 @@ export class AsyncGzipCodec implements AsyncColdPathCodec {
    */
   async encode(bytes: Uint8Array): Promise<Uint8Array> {
     this._encodeCount++
-    this._totalInputBytes += bytes.length
+    this._totalInputBytes = Math.min(this._totalInputBytes + bytes.length, Number.MAX_SAFE_INTEGER)
 
     const compressed = await gzipAsync(bytes, { level: 6 })
     const result = new Uint8Array(compressed)
-    this._totalOutputBytes += result.length
+    this._totalOutputBytes = Math.min(this._totalOutputBytes + result.length, Number.MAX_SAFE_INTEGER)
 
     return result
   }

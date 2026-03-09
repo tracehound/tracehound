@@ -24,8 +24,8 @@ import {
   DEFAULT_CONSTRAINTS,
   getProcessIsolationTelemetry,
   type HoundHandle,
-  type HoundProcessIsolationTelemetry,
   type HoundProcessConstraints,
+  type HoundProcessIsolationTelemetry,
   type IHoundProcessAdapter,
 } from './process-adapter.js'
 
@@ -169,6 +169,7 @@ export interface IHoundPool {
   /**
    * Register result handler.
    * Internal use only - NOT exposed to Agent.
+   * Silently drops the handler (with a warn message) if the capacity limit is reached.
    */
   onResult(handler: (result: HoundResult) => void): void
 
@@ -202,6 +203,8 @@ interface ProcessState {
  * Uses child process isolation per RFC-0000 amendment.
  */
 export class HoundPool implements IHoundPool {
+  private static readonly MAX_RESULT_HANDLERS = 64
+
   private readonly processes: Map<string, ProcessState> = new Map()
   private readonly pendingQueue: Evidence[] = []
   private readonly resultHandlers: Array<(result: HoundResult) => void> = []
@@ -342,6 +345,10 @@ export class HoundPool implements IHoundPool {
   }
 
   onResult(handler: (result: HoundResult) => void): void {
+    if (this.resultHandlers.length >= HoundPool.MAX_RESULT_HANDLERS) {
+      console.warn('[tracehound] HoundPool resultHandlers capacity reached, handler dropped')
+      return
+    }
     this.resultHandlers.push(handler)
   }
 

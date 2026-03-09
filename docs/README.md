@@ -15,6 +15,7 @@
 | **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)                                                     | Runtime and adapter configuration defaults       |
 | **Migration**     | [BREAKING-CHANGES.md](./BREAKING-CHANGES.md)                                               | Breaking changes and upgrade path                |
 | **Roadmap**       | [roadmap/TRACEHOUND-UNIFIED-ROADMAP.md](./roadmap/TRACEHOUND-UNIFIED-ROADMAP.md)           | Authoritative technical roadmap                  |
+| **Remediation**   | [CRITICAL-SECURITY-REMEDIATION-PLAN.md](./CRITICAL-SECURITY-REMEDIATION-PLAN.md)           | Active plan for verified critical security gaps  |
 | **Validation**    | [../security/paranoid-validation-playbook.md](../security/paranoid-validation-playbook.md) | Deep security review and release validation path |
 
 ---

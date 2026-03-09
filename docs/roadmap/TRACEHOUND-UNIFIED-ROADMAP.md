@@ -57,16 +57,17 @@ Interpretation:
 Goal: move from lab confidence to real-world OSS validation with minimal planning overhead.
 
 1. Keep this file as the only active roadmap.
-2. Collapse roadmap sprawl by treating other roadmap documents as archived reference inputs.
-3. Run soak when useful, but treat it as confidence evidence rather than a universal ship gate.
-4. Gather OSS field feedback:
+2. Treat [../CRITICAL-SECURITY-REMEDIATION-PLAN.md](../CRITICAL-SECURITY-REMEDIATION-PLAN.md) as the active execution plan for the verified March 9, 2026 security remediation backlog until those blockers are closed.
+3. Collapse roadmap sprawl by treating other roadmap documents as archived reference inputs.
+4. Run soak when useful, but treat it as confidence evidence rather than a universal ship gate.
+5. Gather OSS field feedback:
    - install friction
    - configuration friction
    - false-positive containment noise
    - restart and upgrade survivability
    - incident reconstruction usefulness
-5. Prefer real issue intake, operator notes, and field reports over creating new roadmap sub-documents.
-6. Keep release discipline lightweight for docs-weighted or minimal-code releases.
+6. Prefer real issue intake, operator notes, and field reports over creating new roadmap sub-documents.
+7. Keep release discipline lightweight for docs-weighted or minimal-code releases.
 
 ### Next
 
@@ -175,9 +176,10 @@ Usage rule:
 ## 11. References
 
 1. [docs/README.md](../README.md)
-2. [internal/ROADMAP.md](../../internal/ROADMAP.md)
-3. [docs/rfc/0002-Argos.md](../rfc/0002-Argos.md)
-4. [docs/rfc/0008-RustCorePivot.md](../rfc/0008-RustCorePivot.md)
-5. [docs/rfc/0009-CoordinationProviderContract.md](../rfc/0009-CoordinationProviderContract.md)
-6. [docs/rfc/0014-Watchtower.md](../rfc/0014-Watchtower.md)
-7. [docs/roadmap/FORENSIC-INTEGRITY-AND-TEST-HARDENING-NOTE.md](./FORENSIC-INTEGRITY-AND-TEST-HARDENING-NOTE.md)
+2. [docs/CRITICAL-SECURITY-REMEDIATION-PLAN.md](../CRITICAL-SECURITY-REMEDIATION-PLAN.md)
+3. [internal/ROADMAP.md](../../internal/ROADMAP.md)
+4. [docs/rfc/0002-Argos.md](../rfc/0002-Argos.md)
+5. [docs/rfc/0008-RustCorePivot.md](../rfc/0008-RustCorePivot.md)
+6. [docs/rfc/0009-CoordinationProviderContract.md](../rfc/0009-CoordinationProviderContract.md)
+7. [docs/rfc/0014-Watchtower.md](../rfc/0014-Watchtower.md)
+8. [docs/roadmap/FORENSIC-INTEGRITY-AND-TEST-HARDENING-NOTE.md](./FORENSIC-INTEGRITY-AND-TEST-HARDENING-NOTE.md)

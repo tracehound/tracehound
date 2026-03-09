@@ -2,7 +2,7 @@
  * Express middleware tests.
  */
 
-import type { IAgent, InterceptResult } from '@tracehound/core'
+import type { IAgent, InterceptResult, RuntimeEvidenceHandle } from '@tracehound/core'
 import type { NextFunction, Request, Response } from 'express'
 import { Buffer } from 'node:buffer'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -17,7 +17,7 @@ function createMockAgent(result: InterceptResult): IAgent {
 }
 
 // Mock Express objects
-function createMockReq(overrides: Partial<Request> = {}): Request {
+function createMockReq(overrides: Partial<Request & { rawBody: Buffer }> = {}): Request {
   return {
     ip: '127.0.0.1',
     method: 'GET',
@@ -116,7 +116,7 @@ describe('tracehound middleware', () => {
   it('should NOT return signature by default for quarantined result', () => {
     const agent = createMockAgent({
       status: 'quarantined',
-      handle: { signature: 'test-sig' } as any,
+      handle: { signature: 'test-sig' } as unknown as RuntimeEvidenceHandle,
     })
     const middleware = tracehound({ agent })
     const res = createMockRes()
@@ -124,7 +124,7 @@ describe('tracehound middleware', () => {
     middleware(createMockReq(), res, next)
 
     expect(res.status).toHaveBeenCalledWith(403)
-    const jsonBody = (res.json as any).mock.calls[0][0]
+    const jsonBody = vi.mocked(res.json).mock.calls[0][0]
     expect(jsonBody.signature).toBeUndefined()
     expect(jsonBody.error).toBe('Forbidden')
     expect(res.set).not.toHaveBeenCalledWith('x-tracehound-trace-id', expect.any(String))
@@ -133,7 +133,7 @@ describe('tracehound middleware', () => {
   it('should return signature when emitSignatureInResponse is true', () => {
     const agent = createMockAgent({
       status: 'quarantined',
-      handle: { signature: 'test-sig' } as any,
+      handle: { signature: 'test-sig' } as unknown as RuntimeEvidenceHandle,
     })
     const middleware = tracehound({ agent, emitSignatureInResponse: true })
     const res = createMockRes()
@@ -148,7 +148,7 @@ describe('tracehound middleware', () => {
     const signature = 'trace-123'
     const agent = createMockAgent({
       status: 'quarantined',
-      handle: { signature } as any,
+      handle: { signature } as unknown as RuntimeEvidenceHandle,
     })
     const middleware = tracehound({ agent, emitTraceIdHeader: true })
     const res = createMockRes()
@@ -157,8 +157,8 @@ describe('tracehound middleware', () => {
 
     expect(res.status).toHaveBeenCalledWith(403)
 
-    const traceIdCall = (res.set as any).mock.calls.find(
-      ([name]: [string]) => name === 'x-tracehound-trace-id',
+    const traceIdCall = vi.mocked(res.set).mock.calls.find(
+      ([name]) => name === 'x-tracehound-trace-id',
     )
     expect(traceIdCall).toBeDefined()
 
@@ -221,21 +221,22 @@ describe('tracehound middleware', () => {
       const agent = createMockAgent({ status: 'clean' })
       const middleware = tracehound({ agent })
 
-      const circular: any = { a: 1 }
-      circular.self = circular
+      const circular: Record<string, unknown> = { a: 1 }
+      circular['self'] = circular
 
       const req = createMockReq({
         body: circular,
-        query: { circ: circular } as any,
+        query: { circ: circular } as unknown as Request['query'],
       })
 
       // Should not throw
       expect(() => middleware(req, createMockRes(), next)).not.toThrow()
       expect(agent.intercept).toHaveBeenCalled()
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
-      expect(scent.payload.body).toBeUndefined() // safeClone returns undefined on circular
-      expect(scent.payload.query.circ).toBeUndefined()
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+      const scentPayload = scent.payload as Record<string, unknown>
+      expect(scentPayload['body']).toBeUndefined() // safeClone returns undefined on circular
+      expect((scentPayload['query'] as Record<string, unknown> | undefined)?.['circ']).toBeUndefined()
     })
 
     it('captures rawBody bytes into ingressBytes when available', () => {
@@ -251,9 +252,9 @@ describe('tracehound middleware', () => {
         next,
       )
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.ingressBytes).toBeInstanceOf(Uint8Array)
-      expect(Buffer.from(scent.ingressBytes).toString('utf8')).toBe('{"raw":true}')
+      expect(Buffer.from(scent.ingressBytes! as Uint8Array).toString('utf8')).toBe('{"raw":true}')
     })
 
     it('does not populate ingressBytes from string body when rawBody is absent', () => {
@@ -270,7 +271,7 @@ describe('tracehound middleware', () => {
         next,
       )
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.ingressBytes).toBeUndefined()
     })
 
@@ -286,7 +287,7 @@ describe('tracehound middleware', () => {
         next,
       )
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.ingressBytes).toBeUndefined()
     })
 
@@ -303,7 +304,7 @@ describe('tracehound middleware', () => {
         next,
       )
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.ingressBytes).toBeUndefined()
     })
 
@@ -321,7 +322,7 @@ describe('tracehound middleware', () => {
 
       middleware(req, createMockRes(), next)
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.source.tls).toEqual({
         cipherSuite: 'TLS_AES_256_GCM_SHA384',
         version: 'TLSv1.3',
@@ -343,7 +344,7 @@ describe('tracehound middleware', () => {
 
       middleware(req, createMockRes(), next)
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.source.tls?.cipherSuite).toBe('TLS_AES_256_GCM_SHA384')
       expect(scent.source.tls?.alpn).toBeUndefined()
     })
@@ -362,7 +363,7 @@ describe('tracehound middleware', () => {
 
       middleware(req, createMockRes(), next)
 
-      const scent = (agent.intercept as any).mock.calls[0][0]
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.source.tls?.version).toBe('unknown')
     })
 
@@ -429,14 +430,14 @@ describe('tracehound middleware', () => {
     const expected = new Error('custom intercept failed')
     const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
     const onIntercept = vi.fn((_, __, res: Response) => {
-      ;(res as any).headersSent = true
+      ;(res as unknown as { headersSent: boolean }).headersSent = true
       throw expected
     })
 
     const middleware = tracehound({ agent, onIntercept })
     const req = createMockReq()
-    const res = createMockRes() as any
-    res.headersSent = false
+    const res = createMockRes()
+    ;(res as unknown as { headersSent: boolean }).headersSent = false
 
     middleware(req, res, next)
 

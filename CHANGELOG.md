@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.1] - Unreleased - PR #23 Follow-up Fixes and Release Gate Hardening
+
+This patch release packages the post-`v1.8.0` correctness fixes, release-gate coverage recovery, and documentation alignment work needed before the next remediation branch begins. No breaking changes are intended in this patch.
+
+### Fixed
+
+- `FailSafe.lastPanic` now always reflects the most recently triggered panic event, even when severity-weighted history eviction removes an older lower-severity entry.
+- Scheduler capacity handling now permits rescheduling an existing task ID at the hard task cap, while still dropping the 257th unique task deterministically with a warning.
+- Scheduler jitter input is clamped before `randomInt()` so non-integer jitter configuration cannot exceed the declared bound.
+- `EvidenceHandle.scentId` remains optional for downstream/custom handle implementations, preventing an accidental patch-level type break.
+- Quarantine purge audit records now fall back to `signature` when `scentId` is absent, preserving traceability for legacy or custom evidence handles.
+- `LaneQueue.onAlert()` and `HoundPool.onResult()` remain `void`-returning APIs; internal drop-and-warn behavior is preserved without changing the public contract.
+
+### Tests
+
+- Added regression coverage for scheduler task-capacity boundaries, including explicit assertions for unique-task drop behavior and same-ID rescheduling at capacity.
+- Added regression coverage for fail-safe severity-weighted history eviction and `lastPanic` correctness immediately after eviction pressure.
+- Added regression coverage for lane-queue overflow modes, handler-capacity enforcement, and defensive fallback paths used by branch-diff coverage gates.
+- Tightened cold-storage and Fastify adapter tests to better exercise timing budgets and fail-open reply-state guards.
+
+### Documentation
+
+- Added a repository-local critical security remediation plan to capture the verified high-priority backlog that will be executed in follow-up branches after this patch release.
+- Linked the remediation plan from the documentation index and unified roadmap so release reviewers have a canonical reference for the next security workstream.
+
 ## [1.8.0] - 2026-03-09 - TLS Source Signals and Runtime Hardening
 
 ### Added
@@ -67,10 +92,6 @@ This release delivers the roadmap scope for the Enhanced Quarantine Protocol, wi
 - Replace `purgeRecord.purgeTimestamp` with `purgeRecord.timestamp`.
 - Update custom cold storage adapters to `write(id, payload, signal?)`.
 - Ensure `rawBody` is available before Tracehound middleware/plugin execution in Express/Fastify.
-
-### Breaking Changes
-
-- None.
 
 ## [1.6.1] - 2026-03-07 - Memory Safety and Cryptographic RNG Hardening
 

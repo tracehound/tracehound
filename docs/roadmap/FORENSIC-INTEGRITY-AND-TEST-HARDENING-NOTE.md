@@ -22,15 +22,18 @@ Both topics are high-value for assurance posture, but are not treated as current
 
 ### Concern
 
-`ScentSource` metadata currently has mutation surface through object-reference flow.  
+`ScentSource` metadata currently has mutation surface through object-reference flow.
 Current AuditChain guarantees are strong for lifecycle/hash continuity, but metadata immutability guarantees should be evaluated explicitly before claiming full forensic context tamper-evidence.
+
+**Confirmed attack vector (2026-03-09 QA review):** `Evidence.bytes` getter in `packages/core/src/core/evidence.ts:62-67` returns the internal `ArrayBuffer` reference directly. A caller can open a `Uint8Array` view on the returned buffer and mutate the underlying bytes in-place — bypassing the ownership model established at construction time. This is a post-capture mutation path that the current freeze strategy does not cover.
 
 ### Investigation Goals
 
 1. Verify all source metadata paths for reference leakage and post-capture mutation risk.
-2. Define deterministic immutable snapshot strategy for metadata captured into Evidence.
-3. Decide whether and how metadata integrity (`sourceDigest` or equivalent) must be sealed in AuditChain event material.
-4. Evaluate backward compatibility impact and migration requirements.
+2. **Evaluate `Evidence.bytes` getter: defensive copy (`slice(0)`) vs. internal accessor split** — a private `_rawBytes()` path for performance-critical internal consumers alongside a public copy-returning getter.
+3. Define deterministic immutable snapshot strategy for metadata captured into Evidence.
+4. Decide whether and how metadata integrity (`sourceDigest` or equivalent) must be sealed in AuditChain event material.
+5. Evaluate backward compatibility impact and migration requirements.
 
 ### Expected Deliverables
 

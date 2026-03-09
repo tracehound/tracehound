@@ -126,6 +126,48 @@ describe('Scheduler', () => {
       expect(executions).toBeGreaterThan(0)
     })
 
+    it('should drop a new task when MAX_SCHEDULED_TASKS is reached and warn', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      // Fill to capacity (256 unique IDs)
+      for (let i = 0; i < 256; i++) {
+        scheduler.schedule({ id: `task-cap-${i}`, execute: () => {}, intervalMs: 100 })
+      }
+      expect(scheduler.stats.scheduledTasks).toBe(256)
+
+      // 257th unique ID must be dropped
+      scheduler.schedule({ id: 'task-overflow', execute: () => {}, intervalMs: 100 })
+      expect(scheduler.stats.scheduledTasks).toBe(256)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('task "task-overflow" dropped'),
+      )
+
+      consoleSpy.mockRestore()
+    })
+
+    it('should allow rescheduling an existing task ID even when at capacity', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const original = vi.fn()
+
+      scheduler.schedule({ id: 'task-cap-0', execute: original, intervalMs: 100 })
+      for (let i = 1; i < 256; i++) {
+        scheduler.schedule({ id: `task-cap-${i}`, execute: () => {}, intervalMs: 100 })
+      }
+
+      // Rescheduling an existing ID must not be dropped and must not warn
+      const updated = vi.fn()
+      scheduler.schedule({ id: 'task-cap-0', execute: updated, intervalMs: 200 })
+      expect(scheduler.stats.scheduledTasks).toBe(256)
+      expect(consoleSpy).not.toHaveBeenCalled()
+
+      scheduler.start()
+      vi.advanceTimersByTime(250)
+      expect(updated).toHaveBeenCalled()
+      expect(original).not.toHaveBeenCalled()
+
+      consoleSpy.mockRestore()
+    })
+
     it('multiple tasks execute independently', () => {
       let task1Count = 0
       let task2Count = 0

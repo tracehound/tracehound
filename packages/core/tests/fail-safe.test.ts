@@ -145,6 +145,27 @@ describe('FailSafe', () => {
 
       expect(fs.history.length).toBe(100)
     })
+
+    it('should evict the lowest severity history entry first and preserve lastPanic', () => {
+      const fs = createFailSafe()
+
+      for (let i = 0; i < 100; i++) {
+        fs.panic('critical', `critical-${i}`)
+      }
+
+      fs.panic('warning', 'lowest-severity')
+      expect(fs.history.some((event) => event.context.details === 'lowest-severity')).toBe(false)
+      expect(fs.lastPanic?.level).toBe('warning')
+      expect(fs.lastPanic?.context.details).toBe('lowest-severity')
+
+      fs.panic('emergency', 'latest-emergency')
+
+      expect(fs.history.length).toBe(100)
+      expect(fs.history.some((event) => event.context.details === 'lowest-severity')).toBe(false)
+      expect(fs.history.some((event) => event.context.details === 'latest-emergency')).toBe(true)
+      expect(fs.lastPanic?.level).toBe('emergency')
+      expect(fs.lastPanic?.context.details).toBe('latest-emergency')
+    })
   })
 
   describe('error handling', () => {
@@ -162,6 +183,27 @@ describe('FailSafe', () => {
       })
 
       expect(() => failSafe.panic('warning')).not.toThrow()
+    })
+  })
+
+  describe('factory', () => {
+    it('should merge partial configuration with defaults', () => {
+      const fs = createFailSafe({
+        memory: { warning: 0.5, critical: 0.75, emergency: 0.9 },
+      })
+      const handler = vi.fn()
+
+      fs.on('warning', handler)
+      fs.checkMemory(60, 100)
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warning',
+          context: expect.objectContaining({
+            threshold: 0.5,
+          }),
+        }),
+      )
     })
   })
 })

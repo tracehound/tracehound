@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   NotificationEmitter,
   createNotificationEmitter,
@@ -196,12 +196,18 @@ describe('NotificationEmitter', () => {
     })
 
     describe('dispatch', () => {
-      let mockFetch: any
+      let mockFetch: Mock
 
       beforeEach(() => {
+        vi.useFakeTimers()
         mockFetch = vi.fn()
         vi.stubGlobal('fetch', mockFetch)
         mockFetch.mockResolvedValue({ ok: true, status: 200 })
+      })
+
+      afterEach(() => {
+        vi.useRealTimers()
+        vi.unstubAllGlobals()
       })
 
       it('dispatches webhooks on event emit', async () => {
@@ -210,7 +216,7 @@ describe('NotificationEmitter', () => {
         emitter.emit('threat.detected', { foo: 'bar' })
 
         // Wait for async dispatch
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await vi.runAllTimersAsync()
 
         expect(mockFetch).toHaveBeenCalledWith(
           'https://webhook.site/test',
@@ -228,11 +234,11 @@ describe('NotificationEmitter', () => {
         })
 
         emitter.emit('rate_limit.exceeded', {})
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await vi.runAllTimersAsync()
         expect(mockFetch).not.toHaveBeenCalled()
 
         emitter.emit('threat.detected', {})
-        await new Promise((resolve) => setTimeout(resolve, 10))
+        await vi.runAllTimersAsync()
         expect(mockFetch).toHaveBeenCalled()
       })
 
@@ -243,7 +249,7 @@ describe('NotificationEmitter', () => {
         })
 
         emitter.emit('threat.detected', { data: 1 })
-        await new Promise((resolve) => setTimeout(resolve, 50)) // Hashing takes a bit more time with dynamic import
+        await vi.runAllTimersAsync() // Hashing takes a bit more time with dynamic import
 
         expect(mockFetch).toHaveBeenCalledWith(
           'https://secure.webhook',
@@ -266,7 +272,7 @@ describe('NotificationEmitter', () => {
         })
 
         emitter.emit('threat.detected', {})
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await vi.runAllTimersAsync()
 
         expect(mockFetch).toHaveBeenCalledTimes(2)
       })
@@ -280,7 +286,7 @@ describe('NotificationEmitter', () => {
         })
 
         emitter.emit('threat.detected', {})
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await vi.runAllTimersAsync()
 
         expect(mockFetch).toHaveBeenCalledTimes(2)
       })
@@ -294,7 +300,7 @@ describe('NotificationEmitter', () => {
         })
 
         emitter.emit('threat.detected', {})
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await vi.runAllTimersAsync()
 
         expect(mockFetch).toHaveBeenCalledTimes(2)
       })

@@ -807,7 +807,7 @@ describe('Agent', () => {
       const houndPool: IHoundPool = {
         activate,
         terminate: vi.fn(),
-        onResult: vi.fn(),
+        onResult: vi.fn().mockReturnValue(true),
         shutdown: vi.fn(),
         stats: {
           activeProcesses: 0,

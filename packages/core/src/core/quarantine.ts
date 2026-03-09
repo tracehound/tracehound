@@ -236,8 +236,10 @@ export class Quarantine {
       status: 'purged',
       reason,
       scent: {
-        id: evidence.signature, // Using signature as proxy for scent ID
-        source: evidence.source, // ScentSource from evidence handle
+        // Fall back to signature when scentId is absent (e.g. legacy/custom handles)
+        // to preserve audit traceability.
+        id: evidence.scentId || signature,
+        source: evidence.source,
         timestamp: evidence.captured,
         payloadHash: hash,
         payloadSize: size,
@@ -782,9 +784,14 @@ function sanitizeStorageError(error: string): string {
     .replace(/https?:\/\/\S+/gi, '[endpoint]')
     .replace(/arn:[a-z0-9:/_\-]+/gi, '[arn]')
     .replace(/\b(AKIA|ASIA)[A-Z0-9]{16}\b/g, '[key]')
+    // Redact generic high-entropy tokens (32+ hex or base64 chars) to prevent
+    // credential/secret exfiltration via error messages.
+    .replace(/\b[A-Za-z0-9+/_-]{32,}={0,2}(?![\w-])/g, '[token]')
 
   const sanitized = redacted.trim() || 'storage write failed'
 
-  // Truncate after redaction to prevent log injection via oversized strings
+  // Truncate after redaction to prevent log injection via oversized strings.
+  // Bounded max length (120) limits information leakage; strings shorter than
+  // 120 chars remain shorter — this is not a fixed-length (padded) output.
   return sanitized.slice(0, 120)
 }

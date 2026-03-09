@@ -21,20 +21,16 @@ function createNoisyPayload(size: number): Uint8Array {
   return bytes
 }
 
-async function waitForDiskQueueDrain(storage: MemoryColdStorage, timeoutMs = 2000): Promise<void> {
-  const startedAt = Date.now()
-
-  while (Date.now() - startedAt < timeoutMs) {
-    if (storage.diskQueueDepth === 0) {
-      // allow queued microtasks/fs callbacks to settle
-      await new Promise((resolve) => setTimeout(resolve, 5))
-      return
+async function waitForDiskQueueDrain(storage: MemoryColdStorage, timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  // Poll with setTimeout(0) to yield to the I/O callback queue — setImmediate
+  // alone runs before I/O callbacks and cannot observe appendFile completion.
+  while (storage.diskQueueDepth !== 0) {
+    if (Date.now() >= deadline) {
+      throw new Error('disk queue did not drain in time')
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 10))
+    await new Promise<void>((resolve) => setTimeout(resolve, 10))
   }
-
-  throw new Error('disk queue did not drain in time')
 }
 
 describe('ColdStorage', () => {

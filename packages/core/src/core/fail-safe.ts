@@ -119,6 +119,7 @@ export class FailSafe {
   ])
 
   private panicHistory: PanicEvent[] = []
+  private _lastPanic: PanicEvent | undefined = undefined
   private readonly maxHistory = 100
 
   constructor(private config: FailSafeConfig = DEFAULT_FAIL_SAFE_CONFIG) {}
@@ -235,10 +236,22 @@ export class FailSafe {
    * @param event - Panic event
    */
   trigger(event: PanicEvent): void {
-    // Add to history
+    // Track the most-recently triggered event before any eviction so that
+    // lastPanic always reflects the current event, not a post-eviction artifact.
+    this._lastPanic = event
+
+    // Add to history with severity-weighted eviction.
+    // Evict the lowest-severity entry first to preserve critical/emergency events.
     this.panicHistory.push(event)
     if (this.panicHistory.length > this.maxHistory) {
-      this.panicHistory.shift()
+      const severityRank: Record<PanicLevel, number> = { warning: 0, critical: 1, emergency: 2 }
+      let evictIdx = 0
+      for (let i = 1; i < this.panicHistory.length; i++) {
+        if (severityRank[this.panicHistory[i]!.level] < severityRank[this.panicHistory[evictIdx]!.level]) {
+          evictIdx = i
+        }
+      }
+      this.panicHistory.splice(evictIdx, 1)
     }
 
     // Fire callbacks (non-blocking)
@@ -268,7 +281,7 @@ export class FailSafe {
    * Get last panic event.
    */
   get lastPanic(): PanicEvent | undefined {
-    return this.panicHistory[this.panicHistory.length - 1]
+    return this._lastPanic
   }
 
   /**

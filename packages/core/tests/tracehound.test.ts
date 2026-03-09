@@ -165,8 +165,15 @@ describe('Tracehound Factory', () => {
         }
 
         // Jittered ticks and async archival can complete at different points
-        // under fake timers, so poll deterministically until decay settles.
-        for (let attempt = 0; attempt < 20 && tracehound.quarantine.stats.count > 0; attempt++) {
+        // under fake timers, so poll until decay bookkeeping and archival settle.
+        for (
+          let attempt = 0;
+          attempt < 50 &&
+          (tracehound.quarantine.stats.count > 0 ||
+            tracehound.quarantine.stats.decayedCount === 0 ||
+            tracehound.quarantine.stats.archivedCount === 0);
+          attempt++
+        ) {
           await vi.advanceTimersByTimeAsync(20)
           await flushMicrotasks()
           // Yield to the real event loop so the libuv gzip thread-pool callback
@@ -175,9 +182,12 @@ describe('Tracehound Factory', () => {
           await flushMicrotasks()
         }
 
-        const archived = await tracehound.coldStorage.read(result.handle.signature)
         expect(tracehound.quarantine.stats.count).toBe(0)
         expect(tracehound.quarantine.stats.decayedCount).toBe(1)
+        expect(tracehound.quarantine.stats.archivedCount).toBe(1)
+        expect(tracehound.quarantine.stats.archiveFailureCount).toBe(0)
+
+        const archived = await tracehound.coldStorage.read(result.handle.signature)
         expect(archived.success).toBe(true)
       } finally {
         tracehound.shutdown()

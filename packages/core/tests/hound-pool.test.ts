@@ -223,6 +223,51 @@ describe('HoundPool', () => {
       expect(pool.stats.avgProcessingMs).toBeGreaterThanOrEqual(0)
     })
 
+    it('should register handler within capacity without error', () => {
+      expect(() => pool.onResult(() => {})).not.toThrow()
+    })
+
+    it('should drop handler and warn when MAX_RESULT_HANDLERS capacity is reached', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      // Register up to the limit (64)
+      for (let i = 0; i < 64; i++) {
+        pool.onResult(() => {})
+      }
+
+      // 65th registration should be silently dropped with a warning
+      pool.onResult(() => {})
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[tracehound] HoundPool resultHandlers capacity reached, handler dropped',
+      )
+
+      consoleSpy.mockRestore()
+    })
+
+    it('should not invoke dropped handler when processing completes', () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      // Fill to capacity
+      for (let i = 0; i < 64; i++) {
+        pool.onResult(() => {})
+      }
+
+      // Register a handler that should be dropped
+      let droppedHandlerCalled = false
+      pool.onResult(() => {
+        droppedHandlerCalled = true
+      })
+
+      pool.activate(createEvidence('test-overflow'))
+      const processes = mockAdapter.getMockProcesses()
+      const pid = [...processes.keys()][0]
+      simulateProcessComplete(pid)
+
+      expect(droppedHandlerCalled).toBe(false)
+
+      consoleSpy.mockRestore()
+    })
+
     it('continues emitting when one result handler throws', () => {
       let successfulHandlerCalls = 0
       pool.onResult(() => {

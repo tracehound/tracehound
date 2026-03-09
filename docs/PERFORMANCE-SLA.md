@@ -44,12 +44,10 @@ The intercept path currently performs:
 
 These reflect the current implementation, including known hot spots:
 
-1. Quarantine eviction is deterministic and priority-aware, but victim selection is not currently documented as constant time.
-2. Quarantine stats are derived from current in-memory state and may require iteration.
-3. Rate limiter state is bounded, but timestamp pruning still creates hot-path work under sustained pressure.
+1. Quarantine eviction is deterministic and priority-aware, with victim selection performed by deterministic bounded selection rather than full-store sorting.
+2. Quarantine stats are exposed from maintained in-memory counters; snapshot reads no longer rescan the full store for severity totals or next expiry.
+3. Rate limiter state is bounded, and timestamp pruning now compacts bounded per-source windows instead of allocating filtered arrays on each hot check.
 4. Notification subscribers and webhook delivery are bounded and off the hot path.
-
-Phase 6 of the remediation plan tracks the remaining performance refactor work.
 
 ---
 
@@ -57,19 +55,19 @@ Phase 6 of the remediation plan tracks the remaining performance refactor work.
 
 ### Quarantine
 
-| Metric | Default | Configurable |
-| ------ | ------- | ------------ |
-| Max items | 10,000 | Yes |
-| Max bytes | 100MB | Yes |
-| Eviction policy | Priority, then age | No |
+| Metric          | Default            | Configurable |
+| --------------- | ------------------ | ------------ |
+| Max items       | 10,000             | Yes          |
+| Max bytes       | 100MB              | Yes          |
+| Eviction policy | Priority, then age | No           |
 
 ### Notification plane
 
-| Surface | Bound |
-| ------- | ----- |
+| Surface                | Bound                     |
+| ---------------------- | ------------------------- |
 | Async subscriber queue | Fixed-size per subscriber |
-| Webhook backlog | Fixed-size queue |
-| Webhook inflight work | Fixed concurrency cap |
+| Webhook backlog        | Fixed-size queue          |
+| Webhook inflight work  | Fixed concurrency cap     |
 
 Bounded does not mean lossless. Under pressure, Tracehound may drop queued notification work to preserve host stability.
 
@@ -93,7 +91,7 @@ These tests print observed throughput and latency during execution.
 This document does not currently promise:
 
 1. fixed p50 or p99 latency targets across environments
-2. constant-time eviction or stats derivation
+2. constant-time eviction across total quarantine size
 3. unlimited worker capacity
 4. lossless downstream delivery under sink failure
 

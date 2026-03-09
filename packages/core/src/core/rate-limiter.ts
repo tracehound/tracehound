@@ -55,12 +55,84 @@ export type RateLimitResult =
       reason: string
     }
 
+interface TimestampWindow {
+  values: number[]
+  start: number
+}
+
+function createTimestampWindow(): TimestampWindow {
+  return { values: [], start: 0 }
+}
+
+function clearTimestampWindow(window: TimestampWindow): void {
+  window.values = []
+  window.start = 0
+}
+
+function compactTimestampWindow(window: TimestampWindow): void {
+  if (window.start === 0) {
+    return
+  }
+
+  if (window.start >= window.values.length) {
+    clearTimestampWindow(window)
+    return
+  }
+
+  window.values = window.values.slice(window.start)
+  window.start = 0
+}
+
+function pruneTimestampWindow(
+  window: TimestampWindow,
+  windowStart: number,
+  maxRetainedEntries: number,
+): void {
+  while (window.start < window.values.length) {
+    const timestamp = window.values[window.start]
+    if (timestamp === undefined || timestamp > windowStart) {
+      break
+    }
+
+    window.start += 1
+  }
+
+  if (window.start === window.values.length) {
+    clearTimestampWindow(window)
+    return
+  }
+
+  if (window.start >= maxRetainedEntries || window.start * 2 >= window.values.length) {
+    compactTimestampWindow(window)
+  }
+}
+
+function appendTimestampWindow(
+  window: TimestampWindow,
+  timestamp: number,
+  maxRetainedEntries: number,
+): void {
+  if (window.start >= maxRetainedEntries || window.start * 2 >= window.values.length) {
+    compactTimestampWindow(window)
+  }
+
+  window.values.push(timestamp)
+}
+
+function getTimestampWindowCount(window: TimestampWindow): number {
+  return window.values.length - window.start
+}
+
+function getTimestampWindowOldest(window: TimestampWindow): number | undefined {
+  return window.values[window.start]
+}
+
 /**
  * Source tracking entry (composite fingerprint map).
  */
 interface SourceEntry {
   /** Request timestamps in current window */
-  timestamps: number[]
+  timestamps: TimestampWindow
   /** If blocked, when block expires */
   blockedUntil: number | null
   /** Last activity timestamp for cleanup */
@@ -72,7 +144,7 @@ interface SourceEntry {
  */
 interface IpCeilingEntry {
   /** Request timestamps in current window (allowed requests only) */
-  timestamps: number[]
+  timestamps: TimestampWindow
   /** Last activity timestamp for cleanup */
   lastActivity: number
 }
@@ -256,7 +328,7 @@ export class RateLimiter implements IRateLimiter {
           this.totalEvictions++
         }
       }
-      entry = { timestamps: [], blockedUntil: null, lastActivity: now }
+      entry = { timestamps: createTimestampWindow(), blockedUntil: null, lastActivity: now }
       this.sources.set(key, entry)
     }
 
@@ -296,15 +368,15 @@ export class RateLimiter implements IRateLimiter {
       }
       // Block expired
       entry.blockedUntil = null
-      entry.timestamps = []
+      clearTimestampWindow(entry.timestamps)
     }
 
     // Remove timestamps outside current window
     const windowStart = now - this.config.windowMs
-    entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart)
+    pruneTimestampWindow(entry.timestamps, windowStart, this.config.maxRequests)
 
     // Check if limit exceeded
-    if (entry.timestamps.length >= this.config.maxRequests) {
+    if (getTimestampWindowCount(entry.timestamps) >= this.config.maxRequests) {
       if (this.config.blockDurationMs > 0) {
         entry.blockedUntil = now + this.config.blockDurationMs
         return {
@@ -315,7 +387,7 @@ export class RateLimiter implements IRateLimiter {
         }
       }
 
-      const oldest = entry.timestamps[0]
+      const oldest = getTimestampWindowOldest(entry.timestamps)
       const retryAfter =
         oldest !== undefined ? oldest + this.config.windowMs - now : this.config.windowMs
       return {
@@ -336,7 +408,7 @@ export class RateLimiter implements IRateLimiter {
   private recordCompositeTimestamp(key: string, now: number): void {
     const entry = this.sources.get(key)
     if (entry !== undefined) {
-      entry.timestamps.push(now)
+      appendTimestampWindow(entry.timestamps, now, this.config.maxRequests)
     }
   }
 
@@ -354,20 +426,10 @@ export class RateLimiter implements IRateLimiter {
     entry.lastActivity = now
 
     const windowStart = now - this.config.windowMs
-    const inWindow: number[] = []
-    let oldestInWindow: number | undefined
-    for (let i = 0; i < entry.timestamps.length; i += 1) {
-      const ts = entry.timestamps[i]
-      if (ts !== undefined && ts > windowStart) {
-        if (oldestInWindow === undefined) {
-          oldestInWindow = ts
-        }
-        inWindow.push(ts)
-      }
-    }
-    entry.timestamps = inWindow
+    pruneTimestampWindow(entry.timestamps, windowStart, this.config.maxRequests)
 
-    if (inWindow.length >= this.config.maxRequests) {
+    if (getTimestampWindowCount(entry.timestamps) >= this.config.maxRequests) {
+      const oldestInWindow = getTimestampWindowOldest(entry.timestamps)
       const retryAfter =
         oldestInWindow !== undefined
           ? oldestInWindow + this.config.windowMs - now
@@ -399,13 +461,13 @@ export class RateLimiter implements IRateLimiter {
         if (oldest !== undefined) this.ipCeiling.delete(oldest)
         // Not counted in totalEvictions (internal ceiling map)
       }
-      entry = { timestamps: [], lastActivity: now }
+      entry = { timestamps: createTimestampWindow(), lastActivity: now }
       this.ipCeiling.set(ip, entry)
     }
     entry.lastActivity = now
     const windowStart = now - this.config.windowMs
-    entry.timestamps = entry.timestamps.filter((ts) => ts > windowStart)
-    entry.timestamps.push(now)
+    pruneTimestampWindow(entry.timestamps, windowStart, this.config.maxRequests)
+    appendTimestampWindow(entry.timestamps, now, this.config.maxRequests)
   }
 
   /**

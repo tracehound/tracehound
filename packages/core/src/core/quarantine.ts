@@ -67,6 +67,15 @@ const SEVERITY_RANK: Record<Severity, number> = {
   critical: 3,
 }
 
+function createSeverityCounters(): Record<Severity, number> {
+  return {
+    low: 0,
+    medium: 0,
+    high: 0,
+    critical: 0,
+  }
+}
+
 /**
  * Quarantine storage with priority-based eviction.
  * Stores evidence by signature and evicts lowest priority when limits exceeded.
@@ -75,6 +84,7 @@ export class Quarantine {
   private store = new Map<string, EvidenceHandle>()
   private readonly expirations = new Map<string, number>()
   private readonly decayingSignatures = new Set<string>()
+  private readonly severityCounts = createSeverityCounters()
   private totalBytes = 0
   private droppedCount = 0
   private droppedBytes = 0
@@ -82,6 +92,7 @@ export class Quarantine {
   private decayedCount = 0
   private archivedCount = 0
   private archiveFailureCount = 0
+  private nextExpiryAt: number | null = null
   private readonly coldStorage: IColdStorageAdapter | undefined
   private readonly now: () => number
 
@@ -127,6 +138,7 @@ export class Quarantine {
     // Insert new evidence first, then rebalance deterministically.
     this.store.set(evidence.signature, evidence)
     this.trackExpiry(evidence)
+    this.incrementSeverity(evidence.severity)
     this.totalBytes += evidence.size
 
     // Evict until limits are satisfied.
@@ -176,15 +188,14 @@ export class Quarantine {
 
     // Get size before neutralize (evidence will be disposed)
     const size = evidence.size
+    const severity = evidence.severity
 
     // Neutralize with audit chain
     const record = evidence.neutralize(this.auditChain.lastHash)
     this.auditChain.append(record)
 
     // Remove from store
-    this.store.delete(signature)
-    this.expirations.delete(signature)
-    this.totalBytes -= size
+    this.removeStoredEvidence(signature, size, severity)
 
     return record
   }
@@ -202,10 +213,7 @@ export class Quarantine {
       records.push(record)
     }
 
-    // Clear store
-    this.store.clear()
-    this.expirations.clear()
-    this.totalBytes = 0
+    this.resetStoreState()
 
     return records
   }
@@ -226,6 +234,7 @@ export class Quarantine {
 
     const size = evidence.size
     const hash = evidence.hash
+    const severity = evidence.severity
 
     // Create purge record before disposing
     const record: PurgeRecord = {
@@ -258,9 +267,7 @@ export class Quarantine {
     }
 
     // Remove from store
-    this.store.delete(signature)
-    this.expirations.delete(signature)
-    this.totalBytes -= size
+    this.removeStoredEvidence(signature, size, severity)
 
     return record
   }
@@ -330,17 +337,6 @@ export class Quarantine {
    * Get current quarantine statistics.
    */
   get stats(): QuarantineStats {
-    const bySeverity: Record<Severity, number> = {
-      low: 0,
-      medium: 0,
-      high: 0,
-      critical: 0,
-    }
-
-    for (const evidence of this.store.values()) {
-      bySeverity[evidence.severity]++
-    }
-
     return {
       count: this.store.size,
       bytes: this.totalBytes,
@@ -352,7 +348,7 @@ export class Quarantine {
       archiveFailureCount: this.archiveFailureCount,
       ttlEnabled: this.isTtlEnabled(),
       nextExpiryAt: this.getNextExpiryAt(),
-      bySeverity,
+      bySeverity: { ...this.severityCounts },
     }
   }
 
@@ -369,23 +365,35 @@ export class Quarantine {
    * Lowest severity first, then oldest, then signature for deterministic ties.
    */
   private selectForEviction(count: number): EvidenceHandle[] {
-    const all = Array.from(this.store.values())
+    if (count <= 0 || this.store.size === 0) {
+      return []
+    }
 
-    all.sort((a, b) => {
-      const severityDiff = SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
-      if (severityDiff !== 0) {
-        return severityDiff
+    const limit = Math.min(count, this.store.size)
+    const victims: EvidenceHandle[] = []
+
+    for (const evidence of this.store.values()) {
+      let inserted = false
+
+      for (let index = 0; index < victims.length; index += 1) {
+        const current = victims[index]
+        if (current !== undefined && compareEvictionPriority(evidence, current) < 0) {
+          victims.splice(index, 0, evidence)
+          inserted = true
+          break
+        }
       }
 
-      const capturedDiff = a.captured - b.captured
-      if (capturedDiff !== 0) {
-        return capturedDiff
+      if (!inserted && victims.length < limit) {
+        victims.push(evidence)
       }
 
-      return a.signature.localeCompare(b.signature)
-    })
+      if (victims.length > limit) {
+        victims.pop()
+      }
+    }
 
-    return all.slice(0, count)
+    return victims
   }
 
   /**
@@ -462,9 +470,7 @@ export class Quarantine {
       // Best-effort disposal only.
     }
 
-    this.store.delete(signature)
-    this.expirations.delete(signature)
-    this.totalBytes -= size
+    this.removeStoredEvidence(signature, size, evidence.severity)
 
     if (disposition === 'drop') {
       this.droppedCount++
@@ -481,27 +487,32 @@ export class Quarantine {
   private trackExpiry(evidence: EvidenceHandle): void {
     if (!this.isTtlEnabled()) {
       this.expirations.delete(evidence.signature)
+      this.nextExpiryAt = null
       return
     }
 
     const ttlMs = this.config.ttlMs ?? 0
-    this.expirations.set(evidence.signature, evidence.captured + ttlMs)
+    const expiry = evidence.captured + ttlMs
+    this.expirations.set(evidence.signature, expiry)
+    if (this.nextExpiryAt === null || expiry < this.nextExpiryAt) {
+      this.nextExpiryAt = expiry
+    }
   }
 
   private getNextExpiryAt(): number | null {
-    let nextExpiryAt: number | null = null
-
-    for (const expiry of this.expirations.values()) {
-      if (nextExpiryAt === null || expiry < nextExpiryAt) {
-        nextExpiryAt = expiry
-      }
-    }
-
-    return nextExpiryAt
+    return this.isTtlEnabled() ? this.nextExpiryAt : null
   }
 
   private selectExpired(now: number): EvidenceHandle[] {
     if (!this.isTtlEnabled()) {
+      return []
+    }
+
+    if (this.nextExpiryAt === null && this.expirations.size > 0) {
+      this.recomputeNextExpiryAt()
+    }
+
+    if (this.nextExpiryAt === null || this.nextExpiryAt > now) {
       return []
     }
 
@@ -518,7 +529,7 @@ export class Quarantine {
           candidates.push(evidence)
         } else {
           // Self-heal TTL index when backing evidence has already been removed.
-          this.expirations.delete(signature)
+          this.clearExpiryTracking(signature)
         }
       }
     }
@@ -557,7 +568,7 @@ export class Quarantine {
     // Remove from expirations synchronously before the first await so that
     // concurrent decayExpired() calls (e.g. from back-to-back scheduler ticks)
     // cannot re-select this entry while archival is in flight.
-    this.expirations.delete(evidence.signature)
+    this.clearExpiryTracking(evidence.signature)
 
     const signature = evidence.signature
     const hash = evidence.hash
@@ -638,9 +649,7 @@ export class Quarantine {
         // Best-effort disposal only.
       }
 
-      this.store.delete(signature)
-      this.expirations.delete(signature)
-      this.totalBytes = Math.max(0, this.totalBytes - record.size)
+      this.removeStoredEvidence(signature, record.size, evidence.severity)
       this.decayedCount++
 
       if (archived) {
@@ -658,6 +667,61 @@ export class Quarantine {
     } finally {
       this.decayingSignatures.delete(evidence.signature)
     }
+  }
+
+  private incrementSeverity(severity: Severity): void {
+    this.severityCounts[severity] += 1
+  }
+
+  private decrementSeverity(severity: Severity): void {
+    this.severityCounts[severity] = Math.max(0, this.severityCounts[severity] - 1)
+  }
+
+  private removeStoredEvidence(signature: string, size: number, severity: Severity): void {
+    this.store.delete(signature)
+    this.clearExpiryTracking(signature)
+    this.totalBytes = Math.max(0, this.totalBytes - size)
+    this.decrementSeverity(severity)
+  }
+
+  private clearExpiryTracking(signature: string): void {
+    const expiry = this.expirations.get(signature)
+    if (expiry === undefined) {
+      return
+    }
+
+    this.expirations.delete(signature)
+
+    if (expiry === this.nextExpiryAt) {
+      this.recomputeNextExpiryAt()
+    }
+  }
+
+  private recomputeNextExpiryAt(): void {
+    if (!this.isTtlEnabled() || this.expirations.size === 0) {
+      this.nextExpiryAt = null
+      return
+    }
+
+    let nextExpiryAt: number | null = null
+    for (const expiry of this.expirations.values()) {
+      if (nextExpiryAt === null || expiry < nextExpiryAt) {
+        nextExpiryAt = expiry
+      }
+    }
+
+    this.nextExpiryAt = nextExpiryAt
+  }
+
+  private resetStoreState(): void {
+    this.store.clear()
+    this.expirations.clear()
+    this.totalBytes = 0
+    this.nextExpiryAt = null
+    this.severityCounts.low = 0
+    this.severityCounts.medium = 0
+    this.severityCounts.high = 0
+    this.severityCounts.critical = 0
   }
 
   private async archiveEvidence(
@@ -750,6 +814,20 @@ export class Quarantine {
 
     return archiveResult
   }
+}
+
+function compareEvictionPriority(left: EvidenceHandle, right: EvidenceHandle): number {
+  const severityDiff = SEVERITY_RANK[left.severity] - SEVERITY_RANK[right.severity]
+  if (severityDiff !== 0) {
+    return severityDiff
+  }
+
+  const capturedDiff = left.captured - right.captured
+  if (capturedDiff !== 0) {
+    return capturedDiff
+  }
+
+  return left.signature.localeCompare(right.signature)
 }
 
 function normalizeDecayBatchSize(value: number | undefined): number {

@@ -340,7 +340,16 @@ describe('Quarantine', () => {
       for (let i = 0; i < size; i++) view[i] = i
       const contentHash = hashBuffer(bytes)
       // Pass scentId as 8th arg (after compressed=false)
-      const evidence = new Evidence(bytes, 'injection:sig-scent-test', contentHash, 'high', Date.now(), { ip: '1.2.3.4' }, false, originalScentId)
+      const evidence = new Evidence(
+        bytes,
+        'injection:sig-scent-test',
+        contentHash,
+        'high',
+        Date.now(),
+        { ip: '1.2.3.4' },
+        false,
+        originalScentId,
+      )
       quarantine.insert(evidence)
 
       const record = quarantine.purge('injection:sig-scent-test', 'timeout')
@@ -401,6 +410,34 @@ describe('Quarantine', () => {
       expect(expiringQuarantine.stats.decayedCount).toBe(1)
       expect(archived.success).toBe(true)
       expect(auditChain.export().at(-1)?.type).toBe('decay')
+    })
+
+    it('updates next expiry after decaying the earliest retained evidence', async () => {
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: false,
+        },
+        auditChain,
+        {
+          now: () => 1_150,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-earliest', 'high', 64, 1_000))
+      expiringQuarantine.insert(createEvidence('sig-later', 'medium', 64, 1_200))
+
+      expect(expiringQuarantine.stats.nextExpiryAt).toBe(1_100)
+
+      const result = await expiringQuarantine.decayExpired()
+
+      expect(result.decayedCount).toBe(1)
+      expect(expiringQuarantine.has('sig-earliest')).toBe(false)
+      expect(expiringQuarantine.has('sig-later')).toBe(true)
+      expect(expiringQuarantine.stats.nextExpiryAt).toBe(1_300)
     })
 
     it('retains expired evidence when archival fails under retain mode', async () => {
@@ -1146,6 +1183,27 @@ describe('Quarantine', () => {
       expect(stats.bySeverity.high).toBe(2)
       expect(stats.bySeverity.low).toBe(1)
       expect(stats.bySeverity.medium).toBe(0)
+    })
+
+    it('updates next expiry after the earliest evidence is removed', () => {
+      const expiringQuarantine = new Quarantine(
+        {
+          ...config,
+          ttlMs: 100,
+        },
+        auditChain,
+      )
+
+      expiringQuarantine.insert(createEvidence('sig1', 'high', 100, 1_000))
+      expiringQuarantine.insert(createEvidence('sig2', 'medium', 100, 1_050))
+
+      expect(expiringQuarantine.stats.nextExpiryAt).toBe(1_100)
+
+      expiringQuarantine.neutralize('sig1')
+
+      expect(expiringQuarantine.stats.nextExpiryAt).toBe(1_150)
+      expect(expiringQuarantine.stats.bySeverity.high).toBe(0)
+      expect(expiringQuarantine.stats.bySeverity.medium).toBe(1)
     })
 
     it('updates after operations', () => {

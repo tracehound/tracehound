@@ -238,6 +238,8 @@ Recommended branch:
 
 ### Phase 6: Performance and Boundedness Refactor
 
+Status: Completed on 2026-03-10.
+
 Objective: bring hot-path data structures and observability costs closer to the stated design intent.
 
 Scope:

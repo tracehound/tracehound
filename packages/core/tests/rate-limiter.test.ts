@@ -375,7 +375,10 @@ describe('RateLimiter', () => {
       expect(limiter.check(source).allowed).toBe(true)
 
       const internals = limiter as unknown as {
-        sources: Map<string, { timestamps: number[]; blockedUntil: number | null; lastActivity: number }>
+        sources: Map<
+          string,
+          { timestamps: number[]; blockedUntil: number | null; lastActivity: number }
+        >
         evaluateComposite: (key: string, now: number) => RateLimitResult
       }
       const key = Array.from(internals.sources.keys())[0]
@@ -390,6 +393,44 @@ describe('RateLimiter', () => {
       expect(result.allowed).toBe(true)
       expect(internals.sources.has(key)).toBe(true)
       expect(internals.sources.get(key)).toBe(entryBefore)
+    })
+
+    it('keeps composite timestamp windows physically bounded under repeated pruning', () => {
+      vi.useFakeTimers()
+      try {
+        const limiter = new RateLimiter({
+          windowMs: 25,
+          maxRequests: 3,
+          blockDurationMs: 0,
+        })
+        const source = createSource('198.51.100.44', 'bounded-window')
+
+        for (let cycle = 0; cycle < 40; cycle += 1) {
+          for (let i = 0; i < 3; i += 1) {
+            expect(limiter.check(source).allowed).toBe(true)
+            vi.advanceTimersByTime(5)
+          }
+
+          vi.advanceTimersByTime(30)
+        }
+
+        expect(limiter.check(source).allowed).toBe(true)
+
+        const internals = limiter as unknown as {
+          sources: Map<string, { timestamps: { values: number[]; start: number } }>
+        }
+        const entry = Array.from(internals.sources.values())[0]
+
+        expect(entry).toBeDefined()
+        if (entry === undefined) {
+          return
+        }
+
+        expect(entry.timestamps.values.length).toBeLessThanOrEqual(6)
+        expect(entry.timestamps.start).toBeLessThan(entry.timestamps.values.length)
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 

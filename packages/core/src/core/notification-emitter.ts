@@ -278,7 +278,7 @@ export class NotificationEmitter implements INotificationEmitter {
     let closed = false
 
     const subscriber = {
-      events: events ?? null,
+      events: normalizeEventFilter(events),
       push: (event: TracehoundEvent) => {
         if (closed) return
         if (resolve) {
@@ -383,14 +383,14 @@ export class NotificationEmitter implements INotificationEmitter {
   }
 
   get stats(): NotificationEmitterStats {
-    const byType: Record<string, number> = {}
+    const byType = createEmptyEventTypeRecord()
     for (const [type, count] of this._byType) {
       byType[type] = count
     }
 
     return {
       totalEmitted: this._totalEmitted,
-      byType: byType as Record<EventType, number>,
+      byType,
       activeCallbacks: Array.from(this.callbacks.values()).reduce((sum, set) => sum + set.size, 0),
       activeSubscribers: this.subscribers.length,
       activeWebhooks: this.webhooks.size,
@@ -581,6 +581,26 @@ function normalizeBound(value: number | undefined, fallback: number): number {
   return Math.floor(value)
 }
 
+function normalizeEventFilter(events: EventType[] | undefined): EventType[] | null {
+  if (events === undefined || events.length === 0) {
+    return null
+  }
+
+  return [...events]
+}
+
+function createEmptyEventTypeRecord(): Record<EventType, number> {
+  return {
+    'threat.detected': 0,
+    'evidence.quarantined': 0,
+    'evidence.evicted': 0,
+    'rate_limit.exceeded': 0,
+    'system.panic': 0,
+    'license.validated': 0,
+    'license.expired': 0,
+  }
+}
+
 function normalizeHostname(hostname: string): string {
   let normalized = hostname.toLowerCase()
   if (normalized.startsWith('[') && normalized.endsWith(']')) {
@@ -618,39 +638,159 @@ function isBlockedIpAddress(address: string): boolean {
 }
 
 function isBlockedIpv4(address: string): boolean {
+  const parts = parseIpv4Octets(address)
+  if (!parts) {
+    return true
+  }
+
+  const value = ipv4OctetsToNumber(parts)
+
+  return (
+    isIpv4InRange(value, 0x00000000, 0x00ffffff) ||
+    isIpv4InRange(value, 0x0a000000, 0x0affffff) ||
+    isIpv4InRange(value, 0x64400000, 0x647fffff) ||
+    isIpv4InRange(value, 0x7f000000, 0x7fffffff) ||
+    isIpv4InRange(value, 0xa9fe0000, 0xa9feffff) ||
+    isIpv4InRange(value, 0xac100000, 0xac1fffff) ||
+    isIpv4InRange(value, 0xc0000000, 0xc00000ff) ||
+    isIpv4InRange(value, 0xc0000200, 0xc00002ff) ||
+    isIpv4InRange(value, 0xc0586300, 0xc05863ff) ||
+    isIpv4InRange(value, 0xc0a80000, 0xc0a8ffff) ||
+    isIpv4InRange(value, 0xc6120000, 0xc613ffff) ||
+    isIpv4InRange(value, 0xc6336400, 0xc63364ff) ||
+    isIpv4InRange(value, 0xcb007100, 0xcb0071ff) ||
+    isIpv4InRange(value, 0xe0000000, 0xefffffff) ||
+    isIpv4InRange(value, 0xf0000000, 0xffffffff)
+  )
+}
+
+function isBlockedIpv6(address: string): boolean {
+  const segments = parseIpv6Segments(address)
+  if (!segments) {
+    return true
+  }
+
+  const [first, second, third, fourth, fifth, sixth, seventh, eighth] = segments
+  if (
+    first === undefined ||
+    second === undefined ||
+    third === undefined ||
+    fourth === undefined ||
+    fifth === undefined ||
+    sixth === undefined ||
+    seventh === undefined ||
+    eighth === undefined
+  ) {
+    return true
+  }
+
+  return (
+    segments.every((segment) => segment === 0) ||
+    (first === 0 &&
+      second === 0 &&
+      third === 0 &&
+      fourth === 0 &&
+      fifth === 0 &&
+      sixth === 0 &&
+      seventh === 0 &&
+      eighth === 1) ||
+    (first & 0xfe00) === 0xfc00 ||
+    (first & 0xffc0) === 0xfe80 ||
+    (first & 0xff00) === 0xff00 ||
+    (first === 0x2001 && second === 0x0db8) ||
+    (first === 0x2001 && second === 0x0002)
+  )
+}
+
+function parseIpv4Octets(address: string): [number, number, number, number] | null {
   const parts = address.split('.').map((part) => parseInt(part, 10))
   if (
     parts.length !== 4 ||
     parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
   ) {
-    return true
+    return null
   }
 
-  const [a, b] = parts
-  if (a === undefined || b === undefined) {
-    return true
+  const [first, second, third, fourth] = parts
+  if (first === undefined || second === undefined || third === undefined || fourth === undefined) {
+    return null
   }
 
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
-  )
+  return [first, second, third, fourth]
 }
 
-function isBlockedIpv6(address: string): boolean {
-  return (
-    address === '::' ||
-    address === '::1' ||
-    address === '0:0:0:0:0:0:0:1' ||
-    address.startsWith('fc') ||
-    address.startsWith('fd') ||
-    address.startsWith('fe8') ||
-    address.startsWith('fe9') ||
-    address.startsWith('fea') ||
-    address.startsWith('feb')
-  )
+function ipv4OctetsToNumber(octets: [number, number, number, number]): number {
+  const [first, second, third, fourth] = octets
+  return ((first * 256 + second) * 256 + third) * 256 + fourth
+}
+
+function isIpv4InRange(value: number, start: number, end: number): boolean {
+  return value >= start && value <= end
+}
+
+function parseIpv6Segments(address: string): number[] | null {
+  const normalized = address.toLowerCase()
+  const parts = normalized.split('::')
+  if (parts.length > 2) {
+    return null
+  }
+
+  const left = parseIpv6SegmentGroup(parts[0] ?? '')
+  if (!left) {
+    return null
+  }
+
+  if (parts.length === 1) {
+    return left.length === 8 ? left : null
+  }
+
+  const right = parseIpv6SegmentGroup(parts[1] ?? '')
+  if (!right) {
+    return null
+  }
+
+  const missingSegments = 8 - (left.length + right.length)
+  if (missingSegments < 1) {
+    return null
+  }
+
+  return [...left, ...Array<number>(missingSegments).fill(0), ...right]
+}
+
+function parseIpv6SegmentGroup(group: string): number[] | null {
+  if (group.length === 0) {
+    return []
+  }
+
+  const values: number[] = []
+  const segments = group.split(':')
+  for (let index = 0; index < segments.length; index++) {
+    const segment = segments[index]
+    if (segment === undefined || segment.length === 0) {
+      return null
+    }
+
+    if (segment.includes('.')) {
+      if (index !== segments.length - 1) {
+        return null
+      }
+
+      const ipv4Octets = parseIpv4Octets(segment)
+      if (!ipv4Octets) {
+        return null
+      }
+
+      values.push(ipv4Octets[0] * 256 + ipv4Octets[1], ipv4Octets[2] * 256 + ipv4Octets[3])
+      continue
+    }
+
+    const value = parseInt(segment, 16)
+    if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
+      return null
+    }
+
+    values.push(value)
+  }
+
+  return values
 }

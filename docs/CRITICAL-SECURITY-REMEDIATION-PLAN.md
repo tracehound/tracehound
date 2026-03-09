@@ -269,6 +269,8 @@ Recommended branch:
 
 Objective: close the toolchain risk gap and make dependency posture auditable.
 
+Status: Ready for implementation and PR review.
+
 Scope:
 
 1. root workspace package manager pin
@@ -281,10 +283,35 @@ Required changes:
 2. Upgrade to a non-affected pnpm release if needed.
 3. Capture the rationale in release/security notes.
 
+Implementation detail:
+
+1. Treat `pnpm@9.1.4` as deprecated for this workspace until the CVE review is explicitly closed.
+2. Target a reviewed pnpm 10.x release that closes the 2026 advisory set currently tracked against older pnpm lines.
+3. Update every hardcoded toolchain reference in the repository, not only `package.json`.
+4. Regenerate `pnpm-lock.yaml` with the reviewed pnpm version so CI and local installs converge on the same lock semantics.
+
+Expected edit surface:
+
+1. `package.json` `packageManager`
+2. `pnpm-lock.yaml`
+3. `.github/workflows/codeql-advanced.yml`
+4. `.github/copilot-instructions.md`
+5. any remaining workflow or docs references to the old `corepack prepare pnpm@... --activate` command
+
+Validation plan:
+
+1. Confirm `pnpm install --frozen-lockfile` succeeds with the reviewed pnpm version.
+2. Confirm the primary CI-oriented gates still pass after the lockfile refresh:
+3. `pnpm lint`
+4. `pnpm --filter @tracehound/core test`
+5. Document the exact reviewed pnpm version and the advisory closure rationale in the PR body and release/security notes.
+
 Acceptance criteria:
 
 1. Workspace toolchain is pinned to a reviewed version.
 2. CI/release notes reflect the upgrade and risk closure.
+3. No repository file still instructs operators or CI to activate the superseded pnpm version.
+4. The PR is reviewable as a single-purpose toolchain refresh with no product-behavior changes mixed in.
 
 Recommended branch:
 

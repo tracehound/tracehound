@@ -63,6 +63,10 @@ describe('Quarantine', () => {
     it('accepts config and audit chain', () => {
       expect(quarantine).toBeDefined()
     })
+
+    it('exposes the configured maxBytes bound', () => {
+      expect(quarantine.maxBytes).toBe(config.maxBytes)
+    })
   })
 
   describe('insert', () => {
@@ -948,6 +952,104 @@ describe('Quarantine', () => {
       expect(expiringQuarantine.stats.count).toBe(0)
     })
 
+    it('skips decay work when the next expiry has not been reached yet', async () => {
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: false,
+        },
+        auditChain,
+        {
+          now: () => 1_050,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-future', 'medium', 64, 1_000))
+
+      await expect(expiringQuarantine.decayExpired()).resolves.toEqual({
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 0,
+        retainedCount: 0,
+      })
+      expect(expiringQuarantine.has('sig-future')).toBe(true)
+    })
+
+    it('does not reselect expired evidence already marked as decaying', async () => {
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: false,
+        },
+        auditChain,
+        {
+          now: () => 1_500,
+        },
+      )
+
+      expiringQuarantine.insert(createEvidence('sig-inflight', 'high', 64, 1_000))
+
+      const internals = expiringQuarantine as unknown as {
+        decayingSignatures: Set<string>
+      }
+      internals.decayingSignatures.add('sig-inflight')
+
+      await expect(expiringQuarantine.decayExpired()).resolves.toEqual({
+        decayedCount: 0,
+        archivedCount: 0,
+        archiveFailureCount: 0,
+        retainedCount: 0,
+      })
+      expect(expiringQuarantine.has('sig-inflight')).toBe(true)
+    })
+
+    it('records evidence-unavailable archival errors when archive preparation throws', async () => {
+      const localAuditChain = new AuditChain()
+      const expiringQuarantine = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        localAuditChain,
+        {
+          coldStorage: {
+            isAvailable: async () => true,
+            write: async () => ({ success: true }),
+            read: async () => ({ success: false }),
+            delete: async () => false,
+          },
+          now: () => 1_500,
+        },
+      )
+      expiringQuarantine.insert(createEvidence('sig-archive-throw', 'high', 64, 1_000))
+
+      const internals = expiringQuarantine as unknown as {
+        archiveEvidence: (
+          signature: string,
+          bytes: Uint8Array,
+        ) => Promise<{ archived: boolean; storageId?: string; storageError?: string }>
+      }
+      vi.spyOn(internals, 'archiveEvidence').mockRejectedValue(new Error('encode failed'))
+
+      const result = await expiringQuarantine.decayExpired()
+      const decay = JSON.parse(localAuditChain.export().at(-1)!.eventData) as {
+        details: { storageError: string | null }
+      }
+
+      expect(result.archiveFailureCount).toBe(1)
+      expect(decay.details.storageError).toBe('evidence unavailable for archival')
+    })
+
     it('returns archive cancelled when signal aborts after availability check', async () => {
       const controller = new AbortController()
       const coldStorage = {
@@ -989,6 +1091,45 @@ describe('Quarantine', () => {
         archived: false,
         storageError: 'archive cancelled',
       })
+      expect(coldStorage.write).not.toHaveBeenCalled()
+    })
+
+    it('returns archive cancelled when the signal is already aborted before archive starts', async () => {
+      const coldStorage = {
+        isAvailable: vi.fn(async () => true),
+        write: vi.fn(async () => ({ success: true })),
+        read: async () => ({ success: false }),
+        delete: async () => false,
+      }
+      const q = new Quarantine(
+        {
+          maxCount: 5,
+          maxBytes: 10_000,
+          evictionPolicy: 'priority',
+          ttlMs: 100,
+          archiveOnDecay: true,
+          archiveFailureMode: 'drop',
+        },
+        auditChain,
+        { coldStorage, now: () => 1_500 },
+      )
+      const internals = q as unknown as {
+        runArchive: (
+          signature: string,
+          bytes: Uint8Array,
+          signal: AbortSignal,
+        ) => Promise<{ archived: boolean; storageId?: string; storageError?: string }>
+      }
+      const controller = new AbortController()
+      controller.abort()
+
+      const result = await internals.runArchive('sig-pre-abort', new Uint8Array([1, 2, 3]), controller.signal)
+
+      expect(result).toEqual({
+        archived: false,
+        storageError: 'archive cancelled',
+      })
+      expect(coldStorage.isAvailable).not.toHaveBeenCalled()
       expect(coldStorage.write).not.toHaveBeenCalled()
     })
 
@@ -1070,6 +1211,14 @@ describe('Quarantine', () => {
   })
 
   describe('eviction', () => {
+    it('returns no eviction victims when the requested count is zero', () => {
+      const internals = quarantine as unknown as {
+        selectForEviction: (count: number) => Evidence[]
+      }
+
+      expect(internals.selectForEviction(0)).toEqual([])
+    })
+
     it('evicts lowest severity first', () => {
       quarantine.insert(createEvidence('low1', 'low', 100))
       quarantine.insert(createEvidence('med1', 'medium', 100))

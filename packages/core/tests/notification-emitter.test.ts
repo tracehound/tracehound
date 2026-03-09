@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto'
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { lookup } from 'node:dns/promises'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   NotificationEmitter,
   createNotificationEmitter,
@@ -129,6 +129,17 @@ describe('NotificationEmitter', () => {
       expect(result.value.type).toBe('threat.detected')
     })
 
+    it('treats an empty event filter as a subscription to all events', async () => {
+      const subscription = emitter.subscribe([])
+      const iterator = subscription[Symbol.asyncIterator]()
+
+      emitter.emit('rate_limit.exceeded', { source: 'test' })
+
+      const result = await iterator.next()
+      expect(result.value.type).toBe('rate_limit.exceeded')
+      await iterator.return?.()
+    })
+
     it('cleans up on return', async () => {
       const subscription = emitter.subscribe()
       const iterator = subscription[Symbol.asyncIterator]()
@@ -138,6 +149,16 @@ describe('NotificationEmitter', () => {
       await iterator.return?.()
 
       expect(emitter.stats.activeSubscribers).toBe(0)
+    })
+
+    it('returns done when next() is called after the iterator is closed', async () => {
+      const subscription = emitter.subscribe()
+      const iterator = subscription[Symbol.asyncIterator]()
+
+      await iterator.return?.()
+
+      const result = await iterator.next()
+      expect(result).toEqual({ value: undefined, done: true })
     })
 
     it('resolves pending next() when a new event is emitted', async () => {
@@ -198,12 +219,22 @@ describe('NotificationEmitter', () => {
         'http://localhost/hook',
         'http://0.0.0.0/hook',
         'http://10.0.0.1/hook',
+        'http://100.64.0.1/hook',
         'http://172.16.0.1/hook',
         'http://172.31.255.255/hook',
+        'http://192.0.2.1/hook',
         'http://192.168.1.1/hook',
+        'http://198.18.0.1/hook',
+        'http://203.0.113.10/hook',
+        'http://224.0.0.1/hook',
+        'http://240.0.0.1/hook',
         'http://169.254.169.254/latest/meta-data/',
         'http://metadata.google.internal/computeMetadata/v1/',
         'http://[::1]/hook',
+        'http://[fc00::1]/hook',
+        'http://[fe80::1]/hook',
+        'http://[ff02::1]/hook',
+        'http://[2001:db8::1]/hook',
       ]
       for (const url of blocked) {
         expect(() => emitter.registerWebhook({ url })).toThrow(/private\/internal/)
@@ -381,6 +412,81 @@ describe('NotificationEmitter', () => {
         expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
       })
 
+      it('blocks webhook delivery when DNS resolves to a special-use address', async () => {
+        lookupMock.mockResolvedValue([{ address: '100.64.0.10', family: 4 }])
+        emitter.registerWebhook({ url: 'https://edge-name.example/hook' })
+
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
+      })
+
+      it('validates dispatch destinations defensively for malformed and blocked URLs', async () => {
+        const internals = emitter as unknown as {
+          isWebhookDestinationAllowed: (url: string) => Promise<boolean>
+        }
+
+        await expect(internals.isWebhookDestinationAllowed('not-a-url')).resolves.toBe(false)
+        await expect(internals.isWebhookDestinationAllowed('ftp://example.com/hook')).resolves.toBe(
+          false,
+        )
+        await expect(
+          internals.isWebhookDestinationAllowed('https://user:pass@example.com/hook'),
+        ).resolves.toBe(false)
+        await expect(internals.isWebhookDestinationAllowed('https://localhost/hook')).resolves.toBe(
+          false,
+        )
+        await expect(
+          internals.isWebhookDestinationAllowed('https://service.localhost/hook'),
+        ).resolves.toBe(false)
+        await expect(internals.isWebhookDestinationAllowed('https://100.64.0.1/hook')).resolves.toBe(
+          false,
+        )
+        await expect(
+          internals.isWebhookDestinationAllowed('https://[::ffff:127.0.0.1]/hook'),
+        ).resolves.toBe(false)
+        await expect(
+          internals.isWebhookDestinationAllowed('https://93.184.216.34/hook'),
+        ).resolves.toBe(true)
+      })
+
+      it('rejects dispatch destinations when dns lookup is empty or fails', async () => {
+        const internals = emitter as unknown as {
+          isWebhookDestinationAllowed: (url: string) => Promise<boolean>
+        }
+
+        lookupMock.mockResolvedValueOnce([])
+        await expect(
+          internals.isWebhookDestinationAllowed('https://no-records.example/hook'),
+        ).resolves.toBe(false)
+
+        lookupMock.mockRejectedValueOnce(new Error('dns unavailable'))
+        await expect(
+          internals.isWebhookDestinationAllowed('https://lookup-fails.example/hook'),
+        ).resolves.toBe(false)
+      })
+
+      it('drains inflight webhook state even when dispatcher rejects unexpectedly', async () => {
+        emitter = new NotificationEmitter({ webhookMaxInflight: 1, webhookQueueLimit: 1 })
+        emitter.registerWebhook({ url: 'https://rejection.example/hook' })
+
+        const internals = emitter as unknown as {
+          dispatchWebhook: (webhook: unknown, event: TracehoundEvent) => Promise<void>
+        }
+        vi.spyOn(internals, 'dispatchWebhook').mockRejectedValue(new Error('dispatch failed'))
+
+        emitter.emit('threat.detected', { id: 1 })
+
+        await waitForCondition(
+          () =>
+            emitter.stats.inflightWebhookDeliveries === 0 &&
+            emitter.stats.queuedWebhookDeliveries === 0,
+          'expected rejected dispatch to release inflight bookkeeping',
+        )
+      })
+
       it('rejects credentialed webhook URLs at registration', () => {
         expect(() =>
           emitter.registerWebhook({ url: 'https://user:pass@example.com/hook' }),
@@ -441,10 +547,12 @@ describe('NotificationEmitter', () => {
         )
         releaseFirst?.()
         await waitForCondition(
-          () => mockFetch.mock.calls.length === 2,
-          'expected queued webhook delivery to drain after inflight completion',
+          () =>
+            mockFetch.mock.calls.length === 2 &&
+            emitter.stats.inflightWebhookDeliveries === 0 &&
+            emitter.stats.queuedWebhookDeliveries === 0,
+          'expected queued webhook delivery to fully drain after inflight completion',
         )
-
         expect(mockFetch).toHaveBeenCalledTimes(2)
         expect(emitter.stats.inflightWebhookDeliveries).toBe(0)
         expect(emitter.stats.queuedWebhookDeliveries).toBe(0)
@@ -470,6 +578,13 @@ describe('NotificationEmitter', () => {
       expect(emitter.stats.byType['rate_limit.exceeded']).toBe(1)
     })
 
+    it('returns zero counts for event types that have not been emitted', () => {
+      emitter.emit('threat.detected', {})
+
+      expect(emitter.stats.byType['system.panic']).toBe(0)
+      expect(emitter.stats.byType['license.expired']).toBe(0)
+    })
+
     it('tracks active callbacks', () => {
       emitter.on('threat.detected', () => {})
       emitter.on('threat.detected', () => {})
@@ -492,6 +607,18 @@ describe('NotificationEmitter', () => {
       expect(emitter.stats.droppedWebhookDeliveries).toBe(0)
       expect(emitter.stats.rejectedWebhookDeliveries).toBe(0)
     })
+
+    it('normalizes invalid bounds to defaults and floors fractional limits', () => {
+      emitter = new NotificationEmitter({
+        subscriberQueueLimit: 0,
+        webhookQueueLimit: Number.NaN,
+        webhookMaxInflight: 2.9,
+      })
+
+      expect(emitter.stats.subscriberQueueLimit).toBe(64)
+      expect(emitter.stats.webhookQueueLimit).toBe(256)
+      expect(emitter.stats.webhookMaxInflight).toBe(2)
+    })
   })
 
   describe('event structure', () => {
@@ -513,6 +640,11 @@ describe('NotificationEmitter', () => {
     it('creates an emitter instance', () => {
       const em = createNotificationEmitter()
       expect(em.stats.totalEmitted).toBe(0)
+    })
+
+    it('passes configuration through the factory', () => {
+      const em = createNotificationEmitter({ subscriberQueueLimit: 3 })
+      expect(em.stats.subscriberQueueLimit).toBe(3)
     })
   })
 })

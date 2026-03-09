@@ -13,6 +13,8 @@ const HOUND_PROCESS_PATH = resolve(__dirname, '../../packages/core/dist/core/hou
 // HoundPool is automatically wired to the Agent inside createTracehound():
 // quarantined evidence is forwarded to the pool without any manual activation.
 const th = createTracehound({
+  maxPayloadSize: 5_000_000, // 5MB
+
   houndPool: {
     poolSize: 2, // Tiny pool to exhaust quickly
     timeout: 100, // 100ms timeout for pool exhaustion testing
@@ -20,14 +22,22 @@ const th = createTracehound({
     deferQueueLimit: 10,
     processScriptPath: HOUND_PROCESS_PATH,
   },
+
   quarantine: {
-    maxBytes: 1024 * 1024 * 10, // 10MB memory ceiling
     maxCount: 1000,
+    maxBytes: 10_000_000, // 10MB memory ceiling
   },
+
   rateLimit: {
-    windowMs: 60 * 1000,
+    windowMs: 60_000,
     maxRequests: 50000, // High rate limit to isolate testing to IPC/pool behaviour
     blockDurationMs: 60_000,
+  },
+
+  watcher: {
+    maxAlertsPerWindow: 20,
+    alertWindowMs: 60_000,
+    quarantineHighWatermark: 0.85,
   },
 })
 
@@ -45,10 +55,17 @@ app.use(
         ? req.headers['x-request-id'][0]
         : (req.headers['x-request-id'] as string)
 
+      const userAgent = Array.isArray(req.headers['user-agent'])
+        ? req.headers['user-agent'][0]
+        : (req.headers['user-agent'] as string)
+
       return {
         id: `chaos-${generateSecureId()}`,
         timestamp: Date.now(),
-        source: req.ip || '127.0.0.1',
+        source: {
+          ip: req.ip || '127.0.0.1',
+          userAgent: userAgent,
+        },
         threat: req.headers['x-chaos-threat']
           ? {
               category: 'injection',

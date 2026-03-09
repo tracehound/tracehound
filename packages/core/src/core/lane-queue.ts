@@ -152,13 +152,12 @@ export class LaneQueue {
    *
    * @param handler - Function to call for each alert
    */
-  onAlert(handler: (alert: Alert) => void): boolean {
+  onAlert(handler: (alert: Alert) => void): void {
     if (this.handlers.length >= LaneQueue.MAX_HANDLERS) {
       console.warn('[tracehound] LaneQueue handlers capacity reached, handler dropped')
-      return false
+      return
     }
     this.handlers.push(handler)
-    return true
   }
 
   /**

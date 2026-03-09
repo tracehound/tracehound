@@ -223,23 +223,20 @@ describe('HoundPool', () => {
       expect(pool.stats.avgProcessingMs).toBeGreaterThanOrEqual(0)
     })
 
-    it('should return true when handler is registered within capacity', () => {
-      const registered = pool.onResult(() => {})
-      expect(registered).toBe(true)
+    it('should register handler within capacity without error', () => {
+      expect(() => pool.onResult(() => {})).not.toThrow()
     })
 
-    it('should return false and drop handler when MAX_RESULT_HANDLERS capacity is reached', () => {
+    it('should drop handler and warn when MAX_RESULT_HANDLERS capacity is reached', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
       // Register up to the limit (64)
       for (let i = 0; i < 64; i++) {
-        const result = pool.onResult(() => {})
-        expect(result).toBe(true)
+        pool.onResult(() => {})
       }
 
-      // 65th registration should be dropped
-      const overflow = pool.onResult(() => {})
-      expect(overflow).toBe(false)
+      // 65th registration should be silently dropped with a warning
+      pool.onResult(() => {})
       expect(consoleSpy).toHaveBeenCalledWith(
         '[tracehound] HoundPool resultHandlers capacity reached, handler dropped',
       )

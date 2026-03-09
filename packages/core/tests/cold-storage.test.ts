@@ -21,15 +21,23 @@ function createNoisyPayload(size: number): Uint8Array {
   return bytes
 }
 
-async function waitForDiskQueueDrain(storage: MemoryColdStorage, maxIterations = 200): Promise<void> {
+async function waitForDiskQueueDrain(
+  storage: MemoryColdStorage,
+  maxIterations = 200,
+  timeoutMs = 5000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
   for (let i = 0; i < maxIterations; i++) {
     // Double-setImmediate: first tick allows pending I/O callbacks to fire;
     // second tick allows the resulting promise microtasks to settle.
     // This is a well-known Node.js pattern for waiting on real async I/O.
     await new Promise<void>((resolve) => setImmediate(() => setImmediate(resolve)))
     if (storage.diskQueueDepth === 0) return
+    if (Date.now() >= deadline) break
   }
-  throw new Error('disk queue did not drain in time')
+  if (storage.diskQueueDepth !== 0) {
+    throw new Error('disk queue did not drain in time')
+  }
 }
 
 describe('ColdStorage', () => {

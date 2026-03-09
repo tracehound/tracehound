@@ -169,10 +169,9 @@ export interface IHoundPool {
   /**
    * Register result handler.
    * Internal use only - NOT exposed to Agent.
-   *
-   * @returns true if registered, false if capacity limit reached (handler dropped)
+   * Silently drops the handler if the capacity limit is reached.
    */
-  onResult(handler: (result: HoundResult) => void): boolean
+  onResult(handler: (result: HoundResult) => void): void
 
   /**
    * Shutdown all processes.
@@ -345,13 +344,12 @@ export class HoundPool implements IHoundPool {
     })
   }
 
-  onResult(handler: (result: HoundResult) => void): boolean {
+  onResult(handler: (result: HoundResult) => void): void {
     if (this.resultHandlers.length >= HoundPool.MAX_RESULT_HANDLERS) {
       console.warn('[tracehound] HoundPool resultHandlers capacity reached, handler dropped')
-      return false
+      return
     }
     this.resultHandlers.push(handler)
-    return true
   }
 
   shutdown(): void {

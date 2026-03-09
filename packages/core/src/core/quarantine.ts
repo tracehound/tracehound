@@ -789,6 +789,7 @@ function sanitizeStorageError(error: string): string {
   const sanitized = redacted.trim() || 'storage write failed'
 
   // Truncate after redaction to prevent log injection via oversized strings.
-  // Fixed length (120) prevents length-based side-channel inference.
+  // Bounded max length (120) limits information leakage; strings shorter than
+  // 120 chars remain shorter — this is not a fixed-length (padded) output.
   return sanitized.slice(0, 120)
 }

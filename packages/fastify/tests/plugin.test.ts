@@ -34,8 +34,12 @@ function createMockReq(overrides: Partial<FastifyRequest> & { rawBody?: unknown 
 
 function createMockReply(): FastifyReply {
   const reply = {
+    sent: false,
     status: vi.fn().mockReturnThis(),
-    send: vi.fn().mockReturnThis(),
+    send: vi.fn(function (this: { sent: boolean }) {
+      this.sent = true
+      return this
+    }),
     header: vi.fn().mockReturnThis(),
   }
   return reply as unknown as FastifyReply

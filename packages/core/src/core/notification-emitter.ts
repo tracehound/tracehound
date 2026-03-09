@@ -418,10 +418,7 @@ export class NotificationEmitter implements INotificationEmitter {
   }
 
   private drainWebhookQueue(): void {
-    while (
-      this.activeWebhookDispatches < this.webhookMaxInflight &&
-      this.webhookQueue.length > 0
-    ) {
+    while (this.activeWebhookDispatches < this.webhookMaxInflight && this.webhookQueue.length > 0) {
       const job = this.webhookQueue.shift()
       if (!job) {
         return
@@ -566,7 +563,9 @@ export class NotificationEmitter implements INotificationEmitter {
 /**
  * Create a Notification Emitter instance.
  */
-export function createNotificationEmitter(options: NotificationEmitterOptions = {}): INotificationEmitter {
+export function createNotificationEmitter(
+  options: NotificationEmitterOptions = {},
+): INotificationEmitter {
   return new NotificationEmitter(options)
 }
 
@@ -620,7 +619,10 @@ function isBlockedIpAddress(address: string): boolean {
 
 function isBlockedIpv4(address: string): boolean {
   const parts = address.split('.').map((part) => parseInt(part, 10))
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+  if (
+    parts.length !== 4 ||
+    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+  ) {
     return true
   }
 

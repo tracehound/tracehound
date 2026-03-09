@@ -157,9 +157,9 @@ describe('tracehound middleware', () => {
 
     expect(res.status).toHaveBeenCalledWith(403)
 
-    const traceIdCall = vi.mocked(res.set).mock.calls.find(
-      ([name]) => name === 'x-tracehound-trace-id',
-    )
+    const traceIdCall = vi
+      .mocked(res.set)
+      .mock.calls.find(([name]) => name === 'x-tracehound-trace-id')
     expect(traceIdCall).toBeDefined()
 
     const [, traceId] = traceIdCall as [string, string]
@@ -235,7 +235,9 @@ describe('tracehound middleware', () => {
       const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       const scentPayload = scent.payload as Record<string, unknown>
       expect(scentPayload['body']).toBeUndefined() // safeClone returns undefined on circular
-      expect((scentPayload['query'] as Record<string, unknown> | undefined)?.['circ']).toBeUndefined()
+      expect(
+        (scentPayload['query'] as Record<string, unknown> | undefined)?.['circ'],
+      ).toBeUndefined()
     })
 
     it('captures rawBody bytes into ingressBytes when available', () => {

@@ -35,7 +35,7 @@
 
 ## RFCs (Request for Comments)
 
-`docs/rfc/` contains only the normative OSS RFC set. Enterprise fork proposals are tracked outside the public RFC surface.
+`docs/rfc/` contains only the normative RFC set.
 
 | RFC                                                                                        | Status    | Topic                                                     |
 | ------------------------------------------------------------------------------------------ | --------- | --------------------------------------------------------- |

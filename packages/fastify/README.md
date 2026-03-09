@@ -60,12 +60,12 @@ app.listen({ port: 3000 })
 
 ## Response Codes
 
-| Result              | HTTP Status       |
-| ------------------- | ----------------- |
-| `clean`             | Pass through      |
-| `rate_limited`      | 429 + Retry-After |
-| `payload_too_large` | 413               |
-| `quarantined`       | 403               |
+| Result              | HTTP Status             |
+| ------------------- | ----------------------- |
+| `clean`             | Pass through            |
+| `rate_limited`      | 429 + Retry-After       |
+| `payload_too_large` | 413                     |
+| `quarantined`       | 403                     |
 | `error`             | Pass through by default |
 
 `onIntercept` can still emit a custom response for `error` results if you need framework-specific handling.

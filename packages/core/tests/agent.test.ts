@@ -981,10 +981,7 @@ describe('Agent', () => {
       )
 
       const result = localAgent.intercept(
-        createScent(
-          { attack: 'invalid-tls-shape' },
-          { category: 'injection', severity: 'high' },
-        ),
+        createScent({ attack: 'invalid-tls-shape' }, { category: 'injection', severity: 'high' }),
       )
 
       expect(result.status).toBe('quarantined')
@@ -1029,10 +1026,7 @@ describe('Agent', () => {
       )
 
       const result = localAgent.intercept(
-        createScent(
-          { attack: 'invalid-alpn-shape' },
-          { category: 'injection', severity: 'high' },
-        ),
+        createScent({ attack: 'invalid-alpn-shape' }, { category: 'injection', severity: 'high' }),
       )
 
       expect(result.status).toBe('quarantined')

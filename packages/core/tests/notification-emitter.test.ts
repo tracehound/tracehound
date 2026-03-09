@@ -382,9 +382,9 @@ describe('NotificationEmitter', () => {
       })
 
       it('rejects credentialed webhook URLs at registration', () => {
-        expect(() => emitter.registerWebhook({ url: 'https://user:pass@example.com/hook' })).toThrow(
-          /private\/internal/,
-        )
+        expect(() =>
+          emitter.registerWebhook({ url: 'https://user:pass@example.com/hook' }),
+        ).toThrow(/private\/internal/)
       })
 
       it('aborts slow webhook requests after the timeout window', async () => {

@@ -247,7 +247,10 @@ export class FailSafe {
       const severityRank: Record<PanicLevel, number> = { warning: 0, critical: 1, emergency: 2 }
       let evictIdx = 0
       for (let i = 1; i < this.panicHistory.length; i++) {
-        if (severityRank[this.panicHistory[i]!.level] < severityRank[this.panicHistory[evictIdx]!.level]) {
+        if (
+          severityRank[this.panicHistory[i]!.level] <
+          severityRank[this.panicHistory[evictIdx]!.level]
+        ) {
           evictIdx = i
         }
       }

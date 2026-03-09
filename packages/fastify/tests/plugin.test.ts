@@ -17,7 +17,9 @@ function createMockAgent(result: InterceptResult): IAgent {
 }
 
 // Mock Fastify objects
-function createMockReq(overrides: Partial<FastifyRequest> & { rawBody?: unknown } = {}): FastifyRequest {
+function createMockReq(
+  overrides: Partial<FastifyRequest> & { rawBody?: unknown } = {},
+): FastifyRequest {
   return {
     ip: '127.0.0.1',
     method: 'GET',
@@ -135,7 +137,11 @@ describe('tracehoundPlugin', () => {
     })
     const fastify = createMockFastify()
 
-    tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, emitSignatureInResponse: true }, () => {})
+    tracehoundPlugin(
+      fastify as unknown as FastifyInstance,
+      { agent, emitSignatureInResponse: true },
+      () => {},
+    )
 
     const req = createMockReq()
     const reply = createMockReply()
@@ -155,7 +161,11 @@ describe('tracehoundPlugin', () => {
     })
     const fastify = createMockFastify()
 
-    tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, emitTraceIdHeader: true }, () => {})
+    tracehoundPlugin(
+      fastify as unknown as FastifyInstance,
+      { agent, emitTraceIdHeader: true },
+      () => {},
+    )
 
     const req = createMockReq()
     const reply = createMockReply()
@@ -165,9 +175,9 @@ describe('tracehoundPlugin', () => {
 
     expect(reply.status).toHaveBeenCalledWith(403)
 
-    const traceIdCall = vi.mocked(reply.header).mock.calls.find(
-      ([name]) => name === 'x-tracehound-trace-id',
-    )
+    const traceIdCall = vi
+      .mocked(reply.header)
+      .mock.calls.find(([name]) => name === 'x-tracehound-trace-id')
     expect(traceIdCall).toBeDefined()
 
     const [, traceId] = traceIdCall as [string, string]
@@ -317,7 +327,9 @@ describe('tracehoundPlugin', () => {
       const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       const scentPayload = scent.payload as Record<string, unknown>
       expect(scentPayload['body']).toBeUndefined()
-      expect((scentPayload['query'] as Record<string, unknown> | undefined)?.['circ']).toBeUndefined()
+      expect(
+        (scentPayload['query'] as Record<string, unknown> | undefined)?.['circ'],
+      ).toBeUndefined()
     })
 
     it('captures rawBody bytes into ingressBytes when available', () => {
@@ -556,7 +568,9 @@ describe('tracehoundPlugin', () => {
       const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.source.ip).toBe('unknown')
       expect(scent.source.userAgent).toBe('ua-a,ua-b')
-      expect((scent.payload as Record<string, unknown>)['headers']).toEqual(expect.objectContaining({ 'user-agent': 'ua-a,ua-b' }))
+      expect((scent.payload as Record<string, unknown>)['headers']).toEqual(
+        expect.objectContaining({ 'user-agent': 'ua-a,ua-b' }),
+      )
     })
 
     it('omits source.userAgent when user-agent header is absent', () => {
@@ -578,7 +592,9 @@ describe('tracehoundPlugin', () => {
 
       const scent = vi.mocked(agent.intercept).mock.calls[0][0]
       expect(scent.source.userAgent).toBeUndefined()
-      expect((scent.payload as Record<string, unknown>)['headers']).toEqual(expect.objectContaining({ 'user-agent': '' }))
+      expect((scent.payload as Record<string, unknown>)['headers']).toEqual(
+        expect.objectContaining({ 'user-agent': '' }),
+      )
     })
   })
 

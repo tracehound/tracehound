@@ -90,7 +90,10 @@ export class GzipCodec implements ColdPathCodec {
     })
 
     const result = new Uint8Array(compressed)
-    this._totalOutputBytes = Math.min(this._totalOutputBytes + result.length, Number.MAX_SAFE_INTEGER)
+    this._totalOutputBytes = Math.min(
+      this._totalOutputBytes + result.length,
+      Number.MAX_SAFE_INTEGER,
+    )
 
     return result
   }
@@ -196,7 +199,10 @@ export class AsyncGzipCodec implements AsyncColdPathCodec {
 
     const compressed = await gzipAsync(bytes, { level: 6 })
     const result = new Uint8Array(compressed)
-    this._totalOutputBytes = Math.min(this._totalOutputBytes + result.length, Number.MAX_SAFE_INTEGER)
+    this._totalOutputBytes = Math.min(
+      this._totalOutputBytes + result.length,
+      Number.MAX_SAFE_INTEGER,
+    )
 
     return result
   }

@@ -15,19 +15,25 @@ The repository includes a local chaos suite (`pnpm test:chaos`) that exercises p
 Current chaos coverage verifies:
 
 1. saturating the hound pool does not permanently deadlock request flow
-2. post-timeout requests continue returning application responses
+2. clean traffic continues returning application responses within a bounded latency budget during mixed pressure
 3. pool recovery occurs after burst pressure without manual intervention
+4. trace inspection output resumes after recovery and remains observable via opaque trace ids for quarantined responses only
 
 These checks validate host availability behavior. They do not prove perfect detection coverage during degraded windows.
 
-### 1.2 I/O failure survival
+### 1.2 Auxiliary sink failure survival
 
-The same chaos suite simulates a blocked audit write path and verifies that the application remains reachable.
+The same chaos suite now sabotages the real local disk sinks that exist in the runtime:
+
+1. signed runtime snapshot export
+2. trace inspection registry writes used by opaque `x-tracehound-trace-id` inspection
 
 What is verified:
 
-1. Tracehound can degrade when audit-path writes fail
-2. host traffic is preserved instead of being converted into an availability failure
+1. sink write failure emits operator-visible panic/telemetry
+2. quarantined responses still emit opaque `x-tracehound-trace-id` headers before and during trace-registry sink failure
+3. quarantined and clean host traffic remain reachable instead of becoming an availability failure
+4. signed snapshot export can be verified before sabotage and fails closed on read once the sink is broken
 
 ### 1.3 Integrity verification on signed artifacts
 
@@ -61,7 +67,7 @@ Process separation is part of the design, but it should be described as bounded 
 
 ### 3.1 Fail-open bypass window
 
-If Tracehound is degraded and returns `status: 'error'`, the host application continues. That preserves availability, but it can create a short analysis blind spot.
+If Tracehound is degraded and returns `status: 'error'`, the host application continues. That preserves availability, but it can create a short analysis blind spot. In this window, a response may legitimately return HTTP 200 without an opaque trace header because no quarantine result was produced.
 
 ### 3.2 Upstream parser and framework risk
 

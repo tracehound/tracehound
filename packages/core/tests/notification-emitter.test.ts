@@ -441,9 +441,9 @@ describe('NotificationEmitter', () => {
         await expect(
           internals.isWebhookDestinationAllowed('https://service.localhost/hook'),
         ).resolves.toBe(false)
-        await expect(internals.isWebhookDestinationAllowed('https://100.64.0.1/hook')).resolves.toBe(
-          false,
-        )
+        await expect(
+          internals.isWebhookDestinationAllowed('https://100.64.0.1/hook'),
+        ).resolves.toBe(false)
         await expect(
           internals.isWebhookDestinationAllowed('https://[::ffff:127.0.0.1]/hook'),
         ).resolves.toBe(false)

@@ -541,7 +541,10 @@ describe('RateLimiter', () => {
         blockDurationMs: 0,
       })
       const internals = limiter as unknown as {
-        ipCeiling: Map<string, { timestamps: { values: number[]; start: number }; lastActivity: number }>
+        ipCeiling: Map<
+          string,
+          { timestamps: { values: number[]; start: number }; lastActivity: number }
+        >
         evaluateIpCeiling: (ip: string, now: number) => RateLimitResult
       }
 

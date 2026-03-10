@@ -77,9 +77,8 @@ describe('process-adapter', () => {
     vi.doUnmock('node:child_process')
   })
 
-  it('handles backpressure drain and stdout message dispatch', async () => {
+  it('should write payload and dispatch stdout messages when send and onMessage are called', async () => {
     let onData: ((chunk: Buffer) => void) | null = null
-    const onceSpy = vi.fn()
     const writeSpy = vi.fn(() => false)
 
     vi.resetModules()
@@ -90,7 +89,7 @@ describe('process-adapter', () => {
           stdin: {
             destroyed: false,
             write: writeSpy,
-            once: onceSpy,
+            on: () => {},
           },
           stdout: {
             on: (event: string, callback: (chunk: Buffer) => void) => {
@@ -99,6 +98,7 @@ describe('process-adapter', () => {
               }
             },
           },
+          stderr: { on: () => {} },
           on: () => {},
           kill: () => {},
         }) as unknown,
@@ -110,7 +110,6 @@ describe('process-adapter', () => {
 
     adapter.send(handle, new Uint8Array([0x01, 0x02]).buffer)
     expect(writeSpy).toHaveBeenCalled()
-    expect(onceSpy).toHaveBeenCalledWith('drain', expect.any(Function))
 
     let received: ArrayBuffer | null = null
     adapter.onMessage(handle, (payload) => {

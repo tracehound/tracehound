@@ -1123,7 +1123,11 @@ describe('Quarantine', () => {
       const controller = new AbortController()
       controller.abort()
 
-      const result = await internals.runArchive('sig-pre-abort', new Uint8Array([1, 2, 3]), controller.signal)
+      const result = await internals.runArchive(
+        'sig-pre-abort',
+        new Uint8Array([1, 2, 3]),
+        controller.signal,
+      )
 
       expect(result).toEqual({
         archived: false,

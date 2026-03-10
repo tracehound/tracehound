@@ -1,4 +1,4 @@
-import { readSystemSnapshotFromDisk } from '@tracehound/core'
+import { readSystemSnapshotFromDisk, type SnapshotReadResult } from '@tracehound/core'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -11,6 +11,10 @@ const REPO_ROOT = resolve(__dirname, '../..')
 const COMPOSE_FILE = resolve(REPO_ROOT, 'infrastructure/chaos/docker-compose.yml')
 const CHAOS_DATA_DIR = resolve(REPO_ROOT, 'infrastructure/chaos/data')
 const HOST_SNAPSHOT_PATH = resolve(CHAOS_DATA_DIR, 'snapshot/system-snapshot.json')
+const HOST_SNAPSHOT_READBACK_PATH = resolve(
+  CHAOS_DATA_DIR,
+  'snapshot/system-snapshot.readback.json',
+)
 const HOST_TRACE_REGISTRY_PATH = resolve(CHAOS_DATA_DIR, 'trace/trace-registry.ndjson')
 const COMPOSE_PROJECT_NAME = 'tracehound-chaos'
 
@@ -299,6 +303,33 @@ function execInTarget(cmd: string): string {
   }
 }
 
+function readSnapshotViaContainerReadback(secret: string): SnapshotReadResult {
+  const containerSnapshot = execInTarget(
+    `if [ -f \"${CONTAINER_SNAPSHOT_PATH}\" ]; then cat \"${CONTAINER_SNAPSHOT_PATH}\"; fi`,
+  )
+  if (containerSnapshot.length === 0) {
+    return { ok: false, reason: 'NO_INSTANCE' }
+  }
+
+  try {
+    writeFileSync(HOST_SNAPSHOT_READBACK_PATH, containerSnapshot, {
+      encoding: 'utf8',
+      mode: 0o600,
+      flag: 'w',
+    })
+
+    return readSystemSnapshotFromDisk(HOST_SNAPSHOT_READBACK_PATH, secret)
+  } catch {
+    return { ok: false, reason: 'IO_ERROR' }
+  } finally {
+    try {
+      rmSync(HOST_SNAPSHOT_READBACK_PATH, { force: true })
+    } catch {
+      // Best-effort cleanup only.
+    }
+  }
+}
+
 async function dumpSnapshotDiagnostics(snapshotSecret: string, lastState: string | null): Promise<void> {
   console.error('  [diag] Snapshot readiness diagnostics begin')
   console.error(`  [diag] Last snapshot read state: ${lastState ?? 'UNKNOWN'}`)
@@ -356,6 +387,11 @@ async function dumpSnapshotDiagnostics(snapshotSecret: string, lastState: string
   if (containerSecretLength.length > 0) {
     console.error(`  [diag] container snapshot secret length=${containerSecretLength}`)
   }
+
+  const containerVerify = readSnapshotViaContainerReadback(snapshotSecret)
+  console.error(
+    `  [diag] container readback verification=${containerVerify.ok ? 'ok' : containerVerify.reason}`,
+  )
 
   const containerLogs = execInTarget('tail -n 80 /proc/1/fd/1')
   if (containerLogs.length > 0) {
@@ -527,14 +563,23 @@ async function runTests(): Promise<void> {
       'signed snapshot export',
       async () => {
         if (!existsSync(HOST_SNAPSHOT_PATH)) {
-          snapshotReadFailure = 'NO_INSTANCE'
-          return false
+          const readbackResult = readSnapshotViaContainerReadback(snapshotSecret)
+          snapshotReadFailure = readbackResult.ok ? null : `HOST_NO_INSTANCE_${readbackResult.reason}`
+          return readbackResult.ok
         }
 
         const result = readSystemSnapshotFromDisk(HOST_SNAPSHOT_PATH, snapshotSecret)
         if (!result.ok) {
-          snapshotReadFailure = result.reason
-          return false
+          if (result.reason !== 'IO_ERROR') {
+            snapshotReadFailure = result.reason
+            return false
+          }
+
+          const readbackResult = readSnapshotViaContainerReadback(snapshotSecret)
+          snapshotReadFailure = readbackResult.ok
+            ? null
+            : `HOST_IO_ERROR_${readbackResult.reason}`
+          return readbackResult.ok
         }
 
         snapshotReadFailure = null

@@ -1,4 +1,4 @@
-name: Scorecard supply-chain security
+name: OpenSSF Scoring
 on:
   branch_protection_rule:
   schedule:

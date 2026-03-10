@@ -226,7 +226,8 @@ export class Scheduler implements IScheduler {
 
     // Apply jitter to interval using crypto-strength RNG
     // Use Math.floor to ensure jitter stays within [0, jitterMs] for non-integer values.
-    const jitter = this.config.jitterMs > 0 ? this.randomInt(0, Math.floor(this.config.jitterMs) + 1) : 0
+    const jitter =
+      this.config.jitterMs > 0 ? this.randomInt(0, Math.floor(this.config.jitterMs) + 1) : 0
     const delay = this.config.tickInterval + jitter
 
     this.tickTimeoutId = setTimeout(() => {

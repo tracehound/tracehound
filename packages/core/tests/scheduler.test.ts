@@ -437,7 +437,13 @@ describe('Scheduler', () => {
       })
 
       let executions = 0
-      scheduler.schedule({ id: 'det', execute: () => { executions++ }, intervalMs: 100 })
+      scheduler.schedule({
+        id: 'det',
+        execute: () => {
+          executions++
+        },
+        intervalMs: 100,
+      })
       scheduler.start()
 
       // With jitter=0, tick fires at exactly 100ms each time
@@ -460,7 +466,13 @@ describe('Scheduler', () => {
       })
 
       let executions = 0
-      scheduler.schedule({ id: 'clock-test', execute: () => { executions++ }, intervalMs: 500 })
+      scheduler.schedule({
+        id: 'clock-test',
+        execute: () => {
+          executions++
+        },
+        intervalMs: 500,
+      })
       scheduler.start()
 
       // First tick: fakeTime=1_000_000, task lastExecuted=0 → elapsed=1_000_000 >= 500 → runs

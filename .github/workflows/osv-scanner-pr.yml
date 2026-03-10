@@ -6,6 +6,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+permissions:
+  contents: read
+
 jobs:
   scan-pr:
     permissions:

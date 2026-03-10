@@ -15,7 +15,7 @@
 
 ## Motivation
 
-Tracehound roadmap milestone M3 requires an explicit external coordination boundary for Horizon-aligned capabilities without introducing hidden hard dependencies into core execution. The system needs a contract-first model for multi-instance synchronization while preserving fail-open behavior and deterministic core semantics.
+Tracehound roadmap milestone M3 requires an explicit external coordination boundary for future multi-instance capabilities without introducing hidden hard dependencies into core execution. The system needs a contract-first model for multi-instance synchronization while preserving fail-open behavior and deterministic core semantics.
 
 Problems addressed:
 
@@ -108,7 +108,7 @@ export interface CoordinationProvider {
 
 ## Alternatives Considered
 
-1. Direct Horizon SDK dependency in core.
+1. Direct provider SDK dependency in core.
 2. Rejected because it violates external boundary and increases coupling risk.
 3. Fail-closed coordination policy when provider is unavailable.
 4. Rejected because it violates Tracehound fail-open principle and can create self-DoS behavior.

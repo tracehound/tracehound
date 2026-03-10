@@ -16,7 +16,7 @@
 5. Security-lead or Platform/SRE sign-off is not a release blocker for OSS progress.
 6. Soak testing remains valuable as a confidence-building activity, but is not a mandatory blocker for every release.
 7. Docs-weighted or minimal-change releases do not require a full harness refresh by default.
-8. `@tracehound/horizon` remains external to this monorepo.
+8. External coordination capabilities remain outside this monorepo.
 
 ---
 
@@ -29,7 +29,7 @@
 | Current release character                | repo state                                                    | Docs-weighted / minimal code-change release                                            |
 | Legacy internal roadmap                  | `internal/ROADMAP.md`                                         | Deprecated; historical context only                                                    |
 | Latest harness decision baseline         | `tracehound-security-harness/test-results/v1.6.0/go-no-go.md` | Pre-soak green for `v1.6.0`; useful historical evidence, not current release authority |
-| Horizon package availability in monorepo | `pnpm-workspace.yaml`, `packages/*`                           | Not present                                                                            |
+| External coordination package availability in monorepo | `pnpm-workspace.yaml`, `packages/*`                           | Not present                                                                            |
 
 ---
 
@@ -83,7 +83,7 @@ Goal: improve operational trust based on real usage rather than hypothetical pla
 
 Goal: expand only after field evidence justifies it.
 
-1. Horizon coordination maturity and multi-instance workflows.
+1. External coordination maturity and multi-instance workflows.
 2. Satellite products (`Argos`, `Talos`, `Huginn`, `Muninn`, `Heimdall`, `Loki`, `Watchtower`) as separate or external tracks.
 3. Rust or multi-runtime expansion after the Node.js / TypeScript path has enough operational signal.
 
@@ -101,7 +101,7 @@ Goal: expand only after field evidence justifies it.
 
 ---
 
-## 6. Capability Horizon
+## 6. Capability Outlook
 
 | Area                          | Status         | Notes                                                                                                      |
 | ----------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -110,7 +110,7 @@ Goal: expand only after field evidence justifies it.
 | Real-world OSS validation     | In Progress    | Active priority                                                                                            |
 | Soak testing                  | Optional       | Confidence activity; not universal blocker                                                                 |
 | External audit program        | Optional Later | Not current execution driver                                                                               |
-| Horizon coordination contract | Planned        | Contract-first, external boundary preserved                                                                |
+| External coordination contract | Planned        | Contract-first, external boundary preserved                                                                |
 | Enterprise integrations       | Planned        | Pursue only when field demand is concrete                                                                  |
 | Satellite ecosystem           | Planned        | Remains directional, not active execution                                                                  |
 | Rust core pivot               | Planned        | RFC exists; implementation remains on hold pending stronger field signal                                   |

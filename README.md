@@ -2,13 +2,9 @@
 
 <div align="center">
 
-# TRACEHOUND
+**Deterministic runtime security buffer for high-velocity APIs**
 
-**Deterministic Runtime Security Buffer for Modern Applications.**
-
-Tracehound Core is a deterministic and fail-open runtime security layer designed to operate between detection systems and operational response.
-It provides bounded ingestion, rate and buffer controls, controlled choke mechanisms, and reproducible event processing.
-The system does not classify threats or enforce policies. Instead, it guarantees controlled runtime behavior and integrity of the resulting event chain.
+**External systems signal threats. Tracehound preserves evidence.**
 
 [![Advanced CodeQL Analysis](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/codeql-advanced.yml)
 [![Semgrep Security Analysis](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml)
@@ -17,76 +13,137 @@ The system does not classify threats or enforce policies. Instead, it guarantees
 [![License: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/license/apache-2-0)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 
-[Official Website](https://tracehoundlabs.com) · [Documentation](./docs/README.md) · [Migration Guide](./docs/BREAKING-CHANGES.md) · [Security Audit](./security/readme.md) · [Report Bug](https://github.com/tracehound/tracehound/issues) · [Request Feature](https://github.com/tracehound/tracehound/issues) · [FAQ](./docs/FAQ.md)
+[Website](https://tracehoundlabs.com) · [Documentation Index](./docs/README.md) · [API Reference](./docs/API.md) · [Configuration](./docs/CONFIGURATION.md) · [RFCs](./docs/rfc/README.md) · [Security](./security/readme.md) · [Changelog](./CHANGELOG.md)
 
 </div>
 
-## About the Project
+Tracehound is a decision-free forensic runtime that sits between upstream detection and downstream response. It does not classify traffic, apply heuristics, or replace a WAF. It receives explicit threat signals, quarantines evidence, and preserves a tamper-evident operational record without becoming a new denial-of-service vector for the host application.
 
-Tracehound doesn't use heuristics or "guess" if a request is malicious; instead, it acts as a high-integrity buffer for explicit security signals (Scents) from external detectors. By quarantining suspicious events and preserving them in a tamper-evident AuditChain, Tracehound ensures that security events are forever auditable without disrupting production traffic.
+WAFs are one possible upstream authority, not the product boundary. Tracehound’s evidence path can be driven by any explicit external threat signal source that can be mapped into `scent.threat`, including reverse proxies, bot-management systems, abuse detectors, and internal risk services, while native guardrails such as rate limiting and payload-size controls continue to operate independently.
 
-## Why we built this
+This repository contains the open-source Tracehound substrate: `@tracehound/core`, `@tracehound/express`, `@tracehound/fastify`, and `@tracehound/cli`. Current work is centered on real-world OSS validation, deployment confidence, and operator usability.
 
-Modern security architectures often face a trade-off between "blocking and breaking" or "logging and losing" forensic details. We built Tracehound to solve the gap between real-time traffic and backend security analysis:
+## What Tracehound Guarantees
 
-- **Resilience**: Fail-open semantics ensure security tooling never becomes a self-imposed DoS vector.
-- **Forensic Integrity**: Tamper-evident AuditChain provides an immutable record of what actually happened, solving the "log tampering" problem.
-- **Decoupling**: By trusting external logic for detection, Tracehound remains a lightweight, stable, and deterministic buffer that stays out of the way of your application logic.
+- **Decision-free runtime**: Tracehound never decides whether traffic is malicious. Upstream systems provide the threat signal.
+- **Deterministic behavior**: No ML, heuristics, or probabilistic branching in the hot path.
+- **Fail-open host safety**: Runtime faults do not turn Tracehound into an application-layer DoS vector.
+- **Payload-less runtime membrane**: Raw payload bytes stay inside the quarantine boundary; runtime code receives metadata-only handles.
+- **Tamper-evident custody**: Evidence lifecycle events are recorded through `AuditChain`.
+- **Bounded resource use**: Quarantine, rate limiting, notification delivery, hound queues, and decay workflows have explicit caps.
 
----
+## What Tracehound Is Not
 
-## Key Features
+- Not a WAF, IDS, SIEM, RASP, or threat classifier
+- Not an APM or request analytics platform
+- Not a policy engine or access-control layer
+- Not a payload-inspection service for runtime application code
 
-- **Deterministic Security Buffer**: No heuristics, no false positives. It only operates on explicit signals.
-- **Decision-Free Architecture**: Trusts external detection logic, focusing on deterministic evidence handling and bounded ingestion safety.
-- **Fail-Open Semantics**: Designed for high-velocity APIs where production availability is paramount.
-- **AuditChain**: Merkle-chained, tamper-evident forensic logging of all security events.
-- **Bounded Runtime Controls**: Size, queue, and timeout controls are enforced in core paths; performance envelope is deployment-dependent.
-- **Cold Storage Adapters**: Automatic archival of evidence to S3, R2, or GCS.
+## Runtime Model
 
----
+```text
+Request/Event
+  -> Adapter extracts Scent
+  -> agent.intercept(scent)
+     -> rate_limited        (429)
+     -> clean               (pass through)
+     -> payload_too_large   (413)
+     -> ignored             (duplicate signature, pass through)
+     -> quarantined         (403, metadata-only runtime handle)
+     -> error               (fail-open)
+```
 
-## Ecosystem
+### Intercept Statuses
 
-Tracehound is a monorepo containing several specialized packages:
+| Status | Meaning | Default adapter behavior |
+| :--- | :--- | :--- |
+| `clean` | No threat signal on the `Scent` | Pass through |
+| `rate_limited` | Source exceeded bounded sliding-window limits | HTTP `429` + `Retry-After` |
+| `payload_too_large` | Payload exceeded `maxPayloadSize` | HTTP `413` |
+| `ignored` | Duplicate signature or deterministic drop under pressure | Pass through |
+| `quarantined` | Evidence stored successfully | HTTP `403` |
+| `error` | Internal Tracehound failure | Fail-open pass through by default |
 
-| Package                                       | Purpose                                                |
-| :-------------------------------------------- | :----------------------------------------------------- |
-| **[@tracehound/core](./packages/core)**       | The security substrate and runtime agent.              |
-| **[@tracehound/express](./packages/express)** | Official Express middleware for zero-code integration. |
-| **[@tracehound/fastify](./packages/fastify)** | Official Fastify plugin for high-performance APIs.     |
-| **[@tracehound/cli](./packages/cli)**         | Evaluation runtime and forensic inspection tool.       |
+## Repository Scope
 
----
+| Package | Role |
+| :--- | :--- |
+| [`@tracehound/core`](./packages/core) | Security engine, evidence lifecycle, quarantine, AuditChain, watcher, hound pool, notifications |
+| [`@tracehound/express`](./packages/express) | Thin Express middleware adapter |
+| [`@tracehound/fastify`](./packages/fastify) | Thin Fastify plugin adapter |
+| [`@tracehound/cli`](./packages/cli) | CLI and terminal inspection tooling |
+
+## Installation
+
+```bash
+pnpm add @tracehound/core
+pnpm add @tracehound/core @tracehound/express
+pnpm add @tracehound/core @tracehound/fastify
+pnpm add -g @tracehound/cli
+```
+
+Requirements:
+
+- Node.js `>=20`
+- `pnpm` workspace tooling for repository development
 
 ## Quick Start
 
-### Core Usage
+```ts
+import { createTracehound, generateSecureId, type Scent } from '@tracehound/core'
 
-```typescript
-import { createTracehound } from '@tracehound/core'
-
-const tracehound = createTracehound({
-  quarantine: { maxCount: 1000 },
-  rateLimit: { windowMs: 60000, maxRequests: 100 },
+const th = createTracehound({
+  maxPayloadSize: 1_000_000,
+  quarantine: {
+    maxCount: 10_000,
+    maxBytes: 100_000_000,
+  },
+  rateLimit: {
+    windowMs: 60_000,
+    maxRequests: 100,
+  },
 })
 
-// Intercept a potential threat signal (Scent)
-const result = tracehound.agent.intercept({
-  id: 'unique-id',
+const scent: Scent = {
+  id: generateSecureId(),
   timestamp: Date.now(),
-  source: '127.0.0.1',
-  payload: { path: '/api/v1/user', method: 'POST' },
-})
+  source: {
+    ip: '203.0.113.10',
+    userAgent: 'curl/8.7.1',
+  },
+  payload: {
+    method: 'POST',
+    path: '/api/login',
+    body: { username: 'alice' },
+  },
+  threat: {
+    category: 'injection',
+    severity: 'high',
+  },
+}
+
+const result = th.agent.intercept(scent)
 
 if (result.status === 'quarantined') {
-  console.log('Threat quarantined. Signature:', result.handle.signature)
+  console.log(result.handle.signature)
+  console.log(result.handle.membrane) // metadata_only
 }
+
+th.shutdown()
 ```
 
-### Express Integration
+Notes:
 
-```typescript
+- `Scent.source` is a structured object: `{ ip, userAgent?, tls? }`
+- `Scent.payload` must be JSON-serializable
+- If `ingressBytes` is present, Tracehound hashes raw ingress bytes instead of canonicalized payload bytes
+
+## Framework Adapters
+
+### Express
+
+```ts
+import { Buffer } from 'node:buffer'
 import express from 'express'
 import { createTracehound } from '@tracehound/core'
 import { tracehound } from '@tracehound/express'
@@ -94,15 +151,25 @@ import { tracehound } from '@tracehound/express'
 const app = express()
 const th = createTracehound()
 
-// Mount the middleware
-app.use(tracehound({ agent: th.agent }))
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      Reflect.set(req, 'rawBody', Buffer.from(buf))
+    },
+  }),
+)
 
-app.get('/', (req, res) => res.send('Protected by Tracehound'))
+app.use(
+  tracehound({
+    agent: th.agent,
+    emitTraceIdHeader: true,
+  }),
+)
 ```
 
-### Fastify Integration
+### Fastify
 
-```typescript
+```ts
 import fastify from 'fastify'
 import { createTracehound } from '@tracehound/core'
 import { tracehoundPlugin } from '@tracehound/fastify'
@@ -110,58 +177,94 @@ import { tracehoundPlugin } from '@tracehound/fastify'
 const app = fastify()
 const th = createTracehound()
 
-app.register(tracehoundPlugin, { agent: th.agent })
+app.register(tracehoundPlugin, {
+  agent: th.agent,
+  emitTraceIdHeader: true,
+})
 ```
 
----
+Adapter notes:
 
-## Architecture
+- Express and Fastify adapters are intentionally thin and carry no security decision logic
+- For deterministic ingress-byte signatures, set `rawBody` before Tracehound runs
+- `emitTraceIdHeader` is optional and enables `x-tracehound-trace-id` for local inspection workflows
+- `@tracehound/fastify` uses the named export `tracehoundPlugin`
 
-1. External Detector (WAF, SIEM, ML)
+## CLI and Operational Snapshots
 
-2. Tracehound
-   - Agent → Traffic orchestrator
-   - Quarantine → Evidence buffer
-   - AuditChain → Tamper-evident log
-   - HoundPool → Process-separated analysis
-   - Scheduler → Jittered background
-   - Notifications → Universal events
+Tracehound CLI provides runtime status, stats, live watch output, and local trace inspection workflows.
 
----
+```bash
+tracehound status
+tracehound stats
+tracehound inspect --trace-id <trace-id>
+tracehound watch
+tracehound history clear
+tracehound disk clear
+```
 
-## Core Principles
+`status`, `stats`, and `watch` require a signed runtime snapshot. Configure snapshot export in the application runtime:
 
-1. **Decision-free**: Tracehound never decides if a request is malicious. It only acts on external decisions.
-2. **Detection is external**: Use your existing WAF, SIEM, or ML engine to drive Tracehound.
-3. **Forensics > Visualization**: Immutable evidence is our primary product, not pretty dashboards.
-4. **Local-First**: Operates within your application runtime for low-latency interception and auditability.
+```ts
+import { createTracehound } from '@tracehound/core'
 
----
+const th = createTracehound({
+  snapshot: {
+    path: '/var/run/tracehound/system-snapshot.json',
+    secret: process.env.TRACEHOUND_SNAPSHOT_SECRET,
+    intervalMs: 1000,
+  },
+})
+```
 
-## Documentation
+```bash
+export TRACEHOUND_SYSTEM_SNAPSHOT_PATH=/var/run/tracehound/system-snapshot.json
+export TRACEHOUND_SNAPSHOT_SECRET=replace-me
+export TRACEHOUND_SNAPSHOT_MAX_AGE_MS=5000
+export TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS=5000
+```
 
-- **[Getting Started](./docs/GETTING-STARTED.md)**
-- **[API Reference](./docs/API.md)**
-- **[Configuration Reference](./docs/CONFIGURATION.md)**
-- **[Breaking Changes / Migration](./docs/BREAKING-CHANGES.md)**
-- **[Evidence Lifecycle](./docs/EVIDENCE-LIFECYCLE-POLICY.md)**
-- **[Security Assurance & Chaos Testing](./docs/SECURITY-ASSURANCE.md)**
+If snapshot input is missing, stale, tampered, or unverifiable, CLI commands fail explicitly instead of fabricating healthy runtime state.
 
----
+## Documentation Map
 
-## Community
+| Area | Document |
+| :--- | :--- |
+| Onboarding | [Getting Started](./docs/GETTING-STARTED.md) |
+| API surface | [API Reference](./docs/API.md) |
+| Runtime options | [Configuration Reference](./docs/CONFIGURATION.md) |
+| Upgrade path | [Breaking Changes](./docs/BREAKING-CHANGES.md) |
+| Evidence custody | [Evidence Lifecycle Policy](./docs/EVIDENCE-LIFECYCLE-POLICY.md) |
+| Fail-open behavior | [Fail-Open Spec](./docs/FAIL-OPEN-SPEC.md) |
+| Performance envelope | [Performance SLA](./docs/PERFORMANCE-SLA.md) |
+| Security validation | [Security Assurance](./docs/SECURITY-ASSURANCE.md) |
+| Architecture governance | [RFC Index](./docs/rfc/README.md) |
+| Security review corpus | [Security Readme](./security/readme.md) |
 
-- **[Contributing](./CONTRIBUTING.md)**: Establish clear pathways for contribution.
-- **[Code of Conduct](./CODE_OF_CONDUCT.md)**: Maintain a professional and inclusive community.
-- **[Security Policy](./SECURITY.md)**: Reporting vulnerabilities.
+## Development
 
----
+```bash
+pnpm build
+pnpm test
+pnpm test:coverage
+pnpm lint
+pnpm validate:paranoid
+```
 
-## RFCs (Request for Comments)
+Per-package examples:
 
-Tracehound development is governed by the normative RFC set in [docs/rfc](./docs/rfc).
+```bash
+pnpm --filter @tracehound/core test
+pnpm --filter @tracehound/express test
+pnpm --filter @tracehound/fastify test
+pnpm --filter @tracehound/cli test
+```
 
----
+## Contributing and Security
+
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Security Policy](./SECURITY.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
 
 ## License
 

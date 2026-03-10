@@ -68,14 +68,14 @@ Each Tracehound instance maintains:
 
 If you need cross-instance coordination:
 
-| Requirement          | Solution             | Package         |
-| -------------------- | -------------------- | --------------- |
-| Shared blocklist     | Redis coordination   | Horizon         |
-| Global rate limiting | Redis coordination   | Horizon         |
-| Evidence aggregation | Cold Storage + query | Core (async)    |
-| Unified audit trail  | SIEM integration     | Core (notifier) |
+| Requirement          | Solution                      | OSS status               |
+| -------------------- | ----------------------------- | ------------------------ |
+| Shared blocklist     | External coordination layer   | Outside OSS substrate    |
+| Global rate limiting | External coordination layer   | Outside OSS substrate    |
+| Evidence aggregation | Cold Storage + query          | Core (async)             |
+| Unified audit trail  | SIEM integration              | Core (notifier)          |
 
-> **Note:** Multi-instance coordination requires `@tracehound/horizon` ($9, perpetual).
+> **Note:** This document describes the local-first OSS substrate. Cross-instance coordination is a separate concern and is intentionally outside the scope of this package set.
 
 ---
 
@@ -115,27 +115,14 @@ If you need cross-instance coordination:
 - Export to shared Cold Storage for aggregation
 - Query Cold Storage for cross-instance analysis
 
-### Horizon Pattern (Scale)
+### Coordination Pattern (Scale)
 
-With `@tracehound/horizon`:
+For multi-instance deployments, the usual shape is:
 
-- Redis/KeyDB coordination layer
-- Shared blocklist across instances
-- Global rate limiting
-- Real-time cross-instance sync
-
-```typescript
-import '@tracehound/horizon'
-import { Agent } from '@tracehound/core'
-
-// Configure coordination
-Agent.configure({
-  horizon: {
-    redis: 'redis://cluster:6379',
-    sync: ['blocklist', 'rateLimit'],
-  },
-})
-```
+- a separate coordination layer for shared blocklist or rate-limit state
+- Tracehound instances staying local-first in the request path
+- shared cold storage or SIEM pipelines for evidence aggregation and audit visibility
+- explicit failure boundaries so external coordination outages do not change core fail-open behavior
 
 ---
 

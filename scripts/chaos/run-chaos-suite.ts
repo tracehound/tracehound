@@ -1,7 +1,7 @@
 import { readSystemSnapshotFromDisk } from '@tracehound/core'
 import { execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -80,6 +80,11 @@ interface ChaosRuntimeState {
   }>
 }
 
+interface HealthResponse {
+  readonly status: 'ok'
+  readonly snapshotConfigured: boolean
+}
+
 const state = {
   requestCounter: 0,
   infrastructureStarted: false,
@@ -120,7 +125,6 @@ function percentile(values: readonly number[], ratio: number): number {
 function hasTraceRegistryEntry(runtime: ChaosRuntimeState, traceId: string): boolean {
   return runtime.traceRegistry.latestEntries.some((entry) => entry.traceId === traceId)
 }
-
 
 async function waitForTraceObservation(
   traceId: string,
@@ -173,8 +177,9 @@ function ensureDockerReady(): void {
 
 function prepareEnvironment(): string {
   process.env['COMPOSE_PROJECT_NAME'] = COMPOSE_PROJECT_NAME
-  process.env['TRACEHOUND_SNAPSHOT_SECRET'] =
-    process.env['TRACEHOUND_SNAPSHOT_SECRET'] ?? `${randomUUID()}-${randomUUID()}`
+  // Always isolate chaos runs from ambient CI secrets to keep host/container
+  // snapshot signing input deterministic for this test session.
+  process.env['TRACEHOUND_SNAPSHOT_SECRET'] = `${randomUUID()}-${randomUUID()}`
   process.env['TRACEHOUND_SYSTEM_SNAPSHOT_PATH'] = CONTAINER_SNAPSHOT_PATH
   process.env['TRACEHOUND_TRACE_REGISTRY_PATH'] = CONTAINER_TRACE_REGISTRY_PATH
 
@@ -294,6 +299,73 @@ function execInTarget(cmd: string): string {
   }
 }
 
+async function dumpSnapshotDiagnostics(snapshotSecret: string, lastState: string | null): Promise<void> {
+  console.error('  [diag] Snapshot readiness diagnostics begin')
+  console.error(`  [diag] Last snapshot read state: ${lastState ?? 'UNKNOWN'}`)
+
+  try {
+    const healthResponse = await fetch(HEALTH_URL, {
+      method: 'GET',
+      signal: AbortSignal.timeout(2_000),
+    })
+    const healthBody = await healthResponse.text()
+    console.error(`  [diag] /api/health -> HTTP ${healthResponse.status}: ${healthBody}`)
+  } catch (error: unknown) {
+    console.error(`  [diag] /api/health fetch failed: ${toErrorMessage(error)}`)
+  }
+
+  const runtime = await tryFetchRuntimeState()
+  if (runtime === null) {
+    console.error('  [diag] /api/chaos/runtime unavailable')
+  } else {
+    console.error(
+      `  [diag] runtime snapshot: health=${runtime.snapshot.systemHealth}, panics=${runtime.recentPanics.length}, traceBlocked=${runtime.traceRegistry.blocked}`,
+    )
+  }
+
+  if (!existsSync(HOST_SNAPSHOT_PATH)) {
+    console.error(`  [diag] host snapshot file missing at ${HOST_SNAPSHOT_PATH}`)
+  } else {
+    try {
+      const stats = statSync(HOST_SNAPSHOT_PATH)
+      console.error(`  [diag] host snapshot bytes=${stats.size}`)
+      const preview = readFileSync(HOST_SNAPSHOT_PATH, 'utf8').slice(0, 160)
+      console.error(`  [diag] host snapshot preview=${JSON.stringify(preview)}`)
+      const verify = readSystemSnapshotFromDisk(HOST_SNAPSHOT_PATH, snapshotSecret)
+      console.error(`  [diag] host verification result=${verify.ok ? 'ok' : verify.reason}`)
+    } catch (error: unknown) {
+      console.error(`  [diag] host snapshot inspection failed: ${toErrorMessage(error)}`)
+    }
+  }
+
+  const containerSnapshotStat = execInTarget(
+    `if [ -e \"${CONTAINER_SNAPSHOT_PATH}\" ]; then wc -c < \"${CONTAINER_SNAPSHOT_PATH}\"; else echo missing; fi`,
+  )
+  if (containerSnapshotStat.length > 0) {
+    console.error(`  [diag] container snapshot bytes=${containerSnapshotStat}`)
+  }
+
+  const containerSnapshotHead = execInTarget(
+    `if [ -f \"${CONTAINER_SNAPSHOT_PATH}\" ]; then head -c 160 \"${CONTAINER_SNAPSHOT_PATH}\"; fi`,
+  )
+  if (containerSnapshotHead.length > 0) {
+    console.error(`  [diag] container snapshot preview=${JSON.stringify(containerSnapshotHead)}`)
+  }
+
+  const containerSecretLength = execInTarget('printf %s "${TRACEHOUND_SNAPSHOT_SECRET}" | wc -c')
+  if (containerSecretLength.length > 0) {
+    console.error(`  [diag] container snapshot secret length=${containerSecretLength}`)
+  }
+
+  const containerLogs = execInTarget('tail -n 80 /proc/1/fd/1')
+  if (containerLogs.length > 0) {
+    console.error('  [diag] target-app logs tail:')
+    console.error(containerLogs)
+  }
+
+  console.error('  [diag] Snapshot readiness diagnostics end')
+}
+
 async function sendRequest(
   isThreat: boolean,
   bodyBytes = 0,
@@ -366,14 +438,20 @@ async function waitForServer(): Promise<void> {
   process.stdout.write('Waiting for target-app server to be ready...')
 
   const ready = await waitForCondition(
-    'target-app health',
+    'target-app health with snapshot export enabled',
     async () => {
       try {
         const response = await fetch(HEALTH_URL, {
           method: 'GET',
           signal: AbortSignal.timeout(2_000),
         })
-        if (response.ok) {
+        if (!response.ok) {
+          process.stdout.write('.')
+          return false
+        }
+
+        const payload = (await response.json()) as Partial<HealthResponse>
+        if (payload.snapshotConfigured === true) {
           process.stdout.write(' Ready!\n')
           return true
         }
@@ -444,21 +522,32 @@ async function runTests(): Promise<void> {
     await waitForServer()
 
     console.log('\n[Test 0] Signed snapshot export is live')
+    let snapshotReadFailure: string | null = null
     const snapshotReady = await waitForCondition(
       'signed snapshot export',
       async () => {
         if (!existsSync(HOST_SNAPSHOT_PATH)) {
+          snapshotReadFailure = 'NO_INSTANCE'
           return false
         }
 
         const result = readSystemSnapshotFromDisk(HOST_SNAPSHOT_PATH, snapshotSecret)
-        return result.ok
+        if (!result.ok) {
+          snapshotReadFailure = result.reason
+          return false
+        }
+
+        snapshotReadFailure = null
+        return true
       },
-      10_000,
+      30_000,
       250,
     )
     if (!snapshotReady) {
-      console.error('  ❌ FAILED: Snapshot file was not written and verified.')
+      console.error(
+        `  ❌ FAILED: Snapshot file was not written and verified. Last read state=${snapshotReadFailure ?? 'UNKNOWN'}.`,
+      )
+      await dumpSnapshotDiagnostics(snapshotSecret, snapshotReadFailure)
       failedTests += 1
     } else {
       const snapshot = readSystemSnapshotFromDisk(HOST_SNAPSHOT_PATH, snapshotSecret)

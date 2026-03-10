@@ -1,12 +1,15 @@
 # RFC: External Threat Signal Adapters
 
-## Status
-
-Draft
-
-## Author
-
-Open
+| Field          | Value                  |
+| -------------- | ---------------------- |
+| RFC            | 0015                   |
+| Status         | Draft                  |
+| Author         | Tracehound Engineering |
+| Created        | 2026-03-10             |
+| Updated        | 2026-03-10             |
+| Depends on     | RFC-0000               |
+| Supersedes     | None                   |
+| Implemented in | TBD                    |
 
 ## Summary
 
@@ -152,19 +155,114 @@ This is not necessarily the exact public TypeScript contract to expose in core. 
 
 The final mapped `scent.threat` should be as small as the current core requires. The rest belongs to evidence metadata and audit records.
 
+## Minimal `scent.threat` Contract
+
+External signal adapters MUST map upstream security verdicts into the minimal
+core-facing `scent.threat` shape defined below.
+
+```ts
+type ScentThreat = {
+  source: 'external'
+  provider: string
+  decision: 'flagged' | 'blocked' | 'challenged' | 'allowed_with_signal'
+  signal: string
+  requestId?: string
+  score?: number
+  ruleIds?: string[]
+}
+```
+
+## Field requirements
+
+- `source` MUST be the constant value `'external'`.
+- `provider` MUST identify the upstream authority that emitted the signal.
+- `decision` MUST represent the normalized upstream verdict.
+- `signal` MUST identify the specific upstream signal class used for mapping. Examples include `waf_rule_match`, `anomaly_score`, `bot_verdict`, or `managed_detector_hit`.
+- `requestId` SHOULD contain the upstream request correlation identifier when available.
+- `score` MAY be included only when the upstream provider exposes an explicit numeric score.
+- `ruleIds` MAY be included when the upstream provider exposes one or more matched rule identifiers.
+
+Adapters MUST NOT omit `provider`, `decision`, or `signal` when producing `scent.threat`.
+
+Adapters MUST NOT add provider-specific semantics to decision. Provider-specific detail belongs in adapter metadata and evidence records, not in the normalized threat contract.
+
+A few notes on why this shape is the right minimum:
+
+`source: 'external'` gives explicit authority origin.
+`provider` is necessary for provenance.
+`decision` is the normalized action class.
+`signal` prevents the object from becoming semantically empty. Without it, two threats from the same provider can look identical while coming from totally different upstream reasons.
+`requestId`, `score`, and `ruleIds` are optional but operationally important.
+
+This is enough for conformance tests without turning `scent.threat` into a forensic blob.
+
+---
+
+## Revised adapter interface
+
+Then update the interface section so it no longer returns `unknown`.
+
+```md
+## Example Adapter Interface
+
+A minimal implementation shape is:
+
+```ts
+type ScentThreat = {
+  source: 'external'
+  provider: string
+  decision: 'flagged' | 'blocked' | 'challenged' | 'allowed_with_signal'
+  signal: string
+  requestId?: string
+  score?: number
+  ruleIds?: string[]
+}
+
+type ExternalSignalAdapter = {
+  provider: string
+  kind: 'waf' | 'proxy' | 'detector'
+  version: string
+  map(input: {
+    headers: Record<string, string | string[] | undefined>
+    method: string
+    path: string
+    requestId?: string
+  }): {
+    threat?: ScentThreat
+    metadata?: Record<string, unknown>
+  }
+}
+```
+
+map() MUST return either:
+
+- no threat, meaning no compliant external threat mapping was possible, or
+- a fully populated ScentThreat object that satisfies the contract defined in this RFC.
+
 ## Mapping Rules
 
-The mapping rules must be deterministic and conservative.
+Adapter mapping MUST be deterministic and conservative.
 
-If an upstream provider emits an explicit threat verdict, challenge verdict, rule match, or anomaly decision that is contractually considered suspicious by deployment policy, the adapter may map it into `scent.threat`.
+An adapter MAY produce `scent.threat` only when all of the following conditions
+are satisfied:
 
-If upstream metadata is incomplete, ambiguous, malformed, or unverifiable, the adapter must not synthesize a threat.
+1. the upstream source is trusted under the deployment requirements defined in
+   this RFC,
+2. the adapter can identify the provider unambiguously,
+3. the adapter can map the upstream signal into a valid `ScentThreat`,
+4. the upstream input contains a clear suspicion-bearing verdict, challenge,
+   managed rule hit, or equivalent deployment-approved signal.
 
-If a provider emits only informational telemetry without a clear suspicion decision, the adapter may preserve it in metadata but must not convert it into `scent.threat`.
+Adapters MUST NOT synthesize `scent.threat` from incomplete, malformed,
+ambiguous, or purely informational upstream metadata.
 
-If multiple upstream signals exist, adapter precedence must be explicit and documented.
+Adapters MUST NOT infer maliciousness from generic telemetry such as the mere
+presence of a provider header, a request ID, or unrelated proxy metadata.
 
-If a provider emits a numeric score, score interpretation must be provider-specific and versioned. There must be no fake universal score semantics.
+If a provider exposes a numeric score, score interpretation MUST remain
+provider-specific and versioned by the adapter. A score from one provider MUST
+NOT be treated as semantically equivalent to a score from another provider
+without explicit adapter policy.
 
 ## `scent.threat` Contract Strategy
 
@@ -188,6 +286,40 @@ which raw upstream metadata was observed,
 which fields were used to produce the mapped threat.
 
 This trust model is appropriate for a forensic product. Tracehound does not claim that the threat verdict is true in a universal sense. It claims that a recognized upstream authority emitted a signal and that the signal was deterministically preserved and processed.
+
+## Trust Boundary Requirements
+
+Adapters that consume upstream request metadata MUST treat that metadata as
+authoritative only when all of the following deployment conditions are met:
+
+1. **Trusted proxy enforcement**
+   The application MUST run behind a trusted upstream proxy, edge provider, or
+   gateway that is explicitly configured as the sole authority for the relevant
+   security metadata.
+
+2. **Direct-origin bypass prevention**
+   Direct client access to the application origin MUST be blocked. Requests that
+   bypass the trusted upstream layer MUST NOT be able to reach the adapter while
+   still supplying spoofable upstream security headers.
+
+3. **Header stripping and re-injection**
+   Any headers used for threat mapping MUST be stripped from untrusted inbound
+   traffic and re-injected only by the trusted upstream layer. The application
+   MUST NOT trust client-supplied values for adapter-consumed security headers.
+
+4. **Proxy identity validation**
+   The deployment MUST validate that requests claiming upstream authority
+   actually originated from the trusted proxy path. This MAY be established by
+   network topology, authenticated proxying, private connectivity, or equivalent
+   deployment controls.
+
+5. **Deterministic trust configuration**
+   The set of trusted upstream providers and the headers or variables they are
+   allowed to supply MUST be explicitly configured. Adapters MUST NOT accept
+   arbitrary provider claims from request metadata.
+
+If any of these conditions are not met, the adapter MUST treat upstream metadata
+as untrusted and MUST NOT produce `scent.threat` from it.
 
 ## Raw Snapshot Policy
 
@@ -307,13 +439,20 @@ Fixtures should be vendor-specific. Generic fake inputs are not enough because p
 
 ## Security Considerations
 
-The main security risk in this design is false authority. If an attacker can spoof upstream headers directly, the adapter could ingest forged threat signals.
+The primary security risk in this design is false authority through spoofed
+upstream metadata.
 
-This means deployments must only trust upstream metadata when it is delivered through a trusted topology. For example, edge provider headers should only be trusted when the app is actually behind that provider and direct origin bypass is prevented.
+For that reason, adapters MUST comply with the trust-boundary requirements
+defined in this RFC before treating upstream metadata as authoritative.
 
-This RFC therefore assumes trusted deployment boundaries. It does not solve network topology trust by itself.
+In particular, an adapter is non-compliant if it accepts threat-mapping headers
+from requests that can reach origin directly, from requests whose relevant
+headers were not stripped and re-injected by a trusted upstream layer, or from
+deployments that do not explicitly define trusted provider identity.
 
-A secondary risk is over-preservation of sensitive metadata. Raw snapshot policies must remain selective.
+A secondary risk is excessive metadata preservation. Adapter raw snapshots
+SHOULD remain selective and MUST include only the fields necessary to explain
+the mapping and preserve forensic provenance.
 
 ## Compatibility
 
@@ -365,8 +504,14 @@ Score semantics should remain provider-specific. A forced global score model wou
 
 Tracehound should not expand its core into a detector.
 
-The correct move is to formalize an adapter layer for explicit external threat signals. This preserves the current philosophy, strengthens provenance, improves forensic quality, and creates a stable integration surface for WAFs and other upstream security systems.
+The correct architectural move is to formalize an adapter layer for explicit
+external threat signals. This preserves the current philosophy, strengthens
+provenance, improves forensic quality, and creates a stable integration surface
+for WAFs and other upstream security systems.
 
-That keeps the product on the forensic path while making its dependency on upstream threat authorities explicit, structured, and operationally usable.
+That keeps the product on the forensic path while making its dependency on
+upstream threat authorities explicit, structured, and operationally usable.
 
-I can also turn this into a repository-ready `RFC.md` format with section numbering, implementation notes, and a concrete first adapter target such as Cloudflare or ModSecurity.
+An adapter is compliant only if every non-empty threat mapping it emits is a
+valid `ScentThreat` object and only if it enforces the trust-boundary
+requirements in this RFC.

@@ -114,6 +114,9 @@ function createDeterministicCryptoRandom(seed: number): DeterministicCryptoRando
     }
 
     const span = max - min + 1
+    if (span > 0x100000000) {
+      throw new Error(`deterministic fuzz integer range too large: span=${span} exceeds 2^32`)
+    }
     const limit = 0x100000000 - (0x100000000 % span)
     let value = nextUInt32()
 

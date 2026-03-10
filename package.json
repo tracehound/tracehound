@@ -40,7 +40,8 @@
   "packageManager": "pnpm@9.1.4",
   "pnpm": {
     "overrides": {
-      "minimatch": ">=10.2.1",
+      "minimatch": ">=10.2.3",
+      "rollup": ">=4.59.0",
       "esbuild": ">=0.25.0"
     }
   }

@@ -68,12 +68,12 @@ Each Tracehound instance maintains:
 
 If you need cross-instance coordination:
 
-| Requirement          | Solution                      | OSS status               |
-| -------------------- | ----------------------------- | ------------------------ |
-| Shared blocklist     | External coordination layer   | Outside OSS substrate    |
-| Global rate limiting | External coordination layer   | Outside OSS substrate    |
-| Evidence aggregation | Cold Storage + query          | Core (async)             |
-| Unified audit trail  | SIEM integration              | Core (notifier)          |
+| Requirement          | Solution                    | OSS status            |
+| -------------------- | --------------------------- | --------------------- |
+| Shared blocklist     | External coordination layer | Outside OSS substrate |
+| Global rate limiting | External coordination layer | Outside OSS substrate |
+| Evidence aggregation | Cold Storage + query        | Core (async)          |
+| Unified audit trail  | SIEM integration            | Core (notifier)       |
 
 > **Note:** This document describes the local-first OSS substrate. Cross-instance coordination is a separate concern and is intentionally outside the scope of this package set.
 

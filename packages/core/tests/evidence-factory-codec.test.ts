@@ -2,7 +2,7 @@
  * Evidence Factory with Codec Integration tests.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createEvidenceFactory } from '../src/core/evidence-factory.js'
 import type { JsonSerializable } from '../src/types/common.js'
 import type { Scent } from '../src/types/scent.js'
@@ -231,6 +231,58 @@ describe('EvidenceFactory with Codec', () => {
       expect(result1.ok && result2.ok).toBe(true)
       if (result1.ok && result2.ok) {
         expect(result1.signature).toBe(result2.signature)
+      }
+    })
+  })
+
+  describe('Injectable _hrtime (monotonic clock)', () => {
+    const createScent = (payload: JsonSerializable): Scent => ({
+      id: 'hrtime-test',
+      payload,
+      source: { ip: '1.2.3.4' },
+      timestamp: Date.now(),
+    })
+
+    it('should call injected _hrtime on each create()', () => {
+      const mockHrtime = vi.fn((): bigint => 999_000_000n)
+      const factory = createEvidenceFactory({ _hrtime: mockHrtime })
+      const scent = createScent({ test: 'value' })
+
+      const result = factory.create(scent, { category: 'injection', severity: 'high' }, 1_000_000)
+
+      expect(result.ok).toBe(true)
+      expect(mockHrtime).toHaveBeenCalledOnce()
+    })
+
+    it('should expose injected monoNs on result and evidence.monoNs', () => {
+      const fixedMono = 42_000_000_000n
+      const factory = createEvidenceFactory({ _hrtime: () => fixedMono })
+      const scent = createScent({ test: 'value' })
+
+      const result = factory.create(scent, { category: 'injection', severity: 'high' }, 1_000_000)
+
+      expect(result.ok).toBe(true)
+      if (result.ok) {
+        expect(result.monoNs).toBe(fixedMono)
+        expect(result.evidence.monoNs).toBe(fixedMono)
+        // Both are the same value — result.monoNs is a convenience alias
+        expect(result.monoNs).toBe(result.evidence.monoNs)
+      }
+    })
+
+    it('should produce strictly increasing monoNs across consecutive creates', () => {
+      let counter = 0n
+      const factory = createEvidenceFactory({ _hrtime: () => ++counter * 1_000n })
+      const scent = createScent({ test: 'value' })
+      const threat = { category: 'injection' as const, severity: 'high' as const }
+
+      const r1 = factory.create(scent, threat, 1_000_000)
+      const r2 = factory.create(scent, threat, 1_000_000)
+
+      expect(r1.ok).toBe(true)
+      expect(r2.ok).toBe(true)
+      if (r1.ok && r2.ok) {
+        expect(r2.monoNs).toBeGreaterThan(r1.monoNs)
       }
     })
   })

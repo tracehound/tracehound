@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.3] - 2026-03-11 - ESLint Clock/RNG SSoT, Monotonic Evidence Timestamps, and Workflow Hardening
+
+This patch release delivers injectable clock/RNG enforcement via ESLint, monotonic nanosecond timestamps on quarantined evidence, scheduler correctness fixes, and complete SHA-pinning of all GitHub Actions across the CI workflow suite.
+
+### Features
+
+- **ESLint v9 flat config clock/RNG SSoT enforcement** (`packages/core`, root): Added rules that prevent direct `Date.now()`, `Math.random()`, and `crypto.random*` calls from bypassing injectable clock and RNG entry points. Rules are error-level for `Math.random` and `crypto.*`; warn-level for `Date.now()` during the ongoing `RuntimeContext` migration. Injectable bridge closures in scheduler, rate-limiter, and watcher carry explicit disable comments explaining the intent.
+- **Evidence monotonic timestamps** (`packages/core`): Added injectable `_hrtime` bridge to `EvidenceFactory` so monotonic nanosecond timestamps (`process.hrtime.bigint`) are captured at quarantine time. `Evidence` exposes `monoNs: bigint` internally; `RuntimeEvidenceHandle` surfaces it as a decimal string for JSON safety. Enables strict ordering of evidence captured within the same millisecond without relying on wall-clock drift.
+
+### Fixed
+
+- **Scheduler jitter and capacity** (`packages/core`): Corrected edge cases surfaced by code review (#25) — jitter clamping and capacity-boundary behavior now have explicit regression coverage.
+- **Workflow pinned-dependencies** (`.github/workflows`): All GitHub Actions across `ci-main`, `ci-pr`, `chaos-verify`, `codecov`, `codeql-advanced`, `release`, `scorecard`, `security-paranoid`, and `semgrep` workflows are now pinned by full commit SHA per OpenSSF Scorecard Pinned-Dependencies requirements.
+
+### Tests
+
+- Expanded coverage for `EvidenceFactory` monotonic timestamp injection, `RuntimeEvidenceHandle` `monoNs` serialization, rate-limiter injectable clock bridge, scheduler jitter/capacity boundaries, watcher injectable clock paths, and agent `_hrtime` pass-through.
+- Added CLI system-snapshot regression coverage for new injectable bridge behavior.
+
+### Chores
+
+- Documentation narrative and roadmap updates merged from `main`.
+
 ## [1.8.2] - 2026-03-10 - Security Hardening and Remediation Closure Wave
 
 This patch release packages the `fix/security-hardening` branch and closes the high-priority remediation items tracked for runtime fail-open integrity, bounded control-plane behavior, webhook SSRF hardening, constant-time evidence checks, and documentation truth alignment.

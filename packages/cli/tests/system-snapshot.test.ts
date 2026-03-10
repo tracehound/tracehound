@@ -29,6 +29,12 @@ function createFixtureSnapshot(generatedAt: number): SystemSnapshot {
       bytes: 4096,
       droppedCount: 1,
       droppedBytes: 512,
+      evictedCount: 0,
+      decayedCount: 0,
+      archivedCount: 0,
+      archiveFailureCount: 0,
+      ttlEnabled: false,
+      nextExpiryAt: null,
       bySeverity: {
         critical: 1,
         high: 1,
@@ -360,7 +366,7 @@ describe('system snapshot freshness', () => {
       snapshotPath,
       JSON.stringify({
         version: 1,
-        algorithm: 'HMAC-MD5',
+        algorithm: 'HMAC-MD5', // DevSkim: ignore DS126858 - test fixture for rejected algorithm
         payload: createFixtureSnapshot(now.getTime()),
         signature: 'x',
       }),

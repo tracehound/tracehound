@@ -25,6 +25,11 @@ export interface RuntimeEvidenceHandle {
   readonly signature: string
   /** Capture timestamp. */
   readonly captured: number
+  /**
+   * Monotonic capture timestamp as a decimal string (nanoseconds, process.hrtime.bigint).
+   * Stored as string for JSON safety — parse with BigInt(handle.monoNs) for ordering comparisons.
+   */
+  readonly monoNs: string
   /** Threat severity. */
   readonly severity: Severity
   /** Whether underlying evidence has been disposed. */

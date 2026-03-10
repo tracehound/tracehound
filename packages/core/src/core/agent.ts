@@ -338,6 +338,7 @@ export class Agent implements IAgent {
     readonly hash: string
     readonly signature: string
     readonly captured: number
+    readonly monoNs: bigint
     readonly severity: RuntimeEvidenceHandle['severity']
     readonly disposed: boolean
     readonly source: RuntimeEvidenceHandle['source']
@@ -367,6 +368,10 @@ export class Agent implements IAgent {
       },
       captured: {
         get: (): number => evidence.captured,
+        enumerable: true,
+      },
+      monoNs: {
+        get: (): string => evidence.monoNs.toString(),
         enumerable: true,
       },
       severity: {

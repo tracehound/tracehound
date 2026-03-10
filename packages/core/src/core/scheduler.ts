@@ -42,6 +42,18 @@ export interface TickSchedulerConfig {
    * DEFAULT: unlimited.
    */
   maxTasksPerTick?: number
+  /**
+   * Injectable RNG returning a uniform integer in [min, max).
+   * DEFAULT: crypto.randomInt (crypto-strength).
+   * @internal For deterministic testing only.
+   */
+  _randomInt?: (min: number, max: number) => number
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 /**
@@ -144,11 +156,16 @@ export class Scheduler implements IScheduler {
   // Config with defaults
   private readonly skipIfBusy: boolean
   private readonly maxTasksPerTick: number
+  private readonly randomInt: (min: number, max: number) => number
+  private readonly now: () => number
 
   constructor(private readonly config: TickSchedulerConfig) {
     // skipIfBusy defaults to true (RFC requirement)
     this.skipIfBusy = config.skipIfBusy ?? true
     this.maxTasksPerTick = normalizeMaxTasksPerTick(config.maxTasksPerTick)
+    this.randomInt = config._randomInt ?? randomInt
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    this.now = config._now ?? ((): number => Date.now())
   }
 
   start(): void {
@@ -207,9 +224,10 @@ export class Scheduler implements IScheduler {
   private scheduleTick(): void {
     if (!this._running) return
 
-    // Apply jitter to interval using crypto-strength RNG (CLAUDE.md: no Math.random in forensic paths).
+    // Apply jitter to interval using crypto-strength RNG
     // Use Math.floor to ensure jitter stays within [0, jitterMs] for non-integer values.
-    const jitter = this.config.jitterMs > 0 ? randomInt(0, Math.floor(this.config.jitterMs) + 1) : 0
+    const jitter =
+      this.config.jitterMs > 0 ? this.randomInt(0, Math.floor(this.config.jitterMs) + 1) : 0
     const delay = this.config.tickInterval + jitter
 
     this.tickTimeoutId = setTimeout(() => {
@@ -232,7 +250,7 @@ export class Scheduler implements IScheduler {
     }
 
     // Execute due tasks
-    const now = Date.now()
+    const now = this.now()
     const dueTasks = this.getDueTasks(now)
 
     // Sort by priority, then task id for deterministic ordering.

@@ -449,6 +449,7 @@ describe('Evidence', () => {
         defaultSource,
         false,
         '',
+        0n,
         () => 4242,
       )
       const record = evidence.evacuate('s3://bucket/path')
@@ -496,6 +497,37 @@ describe('Evidence', () => {
       }
 
       expect(accessAttempted).toBe(false)
+    })
+  })
+
+  describe('monoNs', () => {
+    it('should return the monoNs value passed to constructor', () => {
+      const evidence = new Evidence(
+        validBytes,
+        validSignature,
+        validHash,
+        'high',
+        Date.now(),
+        defaultSource,
+        false,
+        'scent-id',
+        12345n,
+      )
+
+      expect(evidence.monoNs).toBe(12345n)
+    })
+
+    it('should default monoNs to 0n when omitted', () => {
+      const evidence = new Evidence(
+        validBytes,
+        validSignature,
+        validHash,
+        'high',
+        Date.now(),
+        defaultSource,
+      )
+
+      expect(evidence.monoNs).toBe(0n)
     })
   })
 

@@ -401,4 +401,93 @@ describe('Scheduler', () => {
       expect(stats2.totalTicks).toBeGreaterThan(0)
     })
   })
+
+  describe('Injectable RNG and clock', () => {
+    it('should use injected _randomInt for jitter instead of crypto.randomInt', () => {
+      const calls: Array<[number, number]> = []
+      const injectedRng = (min: number, max: number): number => {
+        calls.push([min, max])
+        return 0 // always zero jitter
+      }
+
+      scheduler.stop()
+      scheduler = createScheduler({
+        tickInterval: 100,
+        jitterMs: 50,
+        _randomInt: injectedRng,
+      })
+      scheduler.start()
+      vi.advanceTimersByTime(300)
+
+      // The injected RNG should have been called with correct bounds
+      expect(calls.length).toBeGreaterThan(0)
+      for (const [min, max] of calls) {
+        expect(min).toBe(0)
+        expect(max).toBe(51) // Math.floor(50) + 1
+      }
+    })
+
+    it('should produce deterministic jitter=0 with _randomInt returning 0', () => {
+      scheduler.stop()
+      scheduler = createScheduler({
+        tickInterval: 100,
+        jitterMs: 50,
+        skipIfBusy: false,
+        _randomInt: () => 0, // always zero jitter
+      })
+
+      let executions = 0
+      scheduler.schedule({
+        id: 'det',
+        execute: () => {
+          executions++
+        },
+        intervalMs: 100,
+      })
+      scheduler.start()
+
+      // With jitter=0, tick fires at exactly 100ms each time
+      vi.advanceTimersByTime(100)
+      expect(executions).toBe(1)
+      vi.advanceTimersByTime(100)
+      expect(executions).toBe(2)
+    })
+
+    it('should use injected _now for task interval tracking', () => {
+      let fakeTime = 1_000_000
+      const mockNow = (): number => fakeTime
+
+      scheduler.stop()
+      scheduler = createScheduler({
+        tickInterval: 100,
+        jitterMs: 0,
+        skipIfBusy: false,
+        _now: mockNow,
+      })
+
+      let executions = 0
+      scheduler.schedule({
+        id: 'clock-test',
+        execute: () => {
+          executions++
+        },
+        intervalMs: 500,
+      })
+      scheduler.start()
+
+      // First tick: fakeTime=1_000_000, task lastExecuted=0 → elapsed=1_000_000 >= 500 → runs
+      vi.advanceTimersByTime(100)
+      expect(executions).toBe(1)
+
+      // Advance fake clock by less than intervalMs → task not due
+      fakeTime += 100
+      vi.advanceTimersByTime(100)
+      expect(executions).toBe(1)
+
+      // Advance fake clock past intervalMs → task due
+      fakeTime += 500
+      vi.advanceTimersByTime(100)
+      expect(executions).toBe(2)
+    })
+  })
 })

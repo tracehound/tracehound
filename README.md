@@ -55,23 +55,23 @@ Request/Event
 
 ### Intercept Statuses
 
-| Status | Meaning | Default adapter behavior |
-| :--- | :--- | :--- |
-| `clean` | No threat signal on the `Scent` | Pass through |
-| `rate_limited` | Source exceeded bounded sliding-window limits | HTTP `429` + `Retry-After` |
-| `payload_too_large` | Payload exceeded `maxPayloadSize` | HTTP `413` |
-| `ignored` | Duplicate signature or deterministic drop under pressure | Pass through |
-| `quarantined` | Evidence stored successfully | HTTP `403` |
-| `error` | Internal Tracehound failure | Fail-open pass through by default |
+| Status              | Meaning                                                  | Default adapter behavior          |
+| :------------------ | :------------------------------------------------------- | :-------------------------------- |
+| `clean`             | No threat signal on the `Scent`                          | Pass through                      |
+| `rate_limited`      | Source exceeded bounded sliding-window limits            | HTTP `429` + `Retry-After`        |
+| `payload_too_large` | Payload exceeded `maxPayloadSize`                        | HTTP `413`                        |
+| `ignored`           | Duplicate signature or deterministic drop under pressure | Pass through                      |
+| `quarantined`       | Evidence stored successfully                             | HTTP `403`                        |
+| `error`             | Internal Tracehound failure                              | Fail-open pass through by default |
 
 ## Repository Scope
 
-| Package | Role |
-| :--- | :--- |
-| [`@tracehound/core`](./packages/core) | Security engine, evidence lifecycle, quarantine, AuditChain, watcher, hound pool, notifications |
-| [`@tracehound/express`](./packages/express) | Thin Express middleware adapter |
-| [`@tracehound/fastify`](./packages/fastify) | Thin Fastify plugin adapter |
-| [`@tracehound/cli`](./packages/cli) | CLI and terminal inspection tooling |
+| Package                                     | Role                                                                                            |
+| :------------------------------------------ | :---------------------------------------------------------------------------------------------- |
+| [`@tracehound/core`](./packages/core)       | Security engine, evidence lifecycle, quarantine, AuditChain, watcher, hound pool, notifications |
+| [`@tracehound/express`](./packages/express) | Thin Express middleware adapter                                                                 |
+| [`@tracehound/fastify`](./packages/fastify) | Thin Fastify plugin adapter                                                                     |
+| [`@tracehound/cli`](./packages/cli)         | CLI and terminal inspection tooling                                                             |
 
 ## Installation
 
@@ -228,18 +228,18 @@ If snapshot input is missing, stale, tampered, or unverifiable, CLI commands fai
 
 ## Documentation Map
 
-| Area | Document |
-| :--- | :--- |
-| Onboarding | [Getting Started](./docs/GETTING-STARTED.md) |
-| API surface | [API Reference](./docs/API.md) |
-| Runtime options | [Configuration Reference](./docs/CONFIGURATION.md) |
-| Upgrade path | [Breaking Changes](./docs/BREAKING-CHANGES.md) |
-| Evidence custody | [Evidence Lifecycle Policy](./docs/EVIDENCE-LIFECYCLE-POLICY.md) |
-| Fail-open behavior | [Fail-Open Spec](./docs/FAIL-OPEN-SPEC.md) |
-| Performance envelope | [Performance SLA](./docs/PERFORMANCE-SLA.md) |
-| Security validation | [Security Assurance](./docs/SECURITY-ASSURANCE.md) |
-| Architecture governance | [RFC Index](./docs/rfc/README.md) |
-| Security review corpus | [Security Readme](./security/readme.md) |
+| Area                    | Document                                                         |
+| :---------------------- | :--------------------------------------------------------------- |
+| Onboarding              | [Getting Started](./docs/GETTING-STARTED.md)                     |
+| API surface             | [API Reference](./docs/API.md)                                   |
+| Runtime options         | [Configuration Reference](./docs/CONFIGURATION.md)               |
+| Upgrade path            | [Breaking Changes](./docs/BREAKING-CHANGES.md)                   |
+| Evidence custody        | [Evidence Lifecycle Policy](./docs/EVIDENCE-LIFECYCLE-POLICY.md) |
+| Fail-open behavior      | [Fail-Open Spec](./docs/FAIL-OPEN-SPEC.md)                       |
+| Performance envelope    | [Performance SLA](./docs/PERFORMANCE-SLA.md)                     |
+| Security validation     | [Security Assurance](./docs/SECURITY-ASSURANCE.md)               |
+| Architecture governance | [RFC Index](./docs/rfc/README.md)                                |
+| Security review corpus  | [Security Readme](./security/readme.md)                          |
 
 ## Development
 

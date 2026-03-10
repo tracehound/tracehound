@@ -11,6 +11,9 @@ concurrency:
   group: osv-scanner-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   scan-scheduled:
     permissions:

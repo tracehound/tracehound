@@ -334,6 +334,7 @@ export type {
   INotificationEmitter,
   LicenseExpiredPayload,
   LicenseValidatedPayload,
+  NotificationEmitterOptions,
   NotificationEmitterStats,
   RateLimitExceededPayload,
   SystemPanicPayload,

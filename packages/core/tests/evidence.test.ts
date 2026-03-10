@@ -53,7 +53,14 @@ describe('Evidence', () => {
 
     it('rejects hash mismatch', () => {
       expect(() => {
-        new Evidence(validBytes, validSignature, 'wrong-hash', 'high', Date.now(), defaultSource)
+        new Evidence(
+          validBytes,
+          validSignature,
+          'b'.repeat(validHash.length),
+          'high',
+          Date.now(),
+          defaultSource,
+        )
       }).toThrow()
     })
 

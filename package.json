@@ -1,6 +1,6 @@
 {
   "name": "tracehound",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -9,7 +9,7 @@
     "pretest": "pnpm --filter @tracehound/core build",
     "test": "pnpm -r test",
     "test:coverage": "vitest run --coverage",
-    "test:chaos": "tsx scripts/chaos/run-chaos-suite.ts",
+    "test:chaos": "pnpm build && tsx scripts/chaos/run-chaos-suite.ts",
     "verify:release": "node scripts/release/verify-publish-packages.mjs",
     "validate:paranoid": "pnpm lint && pnpm format && pnpm build && pnpm test && pnpm test:coverage && pnpm test:chaos && node scripts/release/verify-publish-packages.mjs",
     "review:branch": "node scripts/review/pr-branch-review.mjs",

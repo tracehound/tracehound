@@ -1,10 +1,14 @@
-version: '3.8'
-
 services:
   target-app:
     build:
       context: ../../
       dockerfile: infrastructure/chaos/Dockerfile
+    init: true
+    environment:
+      NODE_ENV: production
+      TRACEHOUND_SYSTEM_SNAPSHOT_PATH: /app/data/snapshot/system-snapshot.json
+      TRACEHOUND_TRACE_REGISTRY_PATH: /app/data/trace/trace-registry.ndjson
+      TRACEHOUND_SNAPSHOT_SECRET: ${TRACEHOUND_SNAPSHOT_SECRET:?TRACEHOUND_SNAPSHOT_SECRET is required}
     ports:
       - '3000:3000'
     deploy:
@@ -12,5 +16,16 @@ services:
         limits:
           cpus: '0.50'
           memory: 128M
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
     volumes:
       - ./data:/app/data

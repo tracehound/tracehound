@@ -8,7 +8,7 @@
 | Status         | Draft                                                                                                                                                                                                                                            |
 | Author         | Core Maintainers                                                                                                                                                                                                                                 |
 | Created        | 2026-03-05                                                                                                                                                                                                                                       |
-| Depends on     | RFC-0000, RFC-0011, RFC-0008                                                                                                                                                                                                                     |
+| Depends on     | RFC-0000, RFC-0011                                                                                                                                                                                                                               |
 | Implemented in | `packages/core/src/core/tracehound.ts`, `packages/core/src/utils/system-snapshot.ts`, `packages/core/src/core/hound-process.ts`, `packages/core/src/core/hound-ipc.ts`, `packages/core/src/core/hound-pool.ts`, `packages/cli/src/commands/*.ts` |
 
 ## Motivation

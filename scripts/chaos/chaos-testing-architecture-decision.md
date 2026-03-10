@@ -17,7 +17,7 @@ This solution was chosen not because it is simple, but because it is the most ac
 
 ### Why the Chosen Solution is Not a Shortcut
 
-The current script (spawning concurrent requests via Node.js and executing `docker exec chmod 400`) does not just create random infrastructural errors. It tests the application's SLAs under deterministic conditions (e.g., "If the pool is completely exhausted, it times out after 100ms and the system remains healthy, returning HTTP 200/403"). This is not an environmental test; it is a **Domain-Specific Invariant Test**.
+The current script (spawning concurrent requests via Node.js and deterministically sabotaging mounted sink paths inside the container) does not just create random infrastructural errors. It tests the application's SLAs under deterministic conditions (e.g., "If the pool is completely exhausted, it times out after 100ms and the system remains healthy, returning HTTP 200/403"). This is not an environmental test; it is a **Domain-Specific Invariant Test**.
 
 ## 2. EFFORT JUSTIFICATION RULE
 
@@ -29,18 +29,18 @@ It is correct because **Tracehound is built on determinism, not randomness, as a
 
 This testing strategy impacts all system layers as follows (no "not affected" assumptions were made):
 
-- **Data Model:** By executing `chmod 400`, it verifies that the data model leaves AuditChain files uncorrupted under Read-Only conditions.
-- **API / Contract Surface:** The test verifies as an auditor whether the API responds according to expected contracts (HTTP 200/403) even under the most severe conditions.
+- **Data Model:** By replacing snapshot and trace-registry file targets with directories, it verifies fail-open behavior against deterministic local sink-write failures without relying on privileged host mutations.
+- **API / Contract Surface:** The test verifies as an auditor whether the API responds according to expected contracts (HTTP 200/403) even under the most severe conditions, and whether opaque `x-tracehound-trace-id` output is present only when a request is actually quarantined.
 - **Runtime Behavior:** The exhaustion and subsequent autonomous recovery of the thread pool is the runtime's most critical "Fail-Open" behavior. The test operates precisely on this surface.
 - **Deployment / Operations:** By not requiring privileged permissions in CI/CD pipelines, it reduces security risks and setup costs to zero.
-- **Observability (Logging, Metrics, Tracing):** For now, the test only evaluates HTTP responses. How the observability infrastructure pushes these errors to Prometheus or logs remains a black box within this specific test's scope.
+- **Observability (Logging, Metrics, Tracing):** The suite now also interrogates the local runtime endpoint for signed snapshot state, panic telemetry, and bounded trace-registry summaries. External log shipping and metrics export remain outside this test's scope.
 - **Future Roadmap Impact:** If Tracehound migrates to different communication protocols (gRPC or UDS) in the future, this REST-focused script will need to be expanded; this reinvestment might not have been necessary if a generic tool had been used.
 
 ## 4. NO SILENT ASSUMPTIONS
 
 **Explicit Assumptions:**
 
-1. We assume that the `docker exec chmod 400` command accurately simulates the hardware transition of a physical disk to a Read-Only state.
+1. We assume that replacing a writable file target with a directory is an acceptably deterministic proxy for "local sink became non-writable" at the application layer.
 2. We assume that the operating system's thread scheduling, combined with Node.js's asynchronous `Promise.all` structure, can emulate a true DoS/Flood attack with sufficient concurrency at the network layer.
 
 **Unknowns:**
@@ -56,14 +56,14 @@ This testing strategy impacts all system layers as follows (no "not affected" as
 ## 6. FAILURE, ROLLBACK, AND BLAST RADIUS
 
 - **Failure Modes:** A Docker Daemon lockup or the process inside the container becoming unresponsive during the test could leave the test script in a zombie (hanging) state.
-- **Rollback Strategy:** The `docker compose down -v` command executed in the `#Teardown` block at the end of the test guarantees that the state at the disk level is completely destroyed. If the process fails, a manual `docker kill` is required.
+- **Rollback Strategy:** The `docker compose down -v --remove-orphans` command executed in the `#Teardown` block at the end of the test tears down the runtime containers and network. Host-mounted chaos artifacts are intentionally preserved for operator inspection until the next suite start resets them.
 - **Blast Radius:** Because the test runs in an isolated `docker-compose` network, there is a zero percent chance of it affecting other active test processes on the host machine or in the CI pipeline.
 
 ## 7. SELF-CRITIQUE REQUIREMENT
 
 To win the trust of the SecOps team in Monday's meeting, they need to hear our weaknesses **from us**.
 
-- **The weakest assumption in this solution:** Timing-based assertions. Hardcoded delays like `sleep(POOL_TIMEOUT_MS + 200)` can make the test flaky depending on the environment's CPU load.
+- **The weakest assumption in this solution:** Timing-based assertions. Although the suite now favors polling over fixed sleeps, the mixed-pressure latency budget is still environment-sensitive under extreme host contention.
 - **The most fragile component:** The methodology of initiating chaos via REST API requests. If the system later implements rate-limiting protections that slow down or drop network requests, this test will break immediately.
 - **Where will this structure fail first in the real world?** When Tracehound begins to be deployed as distributed nodes. Single-process and disk blockages will no longer be sufficient; when attempting to simulate Split-Brain scenarios across nodes, `run-chaos-suite.ts` will become inadequate, mandating a forced migration to Kubernetes-orchestrated chaos tools like Chaos Mesh.
 

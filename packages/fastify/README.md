@@ -60,14 +60,44 @@ app.listen({ port: 3000 })
 
 ## Response Codes
 
-| Result              | HTTP Status       |
-| ------------------- | ----------------- |
-| `clean`             | Pass through      |
-| `rate_limited`      | 429 + Retry-After |
-| `payload_too_large` | 413               |
-| `quarantined`       | 403               |
-| `error`             | 500               |
+| Result              | HTTP Status             |
+| ------------------- | ----------------------- |
+| `clean`             | Pass through            |
+| `rate_limited`      | 429 + Retry-After       |
+| `payload_too_large` | 413                     |
+| `quarantined`       | 403                     |
+| `error`             | Pass through by default |
+
+`onIntercept` can still emit a custom response for `error` results if you need framework-specific handling.
+
+## `onIntercept` Pattern
+
+Use `onIntercept` only when the host application explicitly owns the response contract for that route.
+
+```ts
+app.register(tracehoundPlugin, {
+  agent: th.agent,
+  onIntercept(result, req, reply) {
+    if (result.status === 'error' && !reply.sent) {
+      reply.status(200).send({
+        ok: true,
+        tracehound: {
+          degraded: true,
+          code: result.error.code,
+        },
+      })
+    }
+  },
+})
+```
+
+Guidelines:
+
+1. Keep the default fail-open path for routes whose response shape you do not own.
+2. Only emit a structured fallback when the endpoint already guarantees that response format.
+3. Do not override streams, file downloads, redirects, or HTML responses.
+4. Prefer server-side logging and notification handling for operator visibility.
 
 ## License
 
-MIT
+Apache-2.0

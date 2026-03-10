@@ -190,8 +190,7 @@ describe('Stress Test Scenario', () => {
 
     console.log(`Latency p50: ${p50.toFixed(3)}ms, p99: ${p99.toFixed(3)}ms`)
 
-    // Target: p99 < 1ms in production
-    // CI runners have high variance; 50ms ceiling prevents flaky failures
+    // Descriptive CI ceiling only; this is not a contractual SLA.
     expect(p99).toBeLessThan(50)
   })
 })

@@ -1,6 +1,6 @@
 {
   "name": "@tracehound/cli",
-  "version": "1.8.1",
+  "version": "1.8.2",
   "description": "Tracehound CLI evaluation runtime",
   "license": "Apache-2.0",
   "author": "Erdem Arslan <me@erdem.work>",

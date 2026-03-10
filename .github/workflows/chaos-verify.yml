@@ -40,8 +40,5 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install tsx globally
-        run: npm i -g tsx
-
       - name: Run Tracehound Chaos & Invariant Suite
-        run: npm run test:chaos
+        run: pnpm test:chaos

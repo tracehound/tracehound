@@ -13,15 +13,17 @@ COPY packages/ ./packages/
 COPY scripts/ ./scripts/
 COPY infrastructure/ ./infrastructure/
 
-# Install pnpm and dependencies
-RUN npm install -g pnpm tsx
+# Install pnpm from the repository-managed toolchain
+RUN corepack enable
 RUN pnpm install --frozen-lockfile
 
 # Build workspace packages
 RUN pnpm run build
 
+ENV NODE_ENV=production
+
 # Expose the API port
 EXPOSE 3000
 
 # Run the test server
-CMD ["tsx", "infrastructure/chaos/server.ts"]
+CMD ["pnpm", "exec", "tsx", "infrastructure/chaos/server.ts"]

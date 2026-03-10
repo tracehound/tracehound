@@ -1,156 +1,103 @@
-# Performance SLA Specification
+# Performance Characteristics
 
-> **Version:** 1.1
-> **Status:** Normative
-> **Applies to:** @tracehound/core v1.0.0+
+> **Version:** 1.2
+> **Status:** Descriptive
+> **Applies to:** `@tracehound/core`
 
 ---
 
 ## Overview
 
-This document specifies latency guarantees and performance characteristics for Tracehound core operations.
+This document describes the currently implemented performance model of Tracehound core. It is not a contractual latency SLA.
+
+Published numbers in scenario tests are environment-dependent and should be read as current measurements, not fixed guarantees.
 
 ---
 
-## Latency Guarantees
+## Hot Path Scope
 
-### Agent.intercept()
+`agent.intercept()` is the synchronous hot path.
 
-| Percentile | Target  | Condition             |
-| ---------- | ------- | --------------------- |
-| p50        | < 0.5ms | Normal operation      |
-| p99        | < 2ms   | Normal operation      |
-| p99.9      | < 10ms  | Under memory pressure |
+The following are intentionally outside that latency surface:
 
-**Notes:**
-
-- Does NOT include HoundPool processing time (async)
-- Does NOT include Cold Storage writes (async)
-- Measured from call to result return
+1. HoundPool analysis
+2. Cold storage archival
+3. Notification and webhook delivery
+4. Snapshot disk export
 
 ---
 
-### Component Breakdown
+## Current Design Characteristics
 
-| Component          | p50    | p99    | Notes              |
-| ------------------ | ------ | ------ | ------------------ |
-| Rate limiter check | ~10μs  | ~50μs  | O(1) map lookup    |
-| Evidence creation  | ~100μs | ~500μs | Includes hashing   |
-| Quarantine insert  | ~50μs  | ~200μs | Priority queue op  |
-| AuditChain append  | ~20μs  | ~100μs | Linked list append |
+### Intercept path
 
----
+The intercept path currently performs:
 
-## Memory Guarantees
+1. rate-limit checks
+2. payload validation and encoding
+3. deterministic hashing/signature generation
+4. duplicate detection
+5. bounded quarantine insert
+6. audit chain append
 
-### Quarantine Buffer
+### Data structure notes
 
-| Metric    | Default        | Configurable |
-| --------- | -------------- | ------------ |
-| Max items | 10,000         | Yes          |
-| Max bytes | 100MB          | Yes          |
-| Eviction  | Priority-based | —            |
+These reflect the current implementation, including known hot spots:
 
-### Memory Ceiling Behavior
-
-When approaching limits:
-
-| Usage  | Behavior                       |
-| ------ | ------------------------------ |
-| < 70%  | Normal operation               |
-| 70-85% | Warning emitted                |
-| 85-95% | Critical: accelerated eviction |
-| > 95%  | Emergency: aggressive eviction |
+1. Quarantine eviction is deterministic and priority-aware, with victim selection performed by deterministic bounded selection rather than full-store sorting.
+2. Quarantine stats are exposed from maintained in-memory counters; snapshot reads no longer rescan the full store for severity totals or next expiry.
+3. Rate limiter state is bounded, and timestamp pruning now compacts bounded per-source windows instead of allocating filtered arrays on each hot check.
+4. Notification subscribers and webhook delivery are bounded and off the hot path.
 
 ---
 
-## Eviction Under Pressure
+## Memory Bounds
 
-### Priority-Based Eviction
+### Quarantine
 
-Evidence is evicted based on:
+| Metric          | Default            | Configurable |
+| --------------- | ------------------ | ------------ |
+| Max items       | 10,000             | Yes          |
+| Max bytes       | 100MB              | Yes          |
+| Eviction policy | Priority, then age | No           |
 
-1. **Priority** (low → high)
-2. **Age** (oldest first within same priority)
+### Notification plane
 
-### Eviction Guarantees
+| Surface                | Bound                     |
+| ---------------------- | ------------------------- |
+| Async subscriber queue | Fixed-size per subscriber |
+| Webhook backlog        | Fixed-size queue          |
+| Webhook inflight work  | Fixed concurrency cap     |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Eviction NEVER blocks intercept().                        │
-│  Eviction is synchronous but O(1) amortized.               │
-│  High-priority evidence is evicted LAST.                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## HoundPool Performance
-
-### Process-Based Isolation
-
-| Configuration    | Max Active | Memory Limit | Timeout      |
-| ---------------- | ---------- | ------------ | ------------ |
-| **Core Default** | 8          | 512MB        | 30s          |
-| **+ Horizon**    | Unlimited  | Configurable | Configurable |
-
-> **Note:** Core defaults are sensible for most workloads. Teams requiring
-> unlimited process pools should add `@tracehound/horizon` ($9, perpetual).
-
-### IPC Overhead
-
-| Operation          | Typical | Under Load |
-| ------------------ | ------- | ---------- |
-| Spawn              | ~50ms   | ~100ms     |
-| Message round-trip | ~1ms    | ~5ms       |
-| Termination        | ~10ms   | ~50ms      |
+Bounded does not mean lossless. Under pressure, Tracehound may drop queued notification work to preserve host stability.
 
 ---
 
-## What This SLA Does NOT Cover
+## Measurement Guidance
 
-1. **Cold Storage writes** — Fire-and-forget, async
-2. **Notification delivery** — Async, may be throttled
-3. **HoundPool analysis** — Async, bounded by pool config
-4. **Multi-instance coordination** — Requires Horizon (see below)
+For current measured values, use the repository scenario suite instead of this document:
 
----
+1. `packages/core/scenarios/stress.test.ts`
+2. `packages/core/scenarios/cold-storage-pipeline.test.ts`
+3. `packages/core/scenarios/ipc-stress.test.ts`
+4. `packages/core/scenarios/async-codec-stress.test.ts`
 
-## Horizon Extension
-
-`@tracehound/horizon` ($9, perpetual use) unlocks:
-
-| Capability                | Core Default | + Horizon |
-| ------------------------- | ------------ | --------- |
-| HoundPool processes       | 8 max        | Unlimited |
-| Multi-instance (Redis)    | ❌           | ✅        |
-| mTLS enforcement          | ❌           | ✅        |
-| Policy broker integration | ❌           | ✅        |
-
-Usage:
-
-```typescript
-// Import Horizon FIRST to inject extended config
-import '@tracehound/horizon'
-import { Agent } from '@tracehound/core'
-
-// Core now operates with extended limits
-```
+These tests print observed throughput and latency during execution.
 
 ---
 
-## Measurement Methodology
+## What This Document Does Not Promise
 
-All latency measurements assume:
+This document does not currently promise:
 
-- Node.js 18+ LTS
-- Single-core normalized
-- Warm JIT (after 1000+ calls)
-- No GC pressure (<70% heap usage)
+1. fixed p50 or p99 latency targets across environments
+2. constant-time eviction across total quarantine size
+3. unlimited worker capacity
+4. lossless downstream delivery under sink failure
 
 ---
 
 ## Related Documents
 
-- [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md) — Failure behavior
-- [LOCAL-STATE-SEMANTICS.md](./LOCAL-STATE-SEMANTICS.md) — Instance isolation
+- [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md)
+- [CRITICAL-SECURITY-REMEDIATION-PLAN.md](./CRITICAL-SECURITY-REMEDIATION-PLAN.md)

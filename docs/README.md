@@ -1,7 +1,7 @@
 # Documentation Index
 
-> **Last Updated:** 2026-03-07
-> **Version:** v1.7.0
+> **Last Updated:** 2026-03-10
+> **Version:** v1.8.2
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
 ---
@@ -15,7 +15,6 @@
 | **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)                                                     | Runtime and adapter configuration defaults       |
 | **Migration**     | [BREAKING-CHANGES.md](./BREAKING-CHANGES.md)                                               | Breaking changes and upgrade path                |
 | **Roadmap**       | [roadmap/TRACEHOUND-UNIFIED-ROADMAP.md](./roadmap/TRACEHOUND-UNIFIED-ROADMAP.md)           | Authoritative technical roadmap                  |
-| **Remediation**   | [CRITICAL-SECURITY-REMEDIATION-PLAN.md](./CRITICAL-SECURITY-REMEDIATION-PLAN.md)           | Active plan for verified critical security gaps  |
 | **Validation**    | [../security/paranoid-validation-playbook.md](../security/paranoid-validation-playbook.md) | Deep security review and release validation path |
 
 ---
@@ -35,23 +34,15 @@
 
 ## RFCs (Request for Comments)
 
-Status values in this table reflect RFC governance lifecycle, not roadmap capability labels.
+`docs/rfc/` contains only the normative RFC set.
 
-| RFC                                                                                        | Status    | Topic                                                                   |
-| ------------------------------------------------------------------------------------------ | --------- | ----------------------------------------------------------------------- |
-| [0000-Proposal.md](./rfc/0000-Proposal.md)                                                 | 🔒 Locked | Core architecture (normative)                                           |
-| [0002-Argos.md](./rfc/0002-Argos.md)                                                       | ⚠️ Draft  | Runtime observer (separate product)                                     |
-| [0003-Talos.md](./rfc/0003-Talos.md)                                                       | ⚠️ Draft  | Talos — policy-driven response                                          |
-| [0004-Muninn.md](./rfc/0004-Muninn.md)                                                     | ⚠️ Draft  | Muninn — threat metadata substrate                                      |
-| [0005-Huginn.md](./rfc/0005-Huginn.md)                                                     | ⚠️ Draft  | Huginn — external threat feeds                                          |
-| [0006-Heimdall.md](./rfc/0006-Heimdall.md)                                                 | ⚠️ Draft  | Heimdall — supply chain security                                        |
-| [0007-Loki.md](./rfc/0007-Loki.md)                                                         | ⚠️ Draft  | Loki — passive deception & tarpit                                       |
-| [0008-RustCorePivot.md](./rfc/0008-RustCorePivot.md)                                       | ⚠️ Draft  | Rust core pivot strategy (implementation on-hold pending v1.x feedback) |
-| [0009-CoordinationProviderContract.md](./rfc/0009-CoordinationProviderContract.md)         | ⚠️ Draft  | External coordination contract                                          |
-| [0010-OneWayMembrane.md](./rfc/0010-OneWayMembrane.md)                                     | ⚠️ Draft  | One-way membrane and trace id signaling                                 |
-| [0011-PressureContainment.md](./rfc/0011-PressureContainment.md)                           | ⚠️ Draft  | Pressure containment and graceful shielding                             |
-| [0013-OperationalTruthAndHoundAnalysis.md](./rfc/0013-OperationalTruthAndHoundAnalysis.md) | ⚠️ Draft  | Signed operational truth and deterministic hound analysis               |
-| [0014-Watchtower.md](./rfc/0014-Watchtower.md)                                             | ⚠️ Draft  | Enterprise control plane                                                |
+| RFC                                                                                        | Status    | Topic                                                     |
+| ------------------------------------------------------------------------------------------ | --------- | --------------------------------------------------------- |
+| [0000-Proposal.md](./rfc/0000-Proposal.md)                                                 | 🔒 Locked | Core architecture (normative)                             |
+| [0009-CoordinationProviderContract.md](./rfc/0009-CoordinationProviderContract.md)         | ✅ Stable | External coordination contract                            |
+| [0010-OneWayMembrane.md](./rfc/0010-OneWayMembrane.md)                                     | ✅ Stable | One-way membrane and trace id signaling                   |
+| [0011-PressureContainment.md](./rfc/0011-PressureContainment.md)                           | ✅ Stable | Pressure containment and graceful shielding               |
+| [0013-OperationalTruthAndHoundAnalysis.md](./rfc/0013-OperationalTruthAndHoundAnalysis.md) | ✅ Stable | Signed operational truth and deterministic hound analysis |
 
 ---
 

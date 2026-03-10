@@ -3,7 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRateLimiter, RateLimiter } from '../src/core/rate-limiter.js'
+import { createRateLimiter, RateLimiter, RateLimitResult } from '../src/core/rate-limiter.js'
 import type { RateLimitConfig } from '../src/types/config.js'
 import type { ScentSource } from '../src/types/scent.js'
 
@@ -375,7 +375,10 @@ describe('RateLimiter', () => {
       expect(limiter.check(source).allowed).toBe(true)
 
       const internals = limiter as unknown as {
-        sources: Map<string, { timestamps: number[]; blockedUntil: number | null; lastActivity: number }>
+        sources: Map<
+          string,
+          { timestamps: number[]; blockedUntil: number | null; lastActivity: number }
+        >
         evaluateComposite: (key: string, now: number) => RateLimitResult
       }
       const key = Array.from(internals.sources.keys())[0]
@@ -390,6 +393,172 @@ describe('RateLimiter', () => {
       expect(result.allowed).toBe(true)
       expect(internals.sources.has(key)).toBe(true)
       expect(internals.sources.get(key)).toBe(entryBefore)
+    })
+
+    it('keeps composite timestamp windows physically bounded under repeated pruning', () => {
+      vi.useFakeTimers()
+      try {
+        const limiter = new RateLimiter({
+          windowMs: 25,
+          maxRequests: 3,
+          blockDurationMs: 0,
+        })
+        const source = createSource('198.51.100.44', 'bounded-window')
+
+        for (let cycle = 0; cycle < 40; cycle += 1) {
+          for (let i = 0; i < 3; i += 1) {
+            expect(limiter.check(source).allowed).toBe(true)
+            vi.advanceTimersByTime(5)
+          }
+
+          vi.advanceTimersByTime(30)
+        }
+
+        expect(limiter.check(source).allowed).toBe(true)
+
+        const internals = limiter as unknown as {
+          sources: Map<string, { timestamps: { values: number[]; start: number } }>
+        }
+        const entry = Array.from(internals.sources.values())[0]
+
+        expect(entry).toBeDefined()
+        if (entry === undefined) {
+          return
+        }
+
+        expect(entry.timestamps.values.length).toBeLessThanOrEqual(6)
+        expect(entry.timestamps.start).toBeLessThan(entry.timestamps.values.length)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('compacts partially pruned composite windows before re-evaluating them', () => {
+      const limiter = new RateLimiter({
+        windowMs: 30,
+        maxRequests: 3,
+        blockDurationMs: 0,
+      })
+      const source = createSource('198.51.100.60', 'compact-window')
+
+      expect(limiter.check(source).allowed).toBe(true)
+
+      const internals = limiter as unknown as {
+        sources: Map<
+          string,
+          {
+            timestamps: { values: number[]; start: number }
+            blockedUntil: number | null
+            lastActivity: number
+          }
+        >
+        evaluateExistingComposite: (key: string, now: number) => RateLimitResult
+      }
+      const key = Array.from(internals.sources.keys())[0]
+      expect(key).toBeDefined()
+      if (key === undefined) {
+        return
+      }
+
+      const entry = internals.sources.get(key)
+      expect(entry).toBeDefined()
+      if (entry === undefined) {
+        return
+      }
+
+      entry.timestamps = { values: [10, 20, 50, 60], start: 2 }
+
+      expect(internals.evaluateExistingComposite(key, 70).allowed).toBe(true)
+      expect(entry.timestamps).toEqual({ values: [50, 60], start: 0 })
+    })
+
+    it('clears fully pruned composite windows before recording new timestamps', () => {
+      const limiter = new RateLimiter({
+        windowMs: 30,
+        maxRequests: 2,
+        blockDurationMs: 0,
+      })
+      const source = createSource('198.51.100.61', 'clear-window')
+
+      expect(limiter.check(source).allowed).toBe(true)
+
+      const internals = limiter as unknown as {
+        sources: Map<
+          string,
+          {
+            timestamps: { values: number[]; start: number }
+            blockedUntil: number | null
+            lastActivity: number
+          }
+        >
+        recordCompositeTimestamp: (key: string, now: number) => void
+      }
+      const key = Array.from(internals.sources.keys())[0]
+      expect(key).toBeDefined()
+      if (key === undefined) {
+        return
+      }
+
+      const entry = internals.sources.get(key)
+      expect(entry).toBeDefined()
+      if (entry === undefined) {
+        return
+      }
+
+      entry.timestamps = { values: [10, 20], start: 2 }
+      internals.recordCompositeTimestamp(key, 99)
+
+      expect(entry.timestamps).toEqual({ values: [99], start: 0 })
+    })
+
+    it('propagates rejections from new composite evaluation when ip ceiling allows', () => {
+      const limiter = new RateLimiter({
+        windowMs: 60_000,
+        maxRequests: 3,
+        blockDurationMs: 0,
+      })
+      const source = createSource('198.51.100.62', 'synthetic-rejection')
+      const syntheticResult: RateLimitResult = {
+        allowed: false,
+        blocked: false,
+        retryAfter: 12,
+        reason: 'synthetic rejection',
+      }
+
+      const internals = limiter as unknown as {
+        evaluateComposite: (key: string, now: number) => RateLimitResult
+      }
+      vi.spyOn(internals, 'evaluateComposite').mockReturnValue(syntheticResult)
+
+      expect(limiter.check(source)).toEqual(syntheticResult)
+      expect(limiter.stats.totalRejections).toBe(1)
+    })
+
+    it('falls back to the full window when the ip ceiling has no oldest timestamp', () => {
+      const limiter = new RateLimiter({
+        windowMs: 60,
+        maxRequests: 3,
+        blockDurationMs: 0,
+      })
+      const internals = limiter as unknown as {
+        ipCeiling: Map<
+          string,
+          { timestamps: { values: number[]; start: number }; lastActivity: number }
+        >
+        evaluateIpCeiling: (ip: string, now: number) => RateLimitResult
+      }
+
+      internals.ipCeiling.set('198.51.100.63', {
+        timestamps: { values: [], start: -3 },
+        lastActivity: 0,
+      })
+
+      expect(internals.evaluateIpCeiling('198.51.100.63', 100)).toEqual({
+        allowed: false,
+        blocked: false,
+        retryAfter: 60,
+        reason: 'IP rate ceiling exceeded',
+      })
     })
   })
 

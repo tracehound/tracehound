@@ -221,6 +221,16 @@ export function createProcessAdapter(): IHoundProcessAdapter {
 
       const parser = createMessageParser()
 
+      // Swallow pipe errors on all three stdio streams.
+      // EPIPE on stdin is expected whenever a hound is SIGKILL'd while the
+      // parent still holds a reference to the write end. ERR_STREAM_DESTROYED
+      // can fire on stdout/stderr after the process exits. Neither condition
+      // is actionable here — the HoundPool's exit handler already handles
+      // process lifecycle cleanup.
+      child.stdin?.on('error', swallowPipeError)
+      child.stdout?.on('error', swallowPipeError)
+      child.stderr?.on('error', swallowPipeError)
+
       return {
         pid: child.pid,
         _process: child,
@@ -232,12 +242,7 @@ export function createProcessAdapter(): IHoundProcessAdapter {
       const message = encodeMessage(payload)
       const stdin = handle._process.stdin
       if (!stdin || stdin.destroyed) return
-      const canContinue = stdin.write(message)
-      if (!canContinue) {
-        stdin.once('drain', () => {
-          /* backpressure relieved */
-        })
-      }
+      stdin.write(message)
     },
 
     kill(handle: HoundHandle): void {
@@ -420,4 +425,18 @@ function normalizePlatform(platform: string): NodeJS.Platform | 'unknown' {
 
 function isValidEnforcedMemoryLimitMB(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0
+}
+
+/**
+ * Silently absorb expected pipe errors that arise after a hound process is
+ * SIGKILL'd. EPIPE fires on stdin when the parent writes to a closed pipe;
+ * ERR_STREAM_DESTROYED fires on stdout/stderr when Node.js tears down the
+ * stream after process exit. Both are normal lifecycle events, not faults.
+ */
+function swallowPipeError(err: NodeJS.ErrnoException): void {
+  if (err.code === 'EPIPE' || err.code === 'ERR_STREAM_DESTROYED') {
+    return
+  }
+  // Unexpected pipe error — surface it so it isn't silently lost.
+  console.error('[tracehound] Unexpected hound process pipe error:', err.message)
 }

@@ -1,14 +1,16 @@
 # Fail-Open Behavior Specification
 
-> **Version:** 1.0
+> **Version:** 1.1
 > **Status:** Normative
-> **Applies to:** @tracehound/core v1.0.0+
+> **Applies to:** `@tracehound/core`, `@tracehound/express`, `@tracehound/fastify`
 
 ---
 
 ## Executive Summary
 
-Tracehound follows **fail-open** semantics: when the security subsystem encounters an error, traffic **passes through** rather than blocking. This prevents security tooling from becoming a denial-of-service vector.
+Tracehound follows fail-open semantics for internal security-path failures. When Tracehound cannot complete its own processing safely, it surfaces an internal error state and the host application continues operating.
+
+This document describes the current implemented contract. It does not describe hypothetical route policies, fail-closed modes, or unpublished extension behavior.
 
 ---
 
@@ -16,68 +18,55 @@ Tracehound follows **fail-open** semantics: when the security subsystem encounte
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  Tracehound NEVER blocks legitimate traffic due to its     │
-│  own failures. Security failures degrade gracefully,       │
-│  not catastrophically.                                     │
+│  Tracehound must not become a denial-of-service vector     │
+│  for the host application because of Tracehound's own      │
+│  internal failure paths.                                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Failure Modes
+## Failure Surfaces
 
-### 1. Agent.intercept() Error Handling
+### 1. `agent.intercept()` error handling
 
-```typescript
-// Agent catches ALL errors and returns a status
-// It NEVER throws to the caller
+`agent.intercept()` returns `{ status: 'error', error: TracehoundError }` when Tracehound fails internally.
 
-try {
-  // ... processing
-} catch (error) {
-  return { status: 'error', error: tracehoundError }
-}
-```
+1. The hot path returns an `InterceptResult`; it does not require callers to catch Tracehound exceptions in normal operation.
+2. Callers must handle `status === 'error'` explicitly.
+3. The recommended default action is pass-through plus operator-side logging or notification.
 
-**Caller responsibility:** Check `status === 'error'` and decide action.
-**Default recommendation:** Pass traffic through, log the error.
+### 2. Official adapter default
 
----
+The official Express and Fastify adapters treat `status === 'error'` as pass-through by default.
 
-### 2. FailSafe Panic System
+1. If no custom `onIntercept` handler is configured, the adapter does not emit a terminal `500`.
+2. If a custom `onIntercept` handler writes a response, that application-owned response contract takes precedence.
+3. If a custom handler throws after response start, the adapter delegates to the framework error pipeline.
 
-Three-level threshold-triggered callbacks:
+### 3. Pressure and degradation signals
 
-| Level     | Memory | Quarantine | Error Rate |
-| --------- | ------ | ---------- | ---------- |
-| warning   | 70%    | 70%        | 10/min     |
-| critical  | 85%    | 85%        | 50/min     |
-| emergency | 95%    | 95%        | 100/min    |
+Tracehound exposes degradation through operator channels rather than by forcing a default client-visible error response.
 
-**Callbacks are fire-and-forget:**
+1. `th.notifications` may emit `system.panic` and other runtime events.
+2. `th.watcher.snapshot()` exposes runtime pressure and alert state.
+3. Notification delivery itself is bounded and may drop or reject downstream deliveries under pressure.
 
-```typescript
-// Callbacks never block, never throw
-catch {
-  // Swallow sync errors - fail-safe must not throw
-}
-```
+### 4. What may degrade
 
----
+| Synchronous runtime contract | Auxiliary path that may degrade |
+| ---------------------------- | ------------------------------- |
+| `agent.intercept()` returns  | HoundPool analysis              |
+| Quarantine insert semantics  | Cold storage archival           |
+| Audit chain append           | Notification/webhook delivery   |
 
-### 3. What Degrades vs. What Never Degrades
-
-| Never Degrades    | May Degrade Under Pressure |
-| ----------------- | -------------------------- |
-| Agent.intercept() | HoundPool processing       |
-| Quarantine insert | Cold Storage writes        |
-| AuditChain append | Notification delivery      |
+Fail-open does not mean "nothing is lost." It means host traffic is preserved when Tracehound's own internals degrade.
 
 ---
 
 ## Integration Guide
 
-### Recommended Pattern
+### Recommended pattern
 
 ```typescript
 const result = tracehound.agent.intercept(scent)
@@ -87,53 +76,38 @@ switch (result.status) {
   case 'quarantined':
   case 'ignored':
   case 'rate_limited':
-    // Normal operation
+  case 'payload_too_large':
     break
 
   case 'error':
-    // FAIL-OPEN: Log and pass through
-    logger.error('Tracehound error', result.error)
-    // Continue processing request
+    logger.error('Tracehound internal error', result.error)
+    // Continue host request flow.
     break
 }
 ```
 
-### Anti-Pattern (DO NOT DO)
+### Anti-pattern
 
 ```typescript
-// ❌ WRONG: Blocking on Tracehound error
 if (result.status === 'error') {
   return res.status(500).send('Security error')
 }
 ```
 
----
-
-## Panic Callback Usage
-
-```typescript
-tracehound.failSafe.on('emergency', (event) => {
-  // Notify ops, but don't block traffic
-  alertOps(event)
-})
-
-tracehound.failSafe.on('critical', (event) => {
-  // Reduce non-essential processing
-  disableHoundPool()
-})
-```
+Do not turn Tracehound internal failure into an automatic host-layer denial of service unless your application explicitly owns that response policy.
 
 ---
 
 ## Rationale
 
-1. **Security tools must not become attack vectors** - If Tracehound crashes under load, attackers could exploit this to block all traffic.
-2. **Observability over blocking** - Better to log a threat you couldn't fully process than to deny service.
-3. **Explicit degradation** - The system tells you what degraded; it doesn't hide failures.
+1. Security controls must not become an attacker-controlled traffic breaker.
+2. Operator visibility should live in logs, snapshots, and notifications before it lives on the wire.
+3. Degradation should be explicit, bounded, and reviewable.
 
 ---
 
 ## Related Documents
 
-- [PERFORMANCE-SLA.md](./PERFORMANCE-SLA.md) - Latency guarantees
-- [LOCAL-STATE-SEMANTICS.md](./LOCAL-STATE-SEMANTICS.md) - Instance isolation
+- [API.md](./API.md)
+- [PERFORMANCE-SLA.md](./PERFORMANCE-SLA.md)
+- [LOCAL-STATE-SEMANTICS.md](./LOCAL-STATE-SEMANTICS.md)

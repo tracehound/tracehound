@@ -1,81 +1,106 @@
 # Security Assurance & Chaos Verification
 
-This document outlines the proven facts, known limitations, and architectural rationale behind Tracehound's design as a High-Assurance Security Substrate. It is intended for Security Operations (SecOps) teams and architecture reviewers to understand both the empirical resilience of the system and its theoretical threat model gaps.
+This document summarizes what is currently verified in code and tests, what is deliberately bounded, and what remains outside Tracehound's assurance boundary.
 
-Tracehound is engineered on the principle that the security layer must **never** become a single point of failure for the host application.
-
----
-
-## 1. Verified Invariants (The Facts)
-
-Through our automated Local Chaos & Invariant Verification Suite (`npm run test:chaos`), the following architectural invariants are empirically tested and proven:
-
-### 1.1 Guaranteed Fail-Open (Zombie Hound Survival)
-
-Security middleware often introduces latency or deadlocks when its internal engines hang.
-
-- **Proof:** We freeze a worker process (`SIGSTOP`) under load.
-- **Result:** The system correctly identifies the timeout, bypasses the frozen worker, and allows traffic to flow to the business logic unhindered.
-- **Conclusion:** A locked or stalled Tracehound worker cannot deadlock the main Node.js event loop.
-
-### 1.2 Process Isolation (Poison Pill Resilience)
-
-In-memory engines are vulnerable to memory corruption, native module crashes, or out-of-memory (OOM) exceptions.
-
-- **Proof:** We crash a worker process instantly (`SIGKILL`).
-- **Result:** The main application thread survives without interruption, and a replacement worker is seamlessly spawned.
-- **Conclusion:** Tracehound's blast radius is strictly contained within its child processes. The host application is mathematically isolated from security engine crashes.
-
-### 1.3 Catastrophic I/O Starvation Survival
-
-Audit logs are critical, but a full or read-only disk should not break the API.
-
-- **Proof:** We lock down write permissions (`chmod 400`) on the `AuditChain` directory to simulate catastrophic disk failure.
-- **Result:** Tracehound detects the write failure, degrades gracefully, and maintains application availability (Fail-Open).
-- **Conclusion:** Infrastructure-level I/O failures do not propagate to the business layer.
+Tracehound's design goal is straightforward: internal security-path failure must not take down the host application.
 
 ---
 
-## 2. Threat Model Distinctions (The Narrative)
+## 1. Verified Runtime Behaviors
 
-Tracehound positions itself not as a "magic AI box", but as a **Deterministic Security Substrate**. When evaluating Tracehound against traditional WAFs or in-app RASP solutions, consider the following design trade-offs:
+### 1.1 Fail-open under worker pressure
 
-1. **Standard In-App Middleware (e.g., Express Security Layers):**
-   - _Risk:_ If a standard middleware encounters an algorithmic worst-case scenario (like ReDoS) or an OOM error, the entire Node.js server crashes.
-   - _Advantage of Tracehound:_ We offload the dangerous parsing/analysis to an OS-isolated child process. The host app is safe.
+The repository includes a local chaos suite (`pnpm test:chaos`) that exercises pool exhaustion and timeout behavior against a running target application.
 
-2. **Network WAFs (e.g., Cloudflare, AWS WAF):**
-   - _Risk:_ Network proxies block traffic based on generic signatures but lack application context (e.g., user roles, business logic state).
-   - _Advantage of Tracehound:_ Sitting right inside the application's request lifecycle, Tracehound possesses full context without sacrificing the resilience of a standalone WAF.
+Current chaos coverage verifies:
 
----
+1. saturating the hound pool does not permanently deadlock request flow
+2. clean traffic continues returning application responses within a bounded latency budget during mixed pressure
+3. pool recovery occurs after burst pressure without manual intervention
+4. trace inspection output resumes after recovery and remains observable via opaque trace ids for quarantined responses only
 
-## 3. Known Limitations & Audit Gaps (The Unknowns)
+These checks validate host availability behavior. They do not prove perfect detection coverage during degraded windows.
 
-For full transparency during security audits, the following theoretical vulnerabilities and edge cases remain outside the scope of Tracehound's deterministic guarantees:
+### 1.2 Auxiliary sink failure survival
 
-### 3.1 Blind Spot Injection (Fail-Open Exploitation)
+The same chaos suite now sabotages the real local disk sinks that exist in the runtime:
 
-Because Tracehound strictly adheres to a Fail-Open policy, a sophisticated attacker could intentionally trigger a Fail-Open state (e.g., via intense localized DDoS or triggering complex rules that cause timeouts) and immediately follow up with a malicious payload while the system is bypassing checks.
+1. signed runtime snapshot export
+2. trace inspection registry writes used by opaque `x-tracehound-trace-id` inspection
 
-- _Mitigation:_ The timeout window is extremely small (e.g., `100ms`). Rate limiters are designed to clamp down on the IP _before_ the attacker has time to coordinate a secondary attack.
+What is verified:
 
-### 3.2 Pre-Extraction Vulnerabilities (Scent Generation)
+1. sink write failure emits operator-visible panic/telemetry
+2. quarantined responses still emit opaque `x-tracehound-trace-id` headers before and during trace-registry sink failure
+3. quarantined and clean host traffic remain reachable instead of becoming an availability failure
+4. signed snapshot export can be verified before sabotage and fails closed on read once the sink is broken
 
-Tracehound only analyzes traffic _after_ the host application has extracted the `Scent` (headers, body, etc.).
+### 1.3 Integrity verification on signed artifacts
 
-- _Risk:_ If the host's body parser (e.g., `express.json`) crashes due to an oversized payload or a prototype pollution attack _before_ Tracehound receives the request, the application will still fall over.
-- _Mitigation:_ Host applications must impose strict body size limits and use safe parsing libraries upstream of Tracehound.
+Runtime snapshot verification uses HMAC-SHA256 with constant-time signature comparison. Evidence hash verification also uses constant-time comparison in the evidence constructor.
 
-### 3.3 Audit Log Tampering by `root`
-
-While the local `AuditChain` uses hash linking to become Tamper-Evident for application-level users, it relies on file system security.
-
-- _Risk:_ An attacker who gains root OS access can simply `rm -rf` the entire audit directory, destroying the evidence chain.
-- _Mitigation:_ Mission-critical environments should stream Tracehound logs to an external, write-only SIEM or syslog server immediately.
+These checks are implemented in code and covered by unit tests.
 
 ---
 
-## Conclusion
+## 2. Assurance Boundary
 
-Tracehound's primary value proposition to SecOps is **Zero-Harm Integration**. By strictly controlling its resource footprint and enforcing OS-level child process isolation, it provides a safe, high-speed conduit for running advanced security heuristics—ensuring that the defense mechanisms never become the application's greatest vulnerability.
+Tracehound provides:
+
+1. deterministic intercept handling for externally supplied threat signals
+2. bounded quarantine and bounded notification delivery
+3. fail-open adapter behavior on internal Tracehound errors
+4. tamper-evident audit chaining within the trust boundary of the host
+
+Tracehound does not provide:
+
+1. semantic threat detection
+2. OS-enforced sandbox or VM-grade isolation guarantees
+3. guaranteed lossless downstream delivery under sink failure
+4. privileged-host tamper immunity
+
+Process separation is part of the design, but it should be described as bounded blast-radius reduction, not absolute isolation.
+
+---
+
+## 3. Known Limitations
+
+### 3.1 Fail-open bypass window
+
+If Tracehound is degraded and returns `status: 'error'`, the host application continues. That preserves availability, but it can create a short analysis blind spot. In this window, a response may legitimately return HTTP 200 without an opaque trace header because no quarantine result was produced.
+
+### 3.2 Upstream parser and framework risk
+
+Tracehound operates after the host application extracts a `Scent`. If the upstream parser or framework fails before Tracehound sees the request, that failure is outside Tracehound's control.
+
+### 3.3 Local audit trust boundary
+
+The local audit chain is tamper-evident, not tamper-proof. A privileged attacker on the host can still destroy local files or interfere with local storage.
+
+### 3.4 Bounded auxiliary planes
+
+Notifications, webhooks, archival, and other downstream integrations are bounded to protect host stability. Under pressure or sink failure, they may drop work instead of preserving every outbound event.
+
+---
+
+## 4. Operational Reading
+
+For reviews and audits, read Tracehound as:
+
+1. a deterministic runtime evidence buffer
+2. a fail-open library that preserves host survivability
+3. a bounded control plane that favors stability over lossless delivery
+
+Do not read it as:
+
+1. a WAF replacement
+2. a detection engine
+3. a hard isolation boundary against a privileged host attacker
+
+---
+
+## Related Documents
+
+- [FAIL-OPEN-SPEC.md](./FAIL-OPEN-SPEC.md)
+- [THREAT-MODEL.md](./THREAT-MODEL.md)
+- [CRITICAL-SECURITY-REMEDIATION-PLAN.md](./CRITICAL-SECURITY-REMEDIATION-PLAN.md)

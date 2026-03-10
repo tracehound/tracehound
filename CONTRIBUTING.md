@@ -18,7 +18,7 @@ Thank you for your interest in contributing to Tracehound. As a security-focused
 
 ### Feature Requests
 
-Please open an issue to discuss new features before starting implementation. For significant architectural changes, we may request an [RFC](./docs/rfc).
+Please open an issue to discuss new features before starting implementation. For significant OSS architectural changes, we may request an RFC from the [public OSS RFC set](./docs/rfc/README.md).
 
 ### Pull Request Process
 

@@ -159,7 +159,7 @@ app.register(tracehoundPlugin, { agent: th.agent })
 
 ## RFCs (Request for Comments)
 
-Tracehound development is driven by the RFC process. See the [docs/rfc](./docs/rfc) directory for all active and planned proposals.
+Tracehound development is governed by the normative RFC set in [docs/rfc](./docs/rfc).
 
 ---
 

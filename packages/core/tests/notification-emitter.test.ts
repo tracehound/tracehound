@@ -175,6 +175,26 @@ describe('NotificationEmitter', () => {
       await iterator.return?.()
     })
 
+    it('resolves a pending next() as done when iterator return() is called', async () => {
+      const subscription = emitter.subscribe()
+      const iterator = subscription[Symbol.asyncIterator]()
+      const pending = iterator.next()
+
+      await iterator.return?.()
+
+      await expect(pending).resolves.toEqual({ value: undefined, done: true })
+      expect(emitter.stats.activeSubscribers).toBe(0)
+    })
+
+    it('handles repeated return() calls without throwing', async () => {
+      const subscription = emitter.subscribe()
+      const iterator = subscription[Symbol.asyncIterator]()
+
+      await expect(iterator.return?.()).resolves.toEqual({ value: undefined, done: true })
+      await expect(iterator.return?.()).resolves.toEqual({ value: undefined, done: true })
+      expect(emitter.stats.activeSubscribers).toBe(0)
+    })
+
     it('drops oldest queued subscriber events when the slow-consumer queue is full', async () => {
       emitter = new NotificationEmitter({ subscriberQueueLimit: 2 })
       const subscription = emitter.subscribe()
@@ -312,15 +332,13 @@ describe('NotificationEmitter', () => {
         // Wait for async dispatch
         await vi.runAllTimersAsync()
 
-        expect(mockFetch).toHaveBeenCalledWith(
-          'https://webhook.site/test',
-          expect.objectContaining({
-            method: 'POST',
-            body: expect.stringContaining('threat.detected'),
-            redirect: 'error',
-            signal: expect.any(AbortSignal),
-          }),
-        )
+        expect(mockFetch).toHaveBeenCalledTimes(1)
+        const [url, init] = mockFetch.mock.calls[0] as [unknown, RequestInit]
+        expect(String(url)).toBe('https://webhook.site/test')
+        expect(init.method).toBe('POST')
+        expect(String(init.body)).toContain('threat.detected')
+        expect(init.redirect).toBe('error')
+        expect(init.signal).toBeInstanceOf(AbortSignal)
       })
 
       it('filters webhooks by event type', async () => {
@@ -347,14 +365,11 @@ describe('NotificationEmitter', () => {
         emitter.emit('threat.detected', { data: 1 })
         await vi.runAllTimersAsync() // Hashing takes a bit more time with dynamic import
 
-        expect(mockFetch).toHaveBeenCalledWith(
-          'https://secure.webhook',
-          expect.objectContaining({
-            headers: expect.objectContaining({
-              'X-Tracehound-Signature': expect.stringMatching(/^sha256=[a-f0-9]{64}$/),
-            }),
-          }),
-        )
+        expect(mockFetch).toHaveBeenCalledTimes(1)
+        const [url, init] = mockFetch.mock.calls[0] as [unknown, RequestInit]
+        expect(String(url)).toBe('https://secure.webhook/')
+        const headers = init.headers as Record<string, string>
+        expect(headers['X-Tracehound-Signature']).toMatch(/^sha256=[a-f0-9]{64}$/)
       })
 
       it('retries on 5xx errors', async () => {
@@ -410,6 +425,17 @@ describe('NotificationEmitter', () => {
       it('blocks webhook delivery when DNS resolves to a private address', async () => {
         lookupMock.mockResolvedValue([{ address: '127.0.0.1', family: 4 }])
         emitter.registerWebhook({ url: 'https://public-name.example/hook' })
+
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
+      })
+
+      it('rejects webhook delivery when destination resolution fails before dispatch', async () => {
+        lookupMock.mockRejectedValueOnce(new Error('dns unavailable during dispatch'))
+        emitter.registerWebhook({ url: 'https://dispatch-fail.example/hook' })
 
         emitter.emit('threat.detected', {})
         await vi.runAllTimersAsync()
@@ -476,6 +502,139 @@ describe('NotificationEmitter', () => {
         await expect(
           internals.isWebhookDestinationAllowed('https://lookup-fails.example/hook'),
         ).resolves.toBe(false)
+      })
+
+      it('covers ipv4/ipv6 parser edge cases for destination validation', async () => {
+        const internals = emitter as unknown as {
+          isWebhookDestinationAllowed: (url: string) => Promise<boolean>
+        }
+
+        await expect(
+          internals.isWebhookDestinationAllowed('https://[2606:4700:4700::1111]/hook'),
+        ).resolves.toBe(true)
+        await expect(
+          internals.isWebhookDestinationAllowed('https://[2001::db8::1]/hook'),
+        ).resolves.toBe(false)
+        await expect(
+          internals.isWebhookDestinationAllowed('https://[2001:db8:0:0:0:0:0]/hook'),
+        ).resolves.toBe(false)
+        await expect(
+          internals.isWebhookDestinationAllowed('https://[::ffff:999.1.1.1]/hook'),
+        ).resolves.toBe(false)
+        await expect(internals.isWebhookDestinationAllowed('https://256.1.1.1/hook')).resolves.toBe(
+          false,
+        )
+      })
+
+      it('blocks delivery when hostname resolution drifts away from initial allow-set', async () => {
+        lookupMock
+          .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+          .mockResolvedValueOnce([{ address: '93.184.216.35', family: 4 }])
+
+        emitter.registerWebhook({ url: 'https://rebind.example/hook' })
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
+      })
+
+      it('blocks delivery when follow-up resolution contains blocked addresses', async () => {
+        lookupMock
+          .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+          .mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }])
+
+        emitter.registerWebhook({ url: 'https://rebind-private.example/hook' })
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
+      })
+
+      it('blocks delivery when follow-up resolution lookup fails', async () => {
+        lookupMock
+          .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+          .mockRejectedValueOnce(new Error('dns outage'))
+
+        emitter.registerWebhook({ url: 'https://rebind-error.example/hook' })
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
+      })
+
+      it('blocks delivery when follow-up resolution is empty', async () => {
+        lookupMock
+          .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+          .mockResolvedValueOnce([])
+
+        emitter.registerWebhook({ url: 'https://rebind-empty.example/hook' })
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).not.toHaveBeenCalled()
+        expect(emitter.stats.rejectedWebhookDeliveries).toBe(1)
+      })
+
+      it('allows ip-literal webhook dispatch without dns re-resolution', async () => {
+        const lookupCallsBefore = lookupMock.mock.calls.length
+        emitter.registerWebhook({ url: 'https://8.8.8.8/hook' })
+        emitter.emit('threat.detected', {})
+        await vi.runAllTimersAsync()
+
+        expect(mockFetch).toHaveBeenCalledTimes(1)
+        expect(lookupMock.mock.calls.length).toBe(lookupCallsBefore)
+      })
+
+      it('returns early when queue shift yields no dispatch job', async () => {
+        const internals = emitter as unknown as {
+          drainWebhookQueue: () => void
+          webhookQueue: unknown[]
+          activeWebhookDispatches: number
+          webhookMaxInflight: number
+        }
+
+        internals.activeWebhookDispatches = 0
+        internals.webhookMaxInflight = 1
+        internals.webhookQueue = [undefined]
+
+        expect(() => internals.drainWebhookQueue()).not.toThrow()
+        expect(mockFetch).not.toHaveBeenCalled()
+      })
+
+      it('validates resolution helper branches directly', async () => {
+        const internals = emitter as unknown as {
+          isWebhookResolutionStillAllowed: (destination: {
+            url: URL
+            hostname: string
+            ipLiteral: boolean
+            initialAddresses: ReadonlySet<string>
+          }) => Promise<boolean>
+        }
+
+        await expect(
+          internals.isWebhookResolutionStillAllowed({
+            url: new URL('https://8.8.8.8/hook'),
+            hostname: '8.8.8.8',
+            ipLiteral: true,
+            initialAddresses: new Set(['8.8.8.8']),
+          }),
+        ).resolves.toBe(true)
+
+        lookupMock.mockResolvedValueOnce([
+          { address: '93.184.216.34', family: 4 },
+          { address: '93.184.216.35', family: 4 },
+        ])
+        await expect(
+          internals.isWebhookResolutionStillAllowed({
+            url: new URL('https://multi.example/hook'),
+            hostname: 'multi.example',
+            ipLiteral: false,
+            initialAddresses: new Set(['93.184.216.34']),
+          }),
+        ).resolves.toBe(true)
       })
 
       it('drains inflight webhook state even when dispatcher rejects unexpectedly', async () => {

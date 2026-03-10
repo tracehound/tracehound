@@ -330,7 +330,10 @@ function readSnapshotViaContainerReadback(secret: string): SnapshotReadResult {
   }
 }
 
-async function dumpSnapshotDiagnostics(snapshotSecret: string, lastState: string | null): Promise<void> {
+async function dumpSnapshotDiagnostics(
+  snapshotSecret: string,
+  lastState: string | null,
+): Promise<void> {
   console.error('  [diag] Snapshot readiness diagnostics begin')
   console.error(`  [diag] Last snapshot read state: ${lastState ?? 'UNKNOWN'}`)
 
@@ -564,7 +567,9 @@ async function runTests(): Promise<void> {
       async () => {
         if (!existsSync(HOST_SNAPSHOT_PATH)) {
           const readbackResult = readSnapshotViaContainerReadback(snapshotSecret)
-          snapshotReadFailure = readbackResult.ok ? null : `HOST_NO_INSTANCE_${readbackResult.reason}`
+          snapshotReadFailure = readbackResult.ok
+            ? null
+            : `HOST_NO_INSTANCE_${readbackResult.reason}`
           return readbackResult.ok
         }
 
@@ -576,9 +581,7 @@ async function runTests(): Promise<void> {
           }
 
           const readbackResult = readSnapshotViaContainerReadback(snapshotSecret)
-          snapshotReadFailure = readbackResult.ok
-            ? null
-            : `HOST_IO_ERROR_${readbackResult.reason}`
+          snapshotReadFailure = readbackResult.ok ? null : `HOST_IO_ERROR_${readbackResult.reason}`
           return readbackResult.ok
         }
 

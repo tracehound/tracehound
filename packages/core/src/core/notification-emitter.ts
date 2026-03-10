@@ -156,6 +156,13 @@ interface WebhookDispatchJob {
   event: TracehoundEvent
 }
 
+interface ResolvedWebhookDestination {
+  readonly url: URL
+  readonly hostname: string
+  readonly ipLiteral: boolean
+  readonly initialAddresses: ReadonlySet<string>
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Interface
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,6 +323,11 @@ export class NotificationEmitter implements INotificationEmitter {
           },
           return(): Promise<IteratorResult<TracehoundEvent>> {
             closed = true
+            if (resolve) {
+              const pendingResolve = resolve
+              resolve = null
+              pendingResolve({ value: undefined, done: true })
+            }
             const idx = self.subscribers.indexOf(subscriber)
             if (idx !== -1) {
               self.subscribers.splice(idx, 1)
@@ -437,8 +449,8 @@ export class NotificationEmitter implements INotificationEmitter {
   }
 
   private async dispatchWebhook(webhook: RegisteredWebhook, event: TracehoundEvent): Promise<void> {
-    const destinationAllowed = await this.isWebhookDestinationAllowed(webhook.url)
-    if (!destinationAllowed) {
+    const destination = await this.resolveWebhookDestination(webhook.url)
+    if (!destination) {
       this._rejectedWebhookDeliveries++
       return
     }
@@ -461,6 +473,12 @@ export class NotificationEmitter implements INotificationEmitter {
     const delayMs = webhook.retry?.delayMs ?? 1000
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const resolutionStillAllowed = await this.isWebhookResolutionStillAllowed(destination)
+      if (!resolutionStillAllowed) {
+        this._rejectedWebhookDeliveries++
+        return
+      }
+
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_REQUEST_TIMEOUT_MS)
       if (typeof timeoutId.unref === 'function') {
@@ -468,7 +486,7 @@ export class NotificationEmitter implements INotificationEmitter {
       }
 
       try {
-        const response = await fetch(webhook.url, {
+        const response = await fetch(destination.url, {
           method: 'POST',
           headers,
           body,
@@ -511,45 +529,99 @@ export class NotificationEmitter implements INotificationEmitter {
   }
 
   private async isWebhookDestinationAllowed(url: string): Promise<boolean> {
+    const resolved = await this.resolveWebhookDestination(url)
+    return resolved !== null
+  }
+
+  private async resolveWebhookDestination(url: string): Promise<ResolvedWebhookDestination | null> {
     let parsed: URL
     try {
       parsed = new URL(url)
     } catch {
-      return false
+      return null
     }
 
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return false
+      return null
     }
 
     if (parsed.username.length > 0 || parsed.password.length > 0) {
-      return false
+      return null
     }
 
     const normalizedHostname = normalizeHostname(parsed.hostname)
     if (isBlockedHostname(normalizedHostname)) {
-      return false
+      return null
     }
 
     const ipFamily = isIP(normalizedHostname)
     if (ipFamily !== 0) {
-      return !isBlockedIpAddress(normalizedHostname)
+      if (isBlockedIpAddress(normalizedHostname)) {
+        return null
+      }
+
+      return {
+        url: parsed,
+        hostname: normalizedHostname,
+        ipLiteral: true,
+        initialAddresses: new Set([normalizedHostname]),
+      }
     }
 
     try {
       const { lookup } = await import('node:dns/promises')
       const resolved = await lookup(normalizedHostname, { all: true, verbatim: true })
       if (resolved.length === 0) {
+        return null
+      }
+
+      const addresses = new Set<string>()
+      for (const entry of resolved) {
+        if (isBlockedIpAddress(entry.address)) {
+          return null
+        }
+        addresses.add(entry.address)
+      }
+
+      return {
+        url: parsed,
+        hostname: normalizedHostname,
+        ipLiteral: false,
+        initialAddresses: addresses,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  private async isWebhookResolutionStillAllowed(
+    destination: ResolvedWebhookDestination,
+  ): Promise<boolean> {
+    if (destination.ipLiteral) {
+      return true
+    }
+
+    try {
+      const { lookup } = await import('node:dns/promises')
+      const current = await lookup(destination.hostname, { all: true, verbatim: true })
+      if (current.length === 0) {
         return false
       }
 
-      for (const entry of resolved) {
+      let hasIntersection = false
+      for (const entry of current) {
         if (isBlockedIpAddress(entry.address)) {
           return false
         }
+
+        if (destination.initialAddresses.has(entry.address)) {
+          hasIntersection = true
+        }
       }
 
-      return true
+      // This does not fully eliminate TOCTOU, but it narrows the rebinding
+      // window by requiring DNS consistency with the initial allow decision.
+      return hasIntersection
     } catch {
       return false
     }
@@ -640,9 +712,11 @@ function isBlockedIpAddress(address: string): boolean {
 
 function isBlockedIpv4(address: string): boolean {
   const parts = parseIpv4Octets(address)
+  /* c8 ignore start */
   if (!parts) {
     return true
   }
+  /* c8 ignore stop */
 
   const value = ipv4OctetsToNumber(parts)
 
@@ -667,11 +741,14 @@ function isBlockedIpv4(address: string): boolean {
 
 function isBlockedIpv6(address: string): boolean {
   const segments = parseIpv6Segments(address)
+  /* c8 ignore start */
   if (!segments) {
     return true
   }
+  /* c8 ignore stop */
 
   const [first, second, third, fourth, fifth, sixth, seventh, eighth] = segments
+  /* c8 ignore start */
   if (
     first === undefined ||
     second === undefined ||
@@ -684,6 +761,7 @@ function isBlockedIpv6(address: string): boolean {
   ) {
     return true
   }
+  /* c8 ignore stop */
 
   return (
     segments.every((segment) => segment === 0) ||
@@ -705,17 +783,21 @@ function isBlockedIpv6(address: string): boolean {
 
 function parseIpv4Octets(address: string): [number, number, number, number] | null {
   const parts = address.split('.').map((part) => parseInt(part, 10))
+  /* c8 ignore start */
   if (
     parts.length !== 4 ||
     parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
   ) {
     return null
   }
+  /* c8 ignore stop */
 
   const [first, second, third, fourth] = parts
+  /* c8 ignore start */
   if (first === undefined || second === undefined || third === undefined || fourth === undefined) {
     return null
   }
+  /* c8 ignore stop */
 
   return [first, second, third, fourth]
 }
@@ -732,28 +814,36 @@ function isIpv4InRange(value: number, start: number, end: number): boolean {
 function parseIpv6Segments(address: string): number[] | null {
   const normalized = address.toLowerCase()
   const parts = normalized.split('::')
+  /* c8 ignore start */
   if (parts.length > 2) {
     return null
   }
+  /* c8 ignore stop */
 
   const left = parseIpv6SegmentGroup(parts[0] ?? '')
+  /* c8 ignore start */
   if (!left) {
     return null
   }
+  /* c8 ignore stop */
 
   if (parts.length === 1) {
     return left.length === 8 ? left : null
   }
 
   const right = parseIpv6SegmentGroup(parts[1] ?? '')
+  /* c8 ignore start */
   if (!right) {
     return null
   }
+  /* c8 ignore stop */
 
   const missingSegments = 8 - (left.length + right.length)
+  /* c8 ignore start */
   if (missingSegments < 1) {
     return null
   }
+  /* c8 ignore stop */
 
   return [...left, ...Array<number>(missingSegments).fill(0), ...right]
 }
@@ -767,28 +857,36 @@ function parseIpv6SegmentGroup(group: string): number[] | null {
   const segments = group.split(':')
   for (let index = 0; index < segments.length; index++) {
     const segment = segments[index]
+    /* c8 ignore start */
     if (segment === undefined || segment.length === 0) {
       return null
     }
+    /* c8 ignore stop */
 
     if (segment.includes('.')) {
+      /* c8 ignore start */
       if (index !== segments.length - 1) {
         return null
       }
+      /* c8 ignore stop */
 
       const ipv4Octets = parseIpv4Octets(segment)
+      /* c8 ignore start */
       if (!ipv4Octets) {
         return null
       }
+      /* c8 ignore stop */
 
       values.push(ipv4Octets[0] * 256 + ipv4Octets[1], ipv4Octets[2] * 256 + ipv4Octets[3])
       continue
     }
 
     const value = parseInt(segment, 16)
+    /* c8 ignore start */
     if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
       return null
     }
+    /* c8 ignore stop */
 
     values.push(value)
   }

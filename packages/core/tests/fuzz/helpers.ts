@@ -3,8 +3,38 @@ import { createTracehound, type ITracehound } from '../../src/core/tracehound.js
 import type { Severity } from '../../src/types/common.js'
 import type { ThreatCategory } from '../../src/types/scent.js'
 
-export const FUZZ_SEED = Number(process.env.FUZZ_SEED ?? '20260216')
-export const FUZZ_NUM_RUNS = Number(process.env.FUZZ_NUM_RUNS ?? '120')
+function parseDeterministicEnvInt(
+  name: string,
+  fallback: number,
+  options?: { min?: number; max?: number },
+): number {
+  const raw = process.env[name]
+
+  if (raw === undefined) {
+    return fallback
+  }
+
+  const normalized = raw.trim()
+  if (!/^-?\d+$/.test(normalized)) {
+    throw new Error(`${name} must be a base-10 integer, received ${JSON.stringify(raw)}`)
+  }
+
+  const value = Number(normalized)
+  const min = options?.min ?? Number.MIN_SAFE_INTEGER
+  const max = options?.max ?? Number.MAX_SAFE_INTEGER
+
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be a safe integer between ${min} and ${max}, received ${raw}`)
+  }
+
+  return value
+}
+
+export const FUZZ_SEED = parseDeterministicEnvInt('FUZZ_SEED', 20260216, { min: 0 })
+export const FUZZ_NUM_RUNS = parseDeterministicEnvInt('FUZZ_NUM_RUNS', 120, {
+  min: 1,
+  max: 10_000,
+})
 
 const MAX_DEPTH = 4
 const FLOAT_SCALE = 100_000

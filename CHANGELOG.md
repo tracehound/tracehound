@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.4] - 2026-03-11 - Post-1.8.3 Workflow and Security Maintenance Patch
+
+This patch release captures all commits merged after `v1.8.3`, focused on workflow hardening, dependency security remediation, and fuzz/chaos pipeline stability.
+
+### Security and Dependency Hygiene
+
+- Applied OSV vulnerability remediation updates.
+- Added StepSecurity GitHub Actions hardening updates and follow-up workflow permission fixes.
+
+### CI, Workflow, and Reliability
+
+- Fixed workflow configuration regressions affecting CI and security automation.
+- Updated Scorecard workflow configuration and corrected token-permission placement issues.
+- Fixed chaos test workflow `pnpm install` and naming consistency issues.
+
+### Fuzzing and Test Infrastructure
+
+- Improved fuzz test workflow configuration.
+- Fixed fuzz helper loop-risk behavior in workflow/test support paths.
+
+### Documentation
+
+- Updated README badge links.
+
 ## [1.8.3] - 2026-03-11 - ESLint Clock/RNG SSoT, Monotonic Evidence Timestamps, and Workflow Hardening
 
 This patch release delivers injectable clock/RNG enforcement via ESLint, monotonic nanosecond timestamps on quarantined evidence, scheduler correctness fixes, and complete SHA-pinning of all GitHub Actions across the CI workflow suite.

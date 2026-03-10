@@ -243,11 +243,14 @@ export class RateLimiter implements IRateLimiter {
   private readonly sources = new Map<string, SourceEntry>()
   private readonly ipCeiling = new Map<string, IpCeilingEntry>()
   private readonly config: Required<RateLimitConfig>
+  private readonly now: () => number
   private totalChecks = 0
   private totalRejections = 0
   private totalEvictions = 0
 
-  constructor(config: RateLimitConfig) {
+  constructor(config: RateLimitConfig, now?: () => number) {
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    this.now = now ?? ((): number => Date.now())
     // Validate config
     if (config.windowMs <= 0) {
       throw Errors.invalidConfigRateLimit('windowMs must be positive')
@@ -272,7 +275,7 @@ export class RateLimiter implements IRateLimiter {
 
   check(source: ScentSource): RateLimitResult {
     this.totalChecks++
-    const now = Date.now()
+    const now = this.now()
     const key = generateSourceKey(source)
     const hasCompositeEntry = this.sources.has(key)
 
@@ -506,7 +509,7 @@ export class RateLimiter implements IRateLimiter {
   }
 
   cleanup(): number {
-    const now = Date.now()
+    const now = this.now()
     const staleThreshold = now - this.config.windowMs - this.config.blockDurationMs
 
     let cleaned = 0
@@ -532,7 +535,7 @@ export class RateLimiter implements IRateLimiter {
 
   get stats(): RateLimiterStats {
     let blocked = 0
-    const now = Date.now()
+    const now = this.now()
 
     for (const entry of this.sources.values()) {
       if (entry.blockedUntil !== null && entry.blockedUntil > now) {
@@ -557,6 +560,6 @@ export class RateLimiter implements IRateLimiter {
  * @param config - Rate limit configuration
  * @returns Rate limiter instance
  */
-export function createRateLimiter(config: RateLimitConfig): IRateLimiter {
-  return new RateLimiter(config)
+export function createRateLimiter(config: RateLimitConfig, now?: () => number): IRateLimiter {
+  return new RateLimiter(config, now)
 }

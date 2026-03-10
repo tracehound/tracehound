@@ -111,6 +111,12 @@ export interface WatcherConfig {
   quarantineHighWatermark: number
   /** Maximum total alerts to keep in memory (default: 10000) */
   maxAlerts?: number
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 /**
@@ -179,15 +185,18 @@ export class Watcher implements IWatcher {
   private _lastAlert: Alert | null = null
 
   private readonly maxAlerts: number
+  private readonly now: () => number
 
   constructor(private readonly config: WatcherConfig) {
-    this.startTime = Date.now()
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    this.now = config._now ?? ((): number => Date.now())
+    this.startTime = this.now()
     this.alertWindowStart = this.startTime
     this.maxAlerts = config.maxAlerts ?? 10_000
   }
 
   snapshot(): Readonly<WatcherSnapshot> {
-    const now = Date.now()
+    const now = this.now()
 
     // Build threat stats
     const byCategory: Record<string, number> = {}
@@ -251,7 +260,7 @@ export class Watcher implements IWatcher {
   }
 
   alert(alertInput: Omit<Alert, 'id' | 'timestamp'>): boolean {
-    const now = Date.now()
+    const now = this.now()
 
     // Check if we need to reset the window
     if (now - this.alertWindowStart >= this.config.alertWindowMs) {

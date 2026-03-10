@@ -864,6 +864,22 @@ describe('Agent', () => {
       }
     })
 
+    it('should expose monoNs on quarantined handle', () => {
+      const scent = createScent(
+        { attack: 'mono-test' },
+        { category: 'injection', severity: 'high' },
+      )
+
+      const result = agent.intercept(scent)
+      expect(result.status).toBe('quarantined')
+
+      if (result.status === 'quarantined') {
+        // Stored as decimal string for JSON safety; parseable back to bigint for ordering
+        expect(typeof result.handle.monoNs).toBe('string')
+        expect(BigInt(result.handle.monoNs)).toBeGreaterThanOrEqual(0n)
+      }
+    })
+
     it('exposes an immutable runtime source snapshot', () => {
       const source = {
         ip: '203.0.113.10',

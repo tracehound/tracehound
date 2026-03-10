@@ -797,4 +797,111 @@ describe('RateLimiter', () => {
       expect(limiter.check(createSource('test')).allowed).toBe(true)
     })
   })
+
+  describe('Injectable clock', () => {
+    it('should use injected clock for window boundary decisions', () => {
+      let fakeTime = 1_000_000
+      const mockNow = (): number => fakeTime
+
+      const limiter = new RateLimiter(
+        { windowMs: 1_000, maxRequests: 3, blockDurationMs: 0 },
+        mockNow,
+      )
+      const source = createSource('192.0.2.10')
+
+      // Exhaust window
+      limiter.check(source)
+      limiter.check(source)
+      limiter.check(source)
+      expect(limiter.check(source).allowed).toBe(false)
+
+      // Advance injected clock past the window
+      fakeTime += 1_001
+      expect(limiter.check(source).allowed).toBe(true)
+    })
+
+    it('should use injected clock for block duration expiry', () => {
+      let fakeTime = 1_000_000
+      const mockNow = (): number => fakeTime
+
+      const limiter = new RateLimiter(
+        { windowMs: 1_000, maxRequests: 2, blockDurationMs: 5_000 },
+        mockNow,
+      )
+      const source = createSource('192.0.2.11')
+
+      // Exhaust and trigger block
+      limiter.check(source)
+      limiter.check(source)
+      limiter.check(source) // triggers block
+
+      const blocked = limiter.check(source)
+      expect(blocked.allowed).toBe(false)
+      if (!blocked.allowed) expect(blocked.blocked).toBe(true)
+
+      // Block not yet expired
+      fakeTime += 4_999
+      expect(limiter.check(source).allowed).toBe(false)
+
+      // Block expired
+      fakeTime += 2
+      expect(limiter.check(source).allowed).toBe(true)
+    })
+
+    it('should use injected clock in cleanup()', () => {
+      let fakeTime = 1_000_000
+      const mockNow = (): number => fakeTime
+
+      const limiter = new RateLimiter(
+        { windowMs: 1_000, maxRequests: 5, blockDurationMs: 2_000 },
+        mockNow,
+      )
+      const source = createSource('192.0.2.12')
+      limiter.check(source)
+      expect(limiter.stats.sources).toBe(1)
+
+      // Advance injected clock past stale threshold
+      fakeTime += 1_000 + 2_000 + 1
+      expect(limiter.cleanup()).toBe(1)
+      expect(limiter.stats.sources).toBe(0)
+    })
+
+    it('should use injected clock for stats blocked count', () => {
+      let fakeTime = 1_000_000
+      const mockNow = (): number => fakeTime
+
+      const limiter = new RateLimiter(
+        { windowMs: 1_000, maxRequests: 1, blockDurationMs: 10_000 },
+        mockNow,
+      )
+      const source = createSource('192.0.2.13')
+
+      limiter.check(source) // allowed
+      limiter.check(source) // triggers block
+
+      expect(limiter.stats.blocked).toBe(1)
+
+      // Advance past block duration
+      fakeTime += 10_001
+      expect(limiter.stats.blocked).toBe(0)
+    })
+
+    it('createRateLimiter factory forwards injected clock', () => {
+      let fakeTime = 1_000_000
+      const mockNow = (): number => fakeTime
+
+      const limiter = createRateLimiter(
+        { windowMs: 500, maxRequests: 2, blockDurationMs: 0 },
+        mockNow,
+      )
+      const source = createSource('192.0.2.14')
+
+      limiter.check(source)
+      limiter.check(source)
+      expect(limiter.check(source).allowed).toBe(false)
+
+      fakeTime += 501
+      expect(limiter.check(source).allowed).toBe(true)
+    })
+  })
 })

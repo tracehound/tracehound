@@ -32,6 +32,12 @@ export type EvidenceCreationResult =
       size: number
       /** Whether compression was applied */
       compressed: boolean
+      /**
+       * Monotonic capture timestamp in nanoseconds (process.hrtime.bigint).
+       * Convenience alias for evidence.monoNs — same value, avoids unwrapping.
+       * Use for ordering within the same millisecond.
+       */
+      monoNs: bigint
     }
   | {
       ok: false
@@ -49,6 +55,13 @@ export interface EvidenceFactoryOptions {
    * Use createHotPathCodec() - NO decode access.
    */
   codec?: HotPathCodec
+  /**
+   * Injectable monotonic clock returning nanoseconds since process start.
+   * DEFAULT: process.hrtime.bigint — intentionally excluded from the
+   * no-restricted-syntax ESLint rule; this is the single approved hrtime consumer.
+   * @internal For deterministic testing only.
+   */
+  _hrtime?: () => bigint
 }
 
 /**
@@ -81,9 +94,11 @@ export interface IEvidenceFactory {
  */
 export class EvidenceFactory implements IEvidenceFactory {
   private readonly codec: HotPathCodec | undefined
+  private readonly hrtime: () => bigint
 
   constructor(options: EvidenceFactoryOptions = {}) {
     this.codec = options.codec
+    this.hrtime = options._hrtime ?? ((): bigint => process.hrtime.bigint())
   }
 
   create(scent: Scent, threat: ThreatSignal, maxPayloadSize: number): EvidenceCreationResult {
@@ -113,7 +128,8 @@ export class EvidenceFactory implements IEvidenceFactory {
         finalBytes = encoded.bytes
       }
 
-      // Step 5: Create Evidence instance
+      // Step 5: Capture monotonic timestamp and create Evidence instance
+      const monoNs = this.hrtime()
       const evidence = new Evidence(
         finalBytes.buffer.slice(
           finalBytes.byteOffset,
@@ -126,6 +142,7 @@ export class EvidenceFactory implements IEvidenceFactory {
         scent.source,
         compressed,
         scent.id,
+        monoNs,
       )
 
       return {
@@ -135,6 +152,7 @@ export class EvidenceFactory implements IEvidenceFactory {
         hash,
         size: finalBytes.length,
         compressed,
+        monoNs,
       }
     } catch (error: unknown) {
       // Convert to TracehoundError if not already

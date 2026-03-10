@@ -667,6 +667,45 @@ describe('Tracehound Factory', () => {
     })
   })
 
+  describe('runtime.now wiring', () => {
+    it('should pass runtime.now to watcher so uptime is controlled by injected clock', () => {
+      let fakeTime = 8_000_000
+      const mockNow = (): number => fakeTime
+
+      const tracehound = createTracehound({ runtime: { now: mockNow } })
+      try {
+        fakeTime += 3_000
+        const snapshot = tracehound.watcher.snapshot()
+        expect(snapshot.uptimeMs).toBe(3_000)
+        expect(snapshot.snapshotTime).toBe(fakeTime)
+      } finally {
+        tracehound.shutdown()
+      }
+    })
+
+    it('should pass runtime.now to rate-limiter so window decisions use injected clock', () => {
+      let fakeTime = 8_000_000
+      const mockNow = (): number => fakeTime
+
+      const tracehound = createTracehound({
+        rateLimit: { windowMs: 1_000, maxRequests: 2, blockDurationMs: 0 },
+        runtime: { now: mockNow },
+      })
+      try {
+        const source = { ip: '10.0.0.1' }
+        tracehound.rateLimiter.check(source)
+        tracehound.rateLimiter.check(source)
+        expect(tracehound.rateLimiter.check(source).allowed).toBe(false)
+
+        // Advance injected clock past window — should be allowed again
+        fakeTime += 1_001
+        expect(tracehound.rateLimiter.check(source).allowed).toBe(true)
+      } finally {
+        tracehound.shutdown()
+      }
+    })
+  })
+
   describe('Snapshot API', () => {
     it('exposes runtime snapshot via tracehound.snapshot()', () => {
       const tracehound = createTracehound()

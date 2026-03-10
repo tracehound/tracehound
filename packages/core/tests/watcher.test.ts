@@ -271,4 +271,79 @@ describe('Watcher', () => {
       expect((watcher as any).addEventListener).toBeUndefined()
     })
   })
+
+  describe('Injectable clock', () => {
+    it('should use injected _now for uptime calculation', () => {
+      let fakeTime = 5_000_000
+      const mockNow = (): number => fakeTime
+
+      const w = createWatcher({
+        maxAlertsPerWindow: 10,
+        alertWindowMs: 60_000,
+        quarantineHighWatermark: 0.8,
+        _now: mockNow,
+      })
+
+      fakeTime += 2_500
+      expect(w.snapshot().uptimeMs).toBe(2_500)
+
+      fakeTime += 7_500
+      expect(w.snapshot().uptimeMs).toBe(10_000)
+    })
+
+    it('should use injected _now for alert window reset', () => {
+      let fakeTime = 5_000_000
+      const mockNow = (): number => fakeTime
+
+      const w = createWatcher({
+        maxAlertsPerWindow: 3,
+        alertWindowMs: 1_000,
+        quarantineHighWatermark: 0.8,
+        _now: mockNow,
+      })
+
+      // Fill window
+      w.alert({ type: 'threat_detected', severity: 'info', message: 'a' })
+      w.alert({ type: 'threat_detected', severity: 'info', message: 'b' })
+      w.alert({ type: 'threat_detected', severity: 'info', message: 'c' })
+      expect(w.snapshot().alertsInWindow).toBe(3)
+
+      // Rate limited
+      expect(w.alert({ type: 'threat_detected', severity: 'info', message: 'd' })).toBe(false)
+
+      // Advance injected clock past alert window
+      fakeTime += 1_001
+      expect(w.alert({ type: 'threat_detected', severity: 'info', message: 'e' })).toBe(true)
+      expect(w.snapshot().alertsInWindow).toBe(1)
+    })
+
+    it('should use injected _now for alert timestamp', () => {
+      const fakeTime = 9_999_999
+      const mockNow = (): number => fakeTime
+
+      const w = createWatcher({
+        maxAlertsPerWindow: 10,
+        alertWindowMs: 60_000,
+        quarantineHighWatermark: 0.8,
+        _now: mockNow,
+      })
+
+      w.alert({ type: 'threat_detected', severity: 'warning', message: 'ts-test' })
+      expect(w.snapshot().lastAlert?.timestamp).toBe(fakeTime)
+    })
+
+    it('should use injected _now for snapshot snapshotTime', () => {
+      const fakeTime = 7_777_777
+      const mockNow = (): number => fakeTime
+
+      const w = createWatcher({
+        maxAlertsPerWindow: 10,
+        alertWindowMs: 60_000,
+        quarantineHighWatermark: 0.8,
+        _now: mockNow,
+      })
+
+      expect(w.snapshot().snapshotTime).toBe(fakeTime)
+    })
+  })
 })

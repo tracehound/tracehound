@@ -32,6 +32,8 @@ export class Evidence implements EvidenceHandle {
     source: ScentSource,
     compressed: boolean = false,
     private readonly _scentId: string = '',
+    private readonly _monoNs: bigint = 0n,
+    // TODO: refactor constructor to options object when mono + now are both stabilized.
     now: () => number = Date.now,
   ) {
     // Validate bytes type
@@ -86,6 +88,10 @@ export class Evidence implements EvidenceHandle {
 
   get captured(): number {
     return this._captured
+  }
+
+  get monoNs(): bigint {
+    return this._monoNs
   }
 
   get severity(): Severity {

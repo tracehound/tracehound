@@ -103,6 +103,20 @@ export interface TracehoundOptions {
     /** Flush interval in ms. Default: 1000 */
     intervalMs?: number
   }
+
+  /**
+   * Runtime dependency overrides.
+   * @internal For deterministic testing only. Production use: omit this field.
+   */
+  runtime?: {
+    /**
+     * Injectable clock returning current time in ms.
+     * When provided, this single clock is used by all time-sensitive subsystems
+     * (scheduler, rate-limiter, watcher) as the single source of time.
+     * DEFAULT: Date.now
+     */
+    now?: () => number
+  }
 }
 
 /**
@@ -173,6 +187,8 @@ class Tracehound implements ITracehound {
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null
 
   constructor(options: TracehoundOptions = {}) {
+    const runtimeNow = options.runtime?.now ?? Date.now
+
     // Initialize components
     this.auditChain = new AuditChain()
     this.notifications = createNotificationEmitter()
@@ -206,20 +222,24 @@ class Tracehound implements ITracehound {
       quarantineDependencies,
     )
 
-    this.rateLimiter = createRateLimiter({
-      windowMs: options.rateLimit?.windowMs ?? 60_000,
-      maxRequests: options.rateLimit?.maxRequests ?? 100,
-      blockDurationMs: options.rateLimit?.blockDurationMs ?? 300_000,
-    })
+    this.rateLimiter = createRateLimiter(
+      {
+        windowMs: options.rateLimit?.windowMs ?? 60_000,
+        maxRequests: options.rateLimit?.maxRequests ?? 100,
+        blockDurationMs: options.rateLimit?.blockDurationMs ?? 300_000,
+      },
+      runtimeNow,
+    )
 
     this.watcher = createWatcher({
       maxAlertsPerWindow: options.watcher?.maxAlertsPerWindow ?? 10,
       alertWindowMs: options.watcher?.alertWindowMs ?? 60_000,
       quarantineHighWatermark: options.watcher?.quarantineHighWatermark ?? 0.8,
+      _now: runtimeNow,
     })
 
     this.evidenceFactory = new EvidenceFactory()
-    this.scheduler = this.createQuarantineDecayScheduler(options.quarantine)
+    this.scheduler = this.createQuarantineDecayScheduler(options.quarantine, runtimeNow)
 
     // Create HoundPool first — Agent depends on it for auto-activation
     const poolConfig: HoundPoolConfig = {
@@ -417,6 +437,7 @@ class Tracehound implements ITracehound {
 
   private createQuarantineDecayScheduler(
     quarantineOptions: TracehoundOptions['quarantine'],
+    now: () => number,
   ): IScheduler | null {
     const ttlMs = quarantineOptions?.ttlMs ?? 0
     if (ttlMs <= 0) {
@@ -433,6 +454,7 @@ class Tracehound implements ITracehound {
       jitterMs: Math.min(intervalMs, 250),
       skipIfBusy: true,
       maxTasksPerTick: 1,
+      _now: now,
     })
 
     scheduler.schedule({

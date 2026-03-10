@@ -14,7 +14,7 @@
     "validate:paranoid": "pnpm lint && pnpm format && pnpm build && pnpm test && pnpm test:coverage && pnpm test:chaos && node scripts/release/verify-publish-packages.mjs",
     "review:branch": "node scripts/review/pr-branch-review.mjs",
     "prelint": "pnpm --filter @tracehound/core build",
-    "lint": "pnpm -r lint",
+    "lint": "pnpm -r lint && eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "clean": "pnpm -r clean"
@@ -25,10 +25,12 @@
     "@types/express": "^4.17.21",
     "@types/node": "^25.0.9",
     "@vitest/coverage-v8": "^2.0.0",
+    "eslint": "^9.0.0",
     "express": "^4.18.2",
     "prettier": "^3.6.2",
     "tsx": "^4.0.0",
     "typescript": "^5.3.0",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^2.0.0"
   },
   "engines": {

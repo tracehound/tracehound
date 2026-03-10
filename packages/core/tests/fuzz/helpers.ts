@@ -1,11 +1,49 @@
+import { createHmac } from 'node:crypto'
 import { createTracehound, type ITracehound } from '../../src/core/tracehound.js'
 import type { Severity } from '../../src/types/common.js'
 import type { ThreatCategory } from '../../src/types/scent.js'
 
-export const FUZZ_SEED = Number(process.env.FUZZ_SEED ?? '20260216')
-export const FUZZ_NUM_RUNS = Number(process.env.FUZZ_NUM_RUNS ?? '120')
+function parseDeterministicEnvInt(
+  name: string,
+  fallback: number,
+  options?: { min?: number; max?: number },
+): number {
+  const raw = process.env[name]
+
+  if (raw === undefined) {
+    return fallback
+  }
+
+  const normalized = raw.trim()
+  if (!/^-?\d+$/.test(normalized)) {
+    throw new Error(`${name} must be a base-10 integer, received ${JSON.stringify(raw)}`)
+  }
+
+  const value = Number(normalized)
+  const min = options?.min ?? Number.MIN_SAFE_INTEGER
+  const max = options?.max ?? Number.MAX_SAFE_INTEGER
+
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
+    throw new Error(`${name} must be a safe integer between ${min} and ${max}, received ${raw}`)
+  }
+
+  return value
+}
+
+export const FUZZ_SEED = parseDeterministicEnvInt('FUZZ_SEED', 20260216, { min: 0 })
+export const FUZZ_NUM_RUNS = parseDeterministicEnvInt('FUZZ_NUM_RUNS', 120, {
+  min: 1,
+  max: 10_000,
+})
 
 const MAX_DEPTH = 4
+const FLOAT_SCALE = 100_000
+
+interface DeterministicCryptoRandom {
+  nextBool(): boolean
+  nextInt(min: number, max: number): number
+  nextScaledNumber(min: number, max: number, scale: number): number
+}
 
 export const THREAT_CATEGORIES: ThreatCategory[] = [
   'injection',
@@ -40,49 +78,93 @@ export function createTestRuntime(maxPayloadSize: number = 256): ITracehound {
   })
 }
 
-function mulberry32(seed: number) {
-  return () => {
-    let t = (seed += 0x6d2b79f5)
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+function createDeterministicCryptoRandom(seed: number): DeterministicCryptoRandom {
+  const key = Buffer.from(`tracehound-fuzz-seed:${seed}`, 'utf8')
+  let counter = 0n
+  let pool = Buffer.alloc(0)
+  let offset = 0
+
+  function refillPool(): void {
+    const message = Buffer.alloc(8)
+    message.writeBigUInt64BE(counter, 0)
+    counter += 1n
+
+    pool = createHmac('sha256', key).update(message).digest()
+    offset = 0
+  }
+
+  function nextByte(): number {
+    if (offset >= pool.length) {
+      refillPool()
+    }
+
+    const value = pool[offset]
+    offset += 1
+    return value
+  }
+
+  function nextUInt32(): number {
+    const bytes = Buffer.from([nextByte(), nextByte(), nextByte(), nextByte()])
+    return bytes.readUInt32BE(0)
+  }
+
+  function nextInt(min: number, max: number): number {
+    if (!Number.isInteger(min) || !Number.isInteger(max) || max < min) {
+      throw new Error(`invalid deterministic fuzz integer range: min=${min} max=${max}`)
+    }
+
+    const span = max - min + 1
+    const limit = 0x100000000 - (0x100000000 % span)
+    let value = nextUInt32()
+
+    while (value >= limit) {
+      value = nextUInt32()
+    }
+
+    return min + (value % span)
+  }
+
+  return {
+    nextBool(): boolean {
+      return (nextByte() & 1) === 1
+    },
+    nextInt,
+    nextScaledNumber(min: number, max: number, scale: number): number {
+      return nextInt(min * scale, max * scale) / scale
+    },
   }
 }
 
-function randomInt(rand: () => number, min: number, max: number): number {
-  return Math.floor(rand() * (max - min + 1)) + min
-}
-
-function randomString(rand: () => number, maxLength = 20): string {
+function randomString(rand: DeterministicCryptoRandom, maxLength = 20): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_😀日本İ'
-  const len = randomInt(rand, 0, maxLength)
+  const len = rand.nextInt(0, maxLength)
   let out = ''
   for (let i = 0; i < len; i++) {
-    out += chars[randomInt(rand, 0, chars.length - 1)]
+    out += chars[rand.nextInt(0, chars.length - 1)]
   }
   return out
 }
 
-export function randomJsonValue(rand: () => number, depth: number = 0): unknown {
-  const pick = randomInt(rand, 0, depth >= MAX_DEPTH ? 3 : 6)
+export function randomJsonValue(rand: DeterministicCryptoRandom, depth: number = 0): unknown {
+  const pick = rand.nextInt(0, depth >= MAX_DEPTH ? 3 : 6)
   switch (pick) {
     case 0:
       return null
     case 1:
-      return rand() > 0.5
+      return rand.nextBool()
     case 2:
-      return Number((rand() * 1000 - 500).toFixed(5))
+      return rand.nextScaledNumber(-500, 500, FLOAT_SCALE)
     case 3:
       return randomString(rand)
     case 4: {
-      const len = randomInt(rand, 0, 8)
+      const len = rand.nextInt(0, 8)
       const arr: unknown[] = []
       for (let i = 0; i < len; i++) arr.push(randomJsonValue(rand, depth + 1))
       return arr
     }
     default: {
       const obj: Record<string, unknown> = {}
-      const len = randomInt(rand, 0, 8)
+      const len = rand.nextInt(0, 8)
       for (let i = 0; i < len; i++)
         obj[`k${i}_${randomString(rand, 6)}`] = randomJsonValue(rand, depth + 1)
       return obj
@@ -119,13 +201,14 @@ export function runDeterministicProperty(
   options?: {
     runs?: number
     seed?: number
-    generator?: (rand: () => number, i: number) => unknown
+    generator?: (rand: DeterministicCryptoRandom, i: number) => unknown
   },
 ): void {
   const seed = options?.seed ?? FUZZ_SEED
   const runs = options?.runs ?? FUZZ_NUM_RUNS
-  const generator = options?.generator ?? ((rand: () => number) => randomJsonValue(rand))
-  const rand = mulberry32(seed)
+  const generator =
+    options?.generator ?? ((rand: DeterministicCryptoRandom) => randomJsonValue(rand))
+  const rand = createDeterministicCryptoRandom(seed)
 
   for (let i = 0; i < runs; i++) {
     const candidate = generator(rand, i)

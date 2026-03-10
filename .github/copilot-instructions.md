@@ -42,7 +42,7 @@ pnpm test
 Additional CI/security checks used by workflows:
 
 - `pnpm audit --prod`
-- `pnpm --filter @tracehound/core test:fuzz:regression`
+- `pnpm test:fuzz:regression`
 - `pnpm test:coverage`
 
 ## Coding conventions to preserve

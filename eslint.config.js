@@ -4,7 +4,7 @@
  * Goals:
  *  1. Prevent new raw Date.now() calls from bypassing injectable _now clocks.
  *     (warn during RuntimeContext migration; promote to error once all 26
- *      existing sites are migrated — tracked via --max-warnings 26 in CI.)
+ *      existing sites are migrated once the migration is complete.)
  *  2. Prevent Math.random() — not cryptographically secure.
  *  3. Prevent direct crypto.randomBytes / crypto.randomUUID property access
  *     outside the approved utils/id.ts gateway.
@@ -28,38 +28,38 @@ export default tseslint.config(
     ignores: ['**/dist/**', 'scripts/**', 'coverage/**'],
   },
   {
-  files: ['packages/*/src/**/*.ts'],
-  languageOptions: {
-    parser: tseslint.parser,
+    files: ['packages/*/src/**/*.ts'],
+    languageOptions: {
+      parser: tseslint.parser,
+    },
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
+          message:
+            "Direct Date.now() bypasses the injectable clock. Use the module's _now parameter or runtime.now. (warn→error after RuntimeContext RFC lands)",
+        },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message:
+            'Math.random() is not cryptographically secure. Use injectable _randomInt or crypto.randomInt().',
+        },
+        {
+          object: 'crypto',
+          property: 'randomBytes',
+          message: 'Direct crypto.randomBytes() access. Use generateSecureId() from utils/id.ts.',
+        },
+        {
+          object: 'crypto',
+          property: 'randomUUID',
+          message: 'Direct crypto.randomUUID() access. Use generateSecureId() from utils/id.ts.',
+        },
+      ],
+    },
   },
-  rules: {
-    'no-restricted-syntax': [
-      'warn',
-      {
-        selector: "CallExpression[callee.object.name='Date'][callee.property.name='now']",
-        message:
-          "Direct Date.now() bypasses the injectable clock. Use the module's _now parameter or runtime.now. (warn→error after RuntimeContext RFC lands)",
-      },
-    ],
-    'no-restricted-properties': [
-      'error',
-      {
-        object: 'Math',
-        property: 'random',
-        message:
-          'Math.random() is not cryptographically secure. Use injectable _randomInt or crypto.randomInt().',
-      },
-      {
-        object: 'crypto',
-        property: 'randomBytes',
-        message: 'Direct crypto.randomBytes() access. Use generateSecureId() from utils/id.ts.',
-      },
-      {
-        object: 'crypto',
-        property: 'randomUUID',
-        message: 'Direct crypto.randomUUID() access. Use generateSecureId() from utils/id.ts.',
-      },
-    ],
-  },
-},
 )

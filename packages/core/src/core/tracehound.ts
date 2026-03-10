@@ -4,8 +4,18 @@
  * Provides a single entry point for initializing Tracehound.
  */
 
+import { existsSync, unlinkSync } from 'node:fs'
+import { Errors } from '../types/errors.js'
+import {
+  exportSystemSnapshot,
+  resolveSystemSnapshotPath,
+  resolveSystemSnapshotSecret,
+  writeSystemSnapshotToDisk,
+  type SystemSnapshot,
+} from '../utils/system-snapshot.js'
 import { createAgent, type IAgent } from './agent.js'
 import { AuditChain } from './audit-chain.js'
+import { createMemoryColdStorage, type IColdStorageAdapter } from './cold-storage.js'
 import { EvidenceFactory, type IEvidenceFactory } from './evidence-factory.js'
 import {
   createHoundPool,
@@ -15,25 +25,15 @@ import {
   type IHoundPool,
 } from './hound-pool.js'
 import { createNotificationEmitter, type INotificationEmitter } from './notification-emitter.js'
-import { Quarantine } from './quarantine.js'
-import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
-import { createScheduler, type IScheduler } from './scheduler.js'
-import { createWatcher, type IWatcher } from './watcher.js'
-import { createMemoryColdStorage, type IColdStorageAdapter } from './cold-storage.js'
-import { Errors } from '../types/errors.js'
-import { existsSync, unlinkSync } from 'node:fs'
 import {
   formatHoundErrorReason,
   formatHoundTimeoutReason,
   SYSTEM_PANIC_REASONS,
 } from './operational-events.js'
-import {
-  exportSystemSnapshot,
-  resolveSystemSnapshotPath,
-  resolveSystemSnapshotSecret,
-  type SystemSnapshot,
-  writeSystemSnapshotToDisk,
-} from '../utils/system-snapshot.js'
+import { Quarantine } from './quarantine.js'
+import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
+import { createScheduler, type IScheduler } from './scheduler.js'
+import { createWatcher, type IWatcher } from './watcher.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -187,7 +187,7 @@ class Tracehound implements ITracehound {
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null
 
   constructor(options: TracehoundOptions = {}) {
-    const runtimeNow = options.runtime?.now ?? Date.now
+    const runtimeNow = options.runtime?.now ?? (() => Date.now())
 
     // Initialize components
     this.auditChain = new AuditChain()

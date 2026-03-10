@@ -43,7 +43,6 @@ Additional CI/security checks used by workflows:
 
 - `pnpm audit --prod`
 - `pnpm --filter @tracehound/core test:fuzz:regression`
-- `pnpm assurance:gate:regression`
 - `pnpm test:coverage`
 
 ## Coding conventions to preserve

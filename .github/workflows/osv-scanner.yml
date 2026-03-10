@@ -7,17 +7,16 @@ on:
     - cron: '12 12 * * 1'
   workflow_dispatch:
 
-permissions:
-  actions: read
-  security-events: write
-  contents: read
-
 concurrency:
   group: osv-scanner-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   scan-scheduled:
+    permissions:
+      actions: read
+      security-events: write
+      contents: read
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@8ae4be80636b94886b3c271caad730985ce0611c # v2.3.3
     with:
       scan-args: |-

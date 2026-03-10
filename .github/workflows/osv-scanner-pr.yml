@@ -6,13 +6,12 @@ on:
   merge_group:
     types: [checks_requested]
 
-permissions:
-  actions: read
-  security-events: write
-  contents: read
-
 jobs:
   scan-pr:
+    permissions:
+      actions: read
+      security-events: write
+      contents: read
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@8ae4be80636b94886b3c271caad730985ce0611c # v2.3.3
     with:
       scan-args: |-

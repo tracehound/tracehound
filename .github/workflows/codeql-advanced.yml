@@ -9,9 +9,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
-  actions: read
-  packages: read
 
 concurrency:
   group: codeql-${{ github.ref }}
@@ -21,6 +18,11 @@ jobs:
   analyze:
     name: codeql
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      security-events: write
     timeout-minutes: 45
     strategy:
       fail-fast: false

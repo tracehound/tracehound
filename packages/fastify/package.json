@@ -1,6 +1,6 @@
 {
   "name": "@tracehound/fastify",
-  "version": "1.8.2",
+  "version": "1.8.3",
   "description": "Fastify plugin for Tracehound security buffer",
   "license": "Apache-2.0",
   "author": "Erdem Arslan <me@erdem.work>",

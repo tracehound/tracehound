@@ -222,19 +222,25 @@ describe('NotificationEmitter', () => {
         'http://100.64.0.1/hook',
         'http://172.16.0.1/hook',
         'http://172.31.255.255/hook',
+        'http://192.0.0.1/hook',
         'http://192.0.2.1/hook',
+        'http://192.88.99.1/hook',
         'http://192.168.1.1/hook',
         'http://198.18.0.1/hook',
+        'http://198.51.100.1/hook',
         'http://203.0.113.10/hook',
         'http://224.0.0.1/hook',
         'http://240.0.0.1/hook',
         'http://169.254.169.254/latest/meta-data/',
         'http://metadata.google.internal/computeMetadata/v1/',
+        'http://[::]/hook',
         'http://[::1]/hook',
         'http://[fc00::1]/hook',
         'http://[fe80::1]/hook',
         'http://[ff02::1]/hook',
         'http://[2001:db8::1]/hook',
+        'http://[2001:db8:1:2:3:4:5:6]/hook',
+        'http://[2001:2::1]/hook',
       ]
       for (const url of blocked) {
         expect(() => emitter.registerWebhook({ url })).toThrow(/private\/internal/)
@@ -450,6 +456,10 @@ describe('NotificationEmitter', () => {
         await expect(
           internals.isWebhookDestinationAllowed('https://93.184.216.34/hook'),
         ).resolves.toBe(true)
+        // IPv4-in-IPv6 notation: exercises parseIpv6SegmentGroup dot-segment path
+        await expect(
+          internals.isWebhookDestinationAllowed('https://[2001:db8::1.2.3.4]/hook'),
+        ).resolves.toBe(false)
       })
 
       it('rejects dispatch destinations when dns lookup is empty or fails', async () => {
@@ -512,9 +522,10 @@ describe('NotificationEmitter', () => {
           () => capturedSignal !== null,
           'expected webhook dispatch to start before timeout assertion',
         )
-        expect(capturedSignal?.aborted).toBe(false)
+        const signal = capturedSignal as unknown as AbortSignal
+        expect(signal.aborted).toBe(false)
         await vi.advanceTimersByTimeAsync(5_000)
-        expect(capturedSignal?.aborted).toBe(true)
+        expect(signal.aborted).toBe(true)
       })
 
       it('bounds webhook inflight work and queue backlog under burst emission', async () => {
@@ -545,7 +556,7 @@ describe('NotificationEmitter', () => {
           () => releaseFirst !== null && mockFetch.mock.calls.length === 1,
           'expected first webhook delivery to enter fetch before release',
         )
-        releaseFirst?.()
+        ;(releaseFirst as unknown as () => void)()
         await waitForCondition(
           () =>
             mockFetch.mock.calls.length === 2 &&

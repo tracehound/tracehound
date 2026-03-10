@@ -118,11 +118,76 @@ describe('process-adapter', () => {
 
     const payload = new Uint8Array([0x11, 0x22]).buffer
     const framed = encodeMessage(payload)
-    onData?.(framed)
+    ;(onData as unknown as (chunk: Buffer) => void)(framed)
 
     expect(received).not.toBeNull()
-    expect(Buffer.from(received as ArrayBuffer)).toEqual(Buffer.from(payload))
+    expect(Buffer.from(received as unknown as ArrayBuffer)).toEqual(Buffer.from(payload))
 
+    vi.doUnmock('node:child_process')
+  })
+
+  it('swallows EPIPE and ERR_STREAM_DESTROYED errors on stdio streams and logs unexpected errors', async () => {
+    const errorHandlers = new Map<string, (err: NodeJS.ErrnoException) => void>()
+
+    vi.resetModules()
+    vi.doMock('node:child_process', () => ({
+      spawn: () =>
+        ({
+          pid: 8888,
+          stdin: {
+            destroyed: false,
+            write: vi.fn(() => false),
+            on: (event: string, handler: unknown) => {
+              errorHandlers.set(`stdin:${event}`, handler as (err: NodeJS.ErrnoException) => void)
+            },
+          },
+          stdout: {
+            on: (event: string, handler: unknown) => {
+              errorHandlers.set(`stdout:${event}`, handler as (err: NodeJS.ErrnoException) => void)
+            },
+          },
+          stderr: {
+            on: (event: string, handler: unknown) => {
+              errorHandlers.set(`stderr:${event}`, handler as (err: NodeJS.ErrnoException) => void)
+            },
+          },
+          on: () => {},
+          kill: () => {},
+        }) as unknown,
+    }))
+
+    const { createProcessAdapter } = await import('../src/core/process-adapter.js')
+    const adapter = createProcessAdapter()
+    adapter.spawn('noop.js')
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const epipeErr = Object.assign(new Error('write EPIPE'), {
+      code: 'EPIPE',
+    }) as NodeJS.ErrnoException
+    const destroyedErr = Object.assign(new Error('stream destroyed'), {
+      code: 'ERR_STREAM_DESTROYED',
+    }) as NodeJS.ErrnoException
+    const unknownErr = Object.assign(new Error('unexpected network error'), {
+      code: 'ECONNRESET',
+    }) as NodeJS.ErrnoException
+
+    // EPIPE on stdin is silently swallowed
+    expect(() => errorHandlers.get('stdin:error')?.(epipeErr)).not.toThrow()
+    expect(consoleSpy).not.toHaveBeenCalled()
+
+    // ERR_STREAM_DESTROYED on stdout is silently swallowed
+    expect(() => errorHandlers.get('stdout:error')?.(destroyedErr)).not.toThrow()
+    expect(consoleSpy).not.toHaveBeenCalled()
+
+    // Unexpected error code is logged
+    errorHandlers.get('stderr:error')?.(unknownErr)
+    expect(consoleSpy).toHaveBeenCalledWith(
+      '[tracehound] Unexpected hound process pipe error:',
+      'unexpected network error',
+    )
+
+    consoleSpy.mockRestore()
     vi.doUnmock('node:child_process')
   })
 

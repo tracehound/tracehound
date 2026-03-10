@@ -16,6 +16,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const HOUND_PROCESS_PATH = resolve(__dirname, '../../packages/core/dist/core/hound-process.js')
 const MAX_RECENT_PANICS = 32
+const MAX_PAYLOAD_SIZE = 5_000_000
 const port = 3000
 
 interface PanicSnapshot {
@@ -28,7 +29,7 @@ const snapshotPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
 const snapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
 
 const th = createTracehound({
-  maxPayloadSize: 5_000_000,
+  maxPayloadSize: MAX_PAYLOAD_SIZE,
   houndPool: {
     poolSize: 2,
     timeout: 100,
@@ -83,7 +84,7 @@ app.disable('x-powered-by')
 
 app.use(
   express.json({
-    limit: '6mb',
+    limit: MAX_PAYLOAD_SIZE + 1_000, // Add some buffer to allow for metadata overhead
     verify: (req, _res, buf) => {
       Reflect.set(req, 'rawBody', Buffer.from(buf))
     },
@@ -107,10 +108,13 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/chaos/runtime', (_req, res) => {
   const traceRegistryStats = getTraceRegistryStats()
-  const latestTraceEntries = listTraceInspectionEntries(5).map((entry) => ({
+  const latestTraceEntries = listTraceInspectionEntries(20).map((entry) => ({
     traceId: entry.traceId,
     signature: entry.signature,
     severity: entry.severity,
+    size: entry.size,
+    captured: entry.captured,
+    source: entry.source,
     recordedAt: entry.recordedAt,
   }))
 

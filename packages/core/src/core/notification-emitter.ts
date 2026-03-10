@@ -7,9 +7,9 @@
  * - No blocking on consumer processing
  */
 
-import { generateSecureId } from '../utils/id.js'
-import { Errors } from '../types/errors.js'
 import { isIP } from 'node:net'
+import { Errors } from '../types/errors.js'
+import { generateSecureId } from '../utils/id.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Event Types
@@ -578,7 +578,8 @@ function normalizeBound(value: number | undefined, fallback: number): number {
     return fallback
   }
 
-  return Math.floor(value)
+  const normalized = Math.floor(value)
+  return normalized >= 1 ? normalized : fallback
 }
 
 function normalizeEventFilter(events: EventType[] | undefined): EventType[] | null {

@@ -67,6 +67,9 @@ interface ChaosRuntimeState {
       readonly traceId: string
       readonly signature: string
       readonly severity: 'low' | 'medium' | 'high' | 'critical'
+      readonly size: number
+      readonly captured: number
+      readonly source: string
       readonly recordedAt: number
     }>
   }
@@ -117,6 +120,7 @@ function percentile(values: readonly number[], ratio: number): number {
 function hasTraceRegistryEntry(runtime: ChaosRuntimeState, traceId: string): boolean {
   return runtime.traceRegistry.latestEntries.some((entry) => entry.traceId === traceId)
 }
+
 
 async function waitForTraceObservation(
   traceId: string,
@@ -182,11 +186,9 @@ function resetHostChaosData(): void {
     rmSync(CHAOS_DATA_DIR, { force: true, recursive: true })
     mkdirSync(resolve(CHAOS_DATA_DIR, 'snapshot'), { recursive: true })
     mkdirSync(resolve(CHAOS_DATA_DIR, 'trace'), { recursive: true })
-    // Pre-create as empty files so the bind-mount exposes files from the start
-    // and fault injection in Tests 3/4 cannot leave directories at these paths
-    // across test runs.
+    // Pre-create snapshot as empty so the bind-mount exposes a file (not a
+    // directory) if a previous Test 4 fault left one behind.
     writeFileSync(HOST_SNAPSHOT_PATH, '')
-    writeFileSync(HOST_TRACE_REGISTRY_PATH, '')
   } catch (error: unknown) {
     console.error(`[Setup] Failed to reset host chaos data: ${toErrorMessage(error)}`)
   }
@@ -418,6 +420,20 @@ async function runTests(): Promise<void> {
   const snapshotSecret = prepareEnvironment()
   resetDanglingInfrastructure()
 
+  // Collect trace entries in memory throughout the test. Written to disk once,
+  // after the container is stopped, so there are no concurrent writes or duplicates.
+  type TraceEntry = ChaosRuntimeState['traceRegistry']['latestEntries'][number]
+  const collectedEntries: TraceEntry[] = []
+  const collectedTraceIds = new Set<string>()
+  const collectTraceEntries = (runtime: ChaosRuntimeState): void => {
+    for (const entry of runtime.traceRegistry.latestEntries) {
+      if (!collectedTraceIds.has(entry.traceId)) {
+        collectedTraceIds.add(entry.traceId)
+        collectedEntries.push(entry)
+      }
+    }
+  }
+
   console.log('[Setup] Bringing up testing infrastructure...')
   let failedTests = 0
 
@@ -459,6 +475,7 @@ async function runTests(): Promise<void> {
       traceSeed.status === 403 && traceSeed.traceId !== null
         ? await waitForTraceObservation(traceSeed.traceId, traceBaseline)
         : null
+    if (traceObserved !== null) collectTraceEntries(traceObserved)
 
     if (traceObserved !== null && traceSeed.traceId !== null) {
       console.log(
@@ -536,6 +553,8 @@ async function runTests(): Promise<void> {
       traceAfterRecoveryBaseline >= 0
         ? await waitForTraceObservation(recoveryTrace.traceId, traceAfterRecoveryBaseline)
         : null
+    if (runtimeAfterPressure !== null) collectTraceEntries(runtimeAfterPressure)
+    if (recoveryTraceObserved !== null) collectTraceEntries(recoveryTraceObserved)
 
     console.log(
       `  Mixed pressure: cleanP95=${cleanP95}ms, cleanStatuses=${cleanDuringPressure.map((result) => result.status).join(', ')}, floodStatuses=${floodStatuses}, floodTraceHeaders=${floodTraceIds}, runtimeRecovered=${runtimeRecoveredAfterPressure}`,
@@ -653,6 +672,14 @@ async function runTests(): Promise<void> {
     }
   } finally {
     cleanupInfrastructure()
+    // Container is stopped — safe to write trace report without concurrent writes.
+    if (collectedEntries.length > 0) {
+      writeFileSync(
+        HOST_TRACE_REGISTRY_PATH,
+        collectedEntries.map((e) => JSON.stringify(e)).join('\n') + '\n',
+        'utf8',
+      )
+    }
   }
 
   if (failedTests > 0) {

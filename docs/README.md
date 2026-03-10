@@ -1,7 +1,7 @@
 # Documentation Index
 
-> **Last Updated:** 2026-03-07
-> **Version:** v1.7.0
+> **Last Updated:** 2026-03-10
+> **Version:** v1.8.2
 > **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
 
 ---
@@ -15,7 +15,6 @@
 | **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)                                                     | Runtime and adapter configuration defaults       |
 | **Migration**     | [BREAKING-CHANGES.md](./BREAKING-CHANGES.md)                                               | Breaking changes and upgrade path                |
 | **Roadmap**       | [roadmap/TRACEHOUND-UNIFIED-ROADMAP.md](./roadmap/TRACEHOUND-UNIFIED-ROADMAP.md)           | Authoritative technical roadmap                  |
-| **Remediation**   | [CRITICAL-SECURITY-REMEDIATION-PLAN.md](./CRITICAL-SECURITY-REMEDIATION-PLAN.md)           | Active plan for verified critical security gaps  |
 | **Validation**    | [../security/paranoid-validation-playbook.md](../security/paranoid-validation-playbook.md) | Deep security review and release validation path |
 
 ---

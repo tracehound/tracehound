@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.2] - 2026-03-10 - Security Hardening and Remediation Closure Wave
+
+This patch release packages the `fix/security-hardening` branch and closes the high-priority remediation items tracked for runtime fail-open integrity, bounded control-plane behavior, webhook SSRF hardening, constant-time evidence checks, and documentation truth alignment.
+
+### Security
+
+- Restored fail-open default behavior in Express and Fastify adapters for internal `status: 'error'` outcomes, preserving host-app request survivability when Tracehound encounters runtime faults.
+- Hardened webhook delivery policy in the notification plane:
+  - bounded queue/backlog and inflight dispatch controls,
+  - timeout + redirect rejection semantics,
+  - DNS-based private/special-use address rejection,
+  - rebinding-aware follow-up resolution consistency checks before outbound attempts.
+- Completed constant-time comparison compliance for security-sensitive evidence hash verification paths.
+
+### Reliability
+
+- Hardened async subscriber lifecycle handling in `NotificationEmitter.subscribe()` so iterator shutdown resolves pending consumers deterministically.
+- Added CI-safe chaos snapshot verification/readback behavior and richer diagnostics for snapshot export race/permission failures in GitHub runner environments.
+
+### Performance
+
+- Optimized hot paths in quarantine and rate-limiter flows to reduce avoidable pressure amplification and align runtime behavior with documented boundedness intent.
+
+### Documentation
+
+- Updated fail-open, API, threat-model, performance-SLA, security-assurance, and roadmap/security docs to remove overclaims and align all normative statements with tested runtime behavior.
+- Refreshed RFC surface and documentation index for current OSS scope.
+
+### Tests
+
+- Added and expanded regression coverage across adapters, notification/webhook security controls, quarantine/rate limiter boundedness, evidence integrity checks, and chaos invariants.
+- Recovered branch-diff coverage for security-hardening edits to satisfy release-gate coverage expectations.
+
 ## [1.8.1] - Security QA & Docs Alignment
 
 This patch release packages the post-`v1.8.0` correctness fixes, release-gate coverage recovery, and documentation alignment work needed before the next remediation branch begins. No breaking changes are intended in this patch.

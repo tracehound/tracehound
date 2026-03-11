@@ -1,63 +1,70 @@
 # @tracehound/express
 
-Express middleware for Tracehound security buffer.
+Thin Express middleware adapter for `@tracehound/core`.
+
+The adapter does not perform threat detection. It maps `agent.intercept()` results to HTTP behavior and keeps fail-open semantics by default.
 
 ## Installation
 
 ```bash
-npm install @tracehound/express @tracehound/core
+pnpm add @tracehound/core @tracehound/express
+# or
+npm install @tracehound/core @tracehound/express
 ```
 
-## Usage
+## Basic Usage
+
+For deterministic signatures based on raw ingress bytes, populate `req.rawBody` before Tracehound middleware runs.
 
 ```ts
+import { Buffer } from 'node:buffer'
 import express from 'express'
-import { tracehound } from '@tracehound/express'
 import { createTracehound } from '@tracehound/core'
+import { tracehound } from '@tracehound/express'
 
 const app = express()
+const th = createTracehound()
 
-// Create Tracehound instance
-const th = createTracehound({
-  quarantine: { maxCount: 10000, maxBytes: 100_000_000 },
-  rateLimit: { windowMs: 60_000, maxRequests: 100 },
-})
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      Reflect.set(req, 'rawBody', Buffer.from(buf))
+    },
+  }),
+)
 
-// Apply middleware
-app.use(express.json())
-app.use(tracehound({ agent: th.agent }))
-
-app.get('/', (req, res) => {
-  res.json({ message: 'Protected by Tracehound' })
-})
-
-app.listen(3000)
+app.use(
+  tracehound({
+    agent: th.agent,
+    emitTraceIdHeader: true,
+  }),
+)
 ```
 
 ## Options
 
-| Option                    | Type                         | Required | Description                                        |
-| ------------------------- | ---------------------------- | -------- | -------------------------------------------------- |
-| `agent`                   | `IAgent`                     | Yes      | Tracehound Agent instance                          |
-| `emitSignatureInResponse` | `boolean`                    | No       | If true, returns signature in 403 (default: false) |
-| `extractScent`            | `(req) => Scent`             | No       | Custom scent extraction                            |
-| `onIntercept`             | `(result, req, res) => void` | No       | Custom response handler                            |
+| Option | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `agent` | `IAgent` | Yes | - | Tracehound Agent instance |
+| `emitSignatureInResponse` | `boolean` | No | `false` | Include signature in `403` body |
+| `emitTraceIdHeader` | `boolean` | No | `false` | Emit `x-tracehound-trace-id` on quarantined responses |
+| `extractScent` | `(req: Request) => Scent` | No | internal extractor | Override Scent extraction |
+| `onIntercept` | `(result, req, res) => void` | No | internal handler | Override response behavior |
 
-## Response Codes
+## Default Status Mapping
 
-| Result              | HTTP Status             |
-| ------------------- | ----------------------- |
-| `clean`             | Pass through            |
-| `rate_limited`      | 429 + Retry-After       |
-| `payload_too_large` | 413                     |
-| `quarantined`       | 403                     |
-| `error`             | Pass through by default |
+| Intercept status | HTTP behavior |
+| --- | --- |
+| `clean` | pass through (`next()`) |
+| `ignored` | pass through (`next()`) |
+| `rate_limited` | `429` + `Retry-After` |
+| `payload_too_large` | `413` |
+| `quarantined` | `403` |
+| `error` | fail-open pass through |
 
-`onIntercept` can still emit a custom response for `error` results if you need framework-specific handling.
+## onIntercept Pattern
 
-## `onIntercept` Pattern
-
-Use `onIntercept` only when the host application explicitly owns the response contract for that route.
+Use custom `onIntercept` only when your route contract is explicit.
 
 ```ts
 app.use(
@@ -78,12 +85,17 @@ app.use(
 )
 ```
 
-Guidelines:
+## Deterministic Signature Notes
 
-1. Keep the default fail-open path for routes whose response shape you do not own.
-2. Only emit a JSON fallback when the endpoint already guarantees a JSON contract.
-3. Do not override streams, file downloads, redirects, or HTML responses.
-4. Prefer server-side logging and notification handling for operator visibility.
+- Adapter only reads `req.rawBody` for `ingressBytes`
+- It does not fall back to `req.body` for raw-byte signatures
+- Without `rawBody`, signatures come from canonicalized payload
+
+## Exports
+
+- `tracehound(options)`
+- `createMiddleware` (alias)
+- types re-export: `Scent`, `InterceptResult`
 
 ## License
 

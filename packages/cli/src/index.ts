@@ -39,7 +39,10 @@ program.addCommand(diskCommand)
 
 // Only parse if executed directly
 const isMain =
-  process.argv[1] && fileURLToPath(import.meta.url).endsWith(process.argv[1].replace(/\\/g, '/'))
+  process.argv[1] &&
+  fileURLToPath(import.meta.url)
+    .replace(/\\/g, '/')
+    .endsWith(process.argv[1].replace(/\\/g, '/'))
 
 if (isMain || process.env.NODE_ENV === 'cli-run') {
   program.parse()

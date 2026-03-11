@@ -605,9 +605,19 @@ describe('CLI Commands', () => {
       renderDashboard(
         {
           timestamp: new Date(snapshot.snapshot.generatedAt).toISOString(),
+          agent: {
+            total: snapshot.snapshot.agent.totalIntercepts,
+            clean: snapshot.snapshot.agent.cleanCount,
+            quarantined: snapshot.snapshot.agent.quarantinedCount,
+            rateLimited: snapshot.snapshot.agent.rateLimitedCount,
+            ignored: snapshot.snapshot.agent.ignoredCount,
+            validationFailures: snapshot.snapshot.agent.validationFailures,
+            membraneRejections: snapshot.snapshot.agent.membraneRejectionCount,
+            errors: snapshot.snapshot.agent.errorCount,
+          },
           system: {
             version: 'test',
-            uptime: '0h 1m 5s',
+            uptime: '1m',
             health: snapshot.snapshot.systemHealth,
           },
           quarantine: {
@@ -615,6 +625,9 @@ describe('CLI Commands', () => {
             bytes: snapshot.snapshot.quarantine.bytes,
             maxBytes: snapshot.snapshot.quarantineMaxBytes,
             bySeverity: snapshot.snapshot.quarantine.bySeverity,
+            archiveFailures: snapshot.snapshot.quarantine.archiveFailureCount ?? 0,
+            dropped: snapshot.snapshot.quarantine.droppedCount,
+            nextExpiryAt: snapshot.snapshot.quarantine.nextExpiryAt ?? null,
           },
           houndPool: {
             active: snapshot.snapshot.houndPool.activeProcesses,
@@ -622,7 +635,22 @@ describe('CLI Commands', () => {
               snapshot.snapshot.houndPool.totalProcesses -
               snapshot.snapshot.houndPool.activeProcesses,
             total: snapshot.snapshot.houndPool.totalProcesses,
+            totalActivations: snapshot.snapshot.houndPool.totalActivations,
+            avgProcessingMs: snapshot.snapshot.houndPool.avgProcessingMs,
+            totalTimeouts: snapshot.snapshot.houndPool.totalTimeouts,
+            totalErrors: snapshot.snapshot.houndPool.totalErrors,
             status: 'ok',
+          },
+          rateLimiter: {
+            sources: snapshot.snapshot.rateLimiter.sources,
+            blocked: snapshot.snapshot.rateLimiter.blocked,
+            totalRejections: snapshot.snapshot.rateLimiter.totalRejections,
+            totalEvictions: snapshot.snapshot.rateLimiter.totalEvictions,
+          },
+          watcher: {
+            threatTotal: snapshot.snapshot.watcher.threats.total,
+            byCategory: snapshot.snapshot.watcher.threats.byCategory,
+            lastAlert: null,
           },
           recentThreats: [],
         },
@@ -630,7 +658,7 @@ describe('CLI Commands', () => {
       )
 
       const output = readLogOutput(logSpy)
-      expect(output).toContain('TRACEHOUND LIVE DASHBOARD')
+      expect(output).toContain('Tracehound Watcher')
       expect(output).toContain('SYSTEM')
     })
 

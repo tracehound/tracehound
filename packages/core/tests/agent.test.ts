@@ -5,9 +5,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Agent, createAgent } from '../src/core/agent.js'
 import { AuditChain } from '../src/core/audit-chain.js'
-import { Evidence } from '../src/core/evidence.js'
 import type { EvidenceCreationResult, IEvidenceFactory } from '../src/core/evidence-factory.js'
 import { createEvidenceFactory } from '../src/core/evidence-factory.js'
+import { Evidence } from '../src/core/evidence.js'
 import type { IHoundPool } from '../src/core/hound-pool.js'
 import type { INotificationEmitter } from '../src/core/notification-emitter.js'
 import { SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
@@ -89,7 +89,7 @@ describe('Agent', () => {
           activeCallbacks: 0,
           activeSubscribers: 0,
           activeWebhooks: 0,
-        } as any
+        } as INotificationEmitter['stats']
       },
     } as unknown as INotificationEmitter
 
@@ -620,7 +620,7 @@ describe('Agent', () => {
     it('returns error for invalid payload', () => {
       const scent: Scent = {
         id: 'test',
-        payload: { value: NaN } as any,
+        payload: { value: NaN },
         source: { ip: '127.0.0.1' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
@@ -708,14 +708,15 @@ describe('Agent', () => {
       }
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+            }) as EvidenceCreationResult,
         ),
       }
       const quarantineMock = {
@@ -764,14 +765,15 @@ describe('Agent', () => {
       }
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+            }) as EvidenceCreationResult,
         ),
       }
       const quarantineMock = {
@@ -926,14 +928,15 @@ describe('Agent', () => {
 
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+            }) as EvidenceCreationResult,
         ),
       }
 
@@ -975,14 +978,15 @@ describe('Agent', () => {
 
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+            }) as EvidenceCreationResult,
         ),
       }
 
@@ -1020,14 +1024,15 @@ describe('Agent', () => {
 
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+            }) as EvidenceCreationResult,
         ),
       }
 

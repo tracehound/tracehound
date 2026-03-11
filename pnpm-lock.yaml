@@ -50,6 +50,28 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@25.2.3)
 
+  infrastructure/soak:
+    dependencies:
+      '@tracehound/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@tracehound/express':
+        specifier: workspace:*
+        version: link:../../packages/express
+      express:
+        specifier: ^4.18.2
+        version: 4.22.1
+    devDependencies:
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.33
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
+
   packages/cli:
     dependencies:
       '@tracehound/core':
@@ -134,6 +156,28 @@ importers:
       vitest:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.33)
+
+  packages/soak:
+    dependencies:
+      '@tracehound/core':
+        specifier: workspace:*
+        version: link:../core
+      '@tracehound/express':
+        specifier: workspace:*
+        version: link:../express
+      express:
+        specifier: ^4.18.2
+        version: 4.22.1
+    devDependencies:
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.33
+      typescript:
+        specifier: ^5.3.0
+        version: 5.9.3
 
 packages:
 

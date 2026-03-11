@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.6] - 2026-03-12 - Package README Modernization (Docs-Only)
+
+This patch release refreshes stale package-level documentation and aligns examples with the current public API and runtime behavior. No runtime code paths or package contracts were changed.
+
+### Documentation
+
+- **`packages/core/README.md`**: Rewritten around the current `createTracehound` flow, `Scent` contract (`source` object + `threat` signal + optional `ingressBytes`), intercept statuses, and signed snapshot integration.
+- **`packages/express/README.md`**: Updated middleware options and behavior docs (`emitTraceIdHeader`, fail-open mapping, deterministic `rawBody` guidance, and `onIntercept` pattern).
+- **`packages/fastify/README.md`**: Updated plugin options and behavior docs (`emitTraceIdHeader`, fail-open mapping, deterministic `req.rawBody` requirement, and `onIntercept` pattern).
+- **`packages/cli/README.md`**: Expanded CLI command reference (`status`, `stats`, `inspect`, `watch`, `history clear`, `disk clear`) plus required snapshot env inputs and trace-inspection workflow.
+- **`packages/core/scenarios/README.md`**: Replaced outdated scenario notes with current scenario suite and execution commands.
+
+### Operational Impact
+
+- No breaking changes.
+- No runtime behavior changes.
+- No configuration contract changes.
+
 ## [1.8.5] - 2026-03-12 - CLI Dashboard Overhaul, Soak Infrastructure, and Fix Wave
 
 ### Features

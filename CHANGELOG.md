@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.5] - 2026-03-12 - CLI Dashboard Overhaul, Soak Infrastructure, and Fix Wave
+
+### Features
+
+- **CLI `watch` dashboard overhaul (`packages/cli`)**: Redesigned multi-screen ANSI live dashboard (`watch.ts`) with bold values, colon-separated key/value labels, and consistent color hierarchy via theme utilities. Screens: overview, watcher, quarantine, pool, agent, help. Nav keys: `[1–5]`, `[h]`, `[r]`, `[q]`. Command bar pinned to terminal bottom row in TTY mode.
+- **`format.ts` consolidation (`packages/cli`)**: Merged `fmt.ts` into `format.ts` as the single canonical formatting module — `fmtBytes`, `fmtCount`, `fmtDuration`, `fmtStatus`, `fmtUptime`.
+- **Soak load-test infrastructure (`infrastructure/soak`)**: Moved soak harness from `packages/` to `infrastructure/soak`; added `server.ts`, `audit.ts`, `file-cold-storage.ts`, `metrics.ts`, `traffic.ts`, `main.ts`. Updated `pnpm-workspace.yaml` accordingly.
+- **CLI `watch` command exposed via `src/index.ts`**.
+
+### Fixed
+
+- **`startDashboard` `setInterval` regression (`packages/cli`)**: Removed the early-return guard on `!process.stdout.isTTY` that prevented `setInterval` from being registered. Replaced `process.stdin.isTTY` checks with `typeof process.stdin.setRawMode === 'function'` so raw-mode setup and key-navigation work correctly in all environments.
+- **`refreshMs` unit inconsistency (`packages/cli`)**: Removed erroneous `Math.ceil(refreshMs / 1000)` conversion in `startDashboard` and `renderDashboard`; the overview header was displaying `refresh: 1ms` instead of `refresh: 1000ms`.
+- **Last-alert field label renamed** from `"id"` to `"signature"` in the LAST ALERT DETAIL section to match the actual field name and domain terminology.
+- **`renderScreen` void returns**: Removed `return` statements from `void renderScreen` switch branches.
+- **`--refresh` NaN guard**: Added `Number.isFinite && !Number.isNaN && parsed > 0` validation for the `--refresh` CLI option.
+- **`index.ts` main-module check**: Replaced `endsWith()` comparison with canonical `fileURLToPath` check to prevent false matches on import paths.
+- **`fmtUptime` sub-minute values**: Returns `"45s"` for durations under one minute instead of collapsing to `"0m"`.
+- **`agent.test.ts` mock contract**: Added missing `monoNs` field to `EvidenceCreationResult` test doubles so mocks match the real factory contract.
+
+### Soak Infrastructure Fixes
+
+- **`audit.ts`**: Use dedicated `"hound.result"` discriminator instead of `"threat.detected"` to prevent offline consumers double-counting hound outcomes as real threat events.
+- **`file-cold-storage.ts`**: Unlink orphaned `.bin` artifact when `.meta.json` write fails; return `false` when unlink settled with errors.
+- **`metrics.ts`**: Wrap `appendFileSync` in `try/catch` so `sample()` is best-effort and cannot take down a soak run.
+- **`server.ts`**: Return readiness promise so callers receive the actual bound port instead of racing socket binding.
+- **`traffic.ts`**: Validate `targetRps` up front; reject `0`, `NaN`, and `Infinity`.
+
+### Tests
+
+- Expanded `watch-dashboard.test.ts` coverage across 49 previously-uncovered lines; added TTY key-navigation suite and command bar pinning tests.
+- Added `format.test.ts` coverage for sub-minute `fmtUptime`.
+- Froze time with `vi.setSystemTime()` in `nextExpiryAt` tests to eliminate flakiness.
+
 ## [1.8.4] - 2026-03-11 - Post-1.8.3 Workflow and Security Maintenance Patch
 
 This patch release captures all commits merged after `v1.8.3`, focused on workflow hardening, dependency security remediation, and fuzz/chaos pipeline stability.

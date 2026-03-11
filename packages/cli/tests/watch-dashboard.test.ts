@@ -803,28 +803,32 @@ describe('renderDashboard overview branches', () => {
 
   it('should render nextExpiryAt duration in SUBSYSTEMS when nextExpiryAt is set', () => {
     const frozenNow = 1_700_000_000_000
+    vi.useFakeTimers()
     vi.setSystemTime(frozenNow)
-    renderScreen(
-      'overview',
-      makeSnapshot({
-        quarantine: {
-          count: 3,
-          bytes: 1024,
-          maxBytes: 8192,
-          bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
-          archiveFailures: 0,
-          dropped: 0,
-          nextExpiryAt: frozenNow + 120_000,
-        },
-      }),
-      120,
-      1,
-    )
-    vi.useRealTimers()
-    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
-    expect(out).toContain('SUBSYSTEMS')
-    // fmtDuration for exactly 120s produces "2m"
-    expect(out).toContain('2m')
+    try {
+      renderScreen(
+        'overview',
+        makeSnapshot({
+          quarantine: {
+            count: 3,
+            bytes: 1024,
+            maxBytes: 8192,
+            bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+            archiveFailures: 0,
+            dropped: 0,
+            nextExpiryAt: frozenNow + 120_000,
+          },
+        }),
+        120,
+        1,
+      )
+      const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+      expect(out).toContain('SUBSYSTEMS')
+      // fmtDuration for exactly 120s produces "2m"
+      expect(out).toContain('2m')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

@@ -458,7 +458,7 @@ export function renderWatcher(s: Snapshot, w: number): void {
   if (s.recentThreats.length > 0) {
     const t = s.recentThreats[0]
     console.log(sec('LAST ALERT DETAIL', w))
-    console.log(field('id', `${t.signature.slice(0, 16)}...`))
+    console.log(field('signature', `${t.signature.slice(0, 16)}...`))
     console.log(field('category', t.category))
     console.log(field('severity', severityColor(t.severity)))
     console.log(field('size', t.size))
@@ -713,7 +713,7 @@ function startDashboard(refreshMs: number): void {
     const snapshotResult = getSnapshot()
     if (snapshotResult.ok) {
       const w = resolveWidth()
-      renderScreen(ui.screen, toDashboardSnapshot(snapshotResult), w, Math.ceil(refreshMs / 1000))
+      renderScreen(ui.screen, toDashboardSnapshot(snapshotResult), w, refreshMs)
     } else {
       renderDisconnected(snapshotResult, refreshMs)
     }
@@ -771,7 +771,7 @@ function startDashboard(refreshMs: number): void {
  * Exported for direct use in tests and external callers.
  */
 export function renderDashboard(s: Snapshot, refreshMs: number): void {
-  renderOverview(s, resolveWidth(), Math.ceil(refreshMs / 1000))
+  renderOverview(s, resolveWidth(), refreshMs)
 }
 
 // ── Command definition ────────────────────────────────────────────────────

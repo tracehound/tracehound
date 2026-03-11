@@ -21,6 +21,15 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFileColdStorage } from './file-cold-storage.js'
 
+export const SOAK_SNAPSHOT_PATH = join(
+  fileURLToPath(import.meta.url),
+  '..',
+  '..',
+  'logs',
+  'snapshot',
+  'system-snapshot.json',
+)
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -54,6 +63,7 @@ export interface SoakServer {
   readonly tracehound: ITracehound
   readonly httpServer: Server
   readonly port: number
+  readonly snapshotPath: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,14 +101,7 @@ export function createSoakServer(port: number): Promise<SoakServer> {
       quarantineHighWatermark: 0.7,
     },
     snapshot: {
-      path: join(
-        fileURLToPath(import.meta.url),
-        '..',
-        '..',
-        'logs',
-        'snapshot',
-        'system-snapshot.json',
-      ),
+      path: SOAK_SNAPSHOT_PATH,
       secret: process.env['TRACEHOUND_SNAPSHOT_SECRET'] ?? 'soak-test-snapshot-secret',
       intervalMs: 1_000,
     },
@@ -212,7 +215,7 @@ export function createSoakServer(port: number): Promise<SoakServer> {
     httpServer.listen(port, () => {
       const addr = httpServer.address()
       const boundPort = addr !== null && typeof addr === 'object' ? addr.port : port
-      resolve({ tracehound: th, httpServer, port: boundPort })
+      resolve({ tracehound: th, httpServer, port: boundPort, snapshotPath: SOAK_SNAPSHOT_PATH })
     })
   })
 }

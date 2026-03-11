@@ -56,11 +56,15 @@ async function main(): Promise<void> {
   // 1. Start server
   const server = await createSoakServer(PORT)
 
+  const snapshotSecret = process.env['TRACEHOUND_SNAPSHOT_SECRET'] ?? 'soak-test-snapshot-secret'
+  const snapshotPath = server.snapshotPath
+
   process.stdout.write(`[soak] Server listening on http://127.0.0.1:${PORT}\n`)
-  process.stdout.write(`[soak] Snapshot → infrastructure/soak/logs/snapshot/system-snapshot.json\n`)
-  process.stdout.write(
-    `[soak] CLI cmd  → $env:TRACEHOUND_SYSTEM_SNAPSHOT_PATH='...'; $env:NODE_ENV='cli-run'; pnpm --filter ./packages/cli dev watch\n\n`,
-  )
+  process.stdout.write(`[soak] Snapshot → ${snapshotPath}\n`)
+  process.stdout.write(`[soak] To watch with the CLI (PowerShell):\n`)
+  process.stdout.write(`[soak]   $env:TRACEHOUND_SYSTEM_SNAPSHOT_PATH='${snapshotPath}'\n`)
+  process.stdout.write(`[soak]   $env:TRACEHOUND_SNAPSHOT_SECRET='${snapshotSecret}'\n`)
+  process.stdout.write(`[soak]   pnpm --filter @tracehound/cli dev watch\n\n`)
 
   // 2. Traffic generator
   const traffic = createTrafficGenerator(PORT, RPS)

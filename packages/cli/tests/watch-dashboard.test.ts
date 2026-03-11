@@ -503,7 +503,10 @@ describe('renderWatcher', () => {
     })
     renderWatcher(snapshot, 80) // compact
     const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
-    expect(out).toContain('ddos')
+    expect(out).toContain('ddos:aaa111')
+    expect(out).toContain('ddos:bbb222')
+    expect(out).not.toContain('ddos:ccc333')
+    expect(out).not.toContain('ddos:ddd444')
   })
 })
 
@@ -873,6 +876,8 @@ describe('startDashboard TTY mode', () => {
   let processOnSpy: ReturnType<typeof vi.spyOn>
   let stdinOnSpy: ReturnType<typeof vi.spyOn>
   let setRawModeMock: ReturnType<typeof vi.fn>
+  let previousIsTTY: PropertyDescriptor | undefined
+  let previousSetRawMode: PropertyDescriptor | undefined
   let stdinDataHandler: ((key: string) => void) | null = null
   let sigintHandler: (() => void) | null = null
   let previousSnapshotPath: string | undefined
@@ -880,6 +885,9 @@ describe('startDashboard TTY mode', () => {
   let fixtureDir = ''
 
   beforeEach(() => {
+    previousIsTTY = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY')
+    previousSetRawMode = Object.getOwnPropertyDescriptor(process.stdin, 'setRawMode')
+
     fixtureDir = mkdtempSync(join(tmpdir(), 'tracehound-tty-'))
     previousSnapshotPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
     previousSnapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
@@ -905,6 +913,17 @@ describe('startDashboard TTY mode', () => {
       configurable: true,
       writable: true,
     })
+    if (previousIsTTY) {
+      Object.defineProperty(process.stdin, 'isTTY', previousIsTTY)
+    } else {
+      Reflect.deleteProperty(process.stdin, 'isTTY')
+    }
+
+    if (previousSetRawMode) {
+      Object.defineProperty(process.stdin, 'setRawMode', previousSetRawMode)
+    } else {
+      Reflect.deleteProperty(process.stdin, 'setRawMode')
+    }
     setRawModeMock = vi.fn().mockReturnValue(process.stdin)
     Object.defineProperty(process.stdin, 'setRawMode', {
       value: setRawModeMock,

@@ -403,12 +403,6 @@ export function renderOverview(s: Snapshot, w: number, refreshMs: number): void 
     }
     console.log()
   }
-
-  // COMMANDS
-  console.log(sec('COMMANDS', w))
-  console.log(
-    muted('  [1] Overview  [2] Watcher  [3] Quarantine  [4] Pool  [5] Agent  [h] Help  [q] Quit'),
-  )
 }
 
 // ── Screen: WATCHER ───────────────────────────────────────────────────────
@@ -465,10 +459,6 @@ export function renderWatcher(s: Snapshot, w: number): void {
     console.log(field('time', t.time))
     console.log()
   }
-
-  // COMMANDS
-  console.log(sec('COMMANDS', w))
-  console.log(muted('  [1] Overview  [3] Quarantine  [4] Pool  [5] Agent  [r] Refresh  [q] Quit'))
 }
 
 // ── Screen: QUARANTINE ────────────────────────────────────────────────────
@@ -521,10 +511,6 @@ export function renderQuarantine(s: Snapshot, w: number): void {
   console.log(field('next expiration', nextExpStr))
   console.log(field('archive failures', String(s.quarantine.archiveFailures)))
   console.log()
-
-  // COMMANDS
-  console.log(sec('COMMANDS', w))
-  console.log(muted('  [1] Overview  [2] Watcher  [4] Pool  [5] Agent  [q] Quit'))
 }
 
 // ── Screen: POOL ──────────────────────────────────────────────────────────
@@ -558,10 +544,6 @@ export function renderPool(s: Snapshot, w: number): void {
   console.log(field('timeouts', String(s.houndPool.totalTimeouts)))
   console.log(field('errors', String(s.houndPool.totalErrors)))
   console.log()
-
-  // COMMANDS
-  console.log(sec('COMMANDS', w))
-  console.log(muted('  [1] Overview  [2] Watcher  [3] Quarantine  [5] Agent  [q] Quit'))
 }
 
 // ── Screen: AGENT ─────────────────────────────────────────────────────────
@@ -599,10 +581,6 @@ export function renderAgent(s: Snapshot, w: number): void {
     console.log(muted(`  ${s.agent.errors} error(s) detected in agent processing`))
     console.log()
   }
-
-  // COMMANDS
-  console.log(sec('COMMANDS', w))
-  console.log(muted('  [1] Overview  [2] Watcher  [3] Quarantine  [4] Pool  [q] Quit'))
 }
 
 // ── Screen: HELP ──────────────────────────────────────────────────────────
@@ -644,6 +622,28 @@ export function renderHelp(w: number): void {
   console.log(field('ENFORCING', 'Rate Limiter Blocking Sources'))
 }
 
+// ── Command bar (pinned to bottom) ───────────────────────────────────────
+
+const CMD_BAR_ITEMS: ReadonlyArray<[Screen, string]> = [
+  ['overview', '[1] Overview'],
+  ['watcher', '[2] Watcher'],
+  ['quarantine', '[3] Quarantine'],
+  ['pool', '[4] Pool'],
+  ['agent', '[5] Agent'],
+  ['help', '[h] Help'],
+]
+
+function cmdBar(current: Screen): string {
+  const parts = CMD_BAR_ITEMS.map(([s, label]) => (s === current ? `● ${label}` : label))
+  return '  ' + [...parts, '[q] Quit'].join(' · ')
+}
+
+function renderCommandBar(screen: Screen): void {
+  if (!process.stdout.isTTY) return
+  const rows = process.stdout.rows ?? 24
+  process.stdout.write(`\x1b[${rows};1H\x1b[2K${muted(cmdBar(screen))}`)
+}
+
 // ── Dispatcher ────────────────────────────────────────────────────────────
 
 export function renderScreen(screen: Screen, s: Snapshot, w: number, refreshMs: number): void {
@@ -667,6 +667,8 @@ export function renderScreen(screen: Screen, s: Snapshot, w: number, refreshMs: 
       renderHelp(w)
       break
   }
+
+  renderCommandBar(screen)
 }
 
 // ── Disconnected state ────────────────────────────────────────────────────
@@ -692,12 +694,16 @@ function renderDisconnected(
 // ── Dashboard entry point ─────────────────────────────────────────────────
 
 function startDashboard(refreshMs: number): void {
-  hideCursor()
+  const hasTTY = typeof process.stdin.setRawMode === 'function'
+
+  if (hasTTY) {
+    hideCursor()
+  }
 
   const ui: { screen: Screen } = { screen: 'overview' }
 
   const cleanup = (): void => {
-    if (process.stdin.isTTY) {
+    if (typeof process.stdin.setRawMode === 'function') {
       process.stdin.setRawMode(false)
     }
     showCursor()
@@ -719,7 +725,7 @@ function startDashboard(refreshMs: number): void {
     }
   }
 
-  if (process.stdin.isTTY) {
+  if (hasTTY) {
     process.stdin.setRawMode(true)
     process.stdin.resume()
     process.stdin.setEncoding('utf8')

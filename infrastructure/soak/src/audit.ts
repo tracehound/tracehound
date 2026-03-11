@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url'
 // Paths
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PKG_ROOT = join(fileURLToPath(import.meta.url), '..', '..') // packages/soak/
+const PKG_ROOT = join(fileURLToPath(import.meta.url), '..', '..') // infrastructure/soak/
 const LOGS_DIR = join(PKG_ROOT, 'logs')
 const FORENSIC_FILE = join(LOGS_DIR, 'forensic.jsonl')
 const AUDIT_CHAIN_FILE = join(LOGS_DIR, 'audit-chain.jsonl')
@@ -53,7 +53,7 @@ const AUDIT_CHAIN_FILE = join(LOGS_DIR, 'audit-chain.jsonl')
 interface ForensicRecord {
   ts: number
   eventId: string
-  type: EventType
+  type: EventType | 'hound.result'
   payload: unknown
 }
 
@@ -189,7 +189,7 @@ export function createAuditLogger(th: ITracehound, auditIntervalMs: number = 10_
     const record: ForensicRecord = {
       ts,
       eventId: result.processId,
-      type: 'threat.detected', // closest forensic category; sig links to evidence
+      type: 'hound.result',
       payload: {
         source: 'hound',
         signature: result.signature,

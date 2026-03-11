@@ -5,8 +5,8 @@
  * and the metrics collector. Handles SIGINT and SIGTERM for graceful shutdown.
  *
  * Usage:
- *   pnpm --filter @tracehound/soak dev          # build + run
- *   node packages/soak/dist/main.js             # after build
+ *   pnpm --filter "tracehound-soak-testing" dev          # build + run
+ *   node infrastructure/soak/dist/main.js             # after build
  *
  * Environment variables:
  *   SOAK_PORT           TCP port for the soak server (default: 8099)
@@ -54,17 +54,12 @@ async function main(): Promise<void> {
   banner()
 
   // 1. Start server
-  const server = createSoakServer(PORT)
-
-  await new Promise<void>((resolve, reject) => {
-    server.httpServer.once('listening', resolve)
-    server.httpServer.once('error', reject)
-  })
+  const server = await createSoakServer(PORT)
 
   process.stdout.write(`[soak] Server listening on http://127.0.0.1:${PORT}\n`)
-  process.stdout.write(`[soak] Snapshot → packages/soak/logs/snapshot/system-snapshot.json\n`)
+  process.stdout.write(`[soak] Snapshot → infrastructure/soak/logs/snapshot/system-snapshot.json\n`)
   process.stdout.write(
-    `[soak] CLI cmd  → $env:TRACEHOUND_SYSTEM_SNAPSHOT_PATH='...'; $env:NODE_ENV='cli-run'; pnpm --filter @tracehound/cli dev watch\n\n`,
+    `[soak] CLI cmd  → $env:TRACEHOUND_SYSTEM_SNAPSHOT_PATH='...'; $env:NODE_ENV='cli-run'; pnpm --filter ./packages/cli dev watch\n\n`,
   )
 
   // 2. Traffic generator

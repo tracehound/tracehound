@@ -1,5 +1,5 @@
 {
-  "name": "@tracehound/soak",
+  "name": "tracehound-soak-testing",
   "private": true,
   "version": "0.1.0",
   "description": "Local Node.js soak test harness for Tracehound integration validation",

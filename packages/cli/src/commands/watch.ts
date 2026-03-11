@@ -239,7 +239,7 @@ function toDashboardSnapshot(
 
 // ── Screen: OVERVIEW ──────────────────────────────────────────────────────
 
-export function renderOverview(s: Snapshot, w: number, refreshSec: number): void {
+export function renderOverview(s: Snapshot, w: number, refreshMs: number): void {
   const mode = calcWidthMode(w)
   const now = new Date()
 
@@ -255,7 +255,7 @@ export function renderOverview(s: Snapshot, w: number, refreshSec: number): void
   console.log(primary(htitle + '─'.repeat(Math.max(0, w - htitle.length))))
   console.log(
     muted(
-      `  v${s.system.version}   uptime: ${s.system.uptime}   health: ${fmtStatus(s.system.health)}   refresh: ${refreshSec}s   time: ${now.toLocaleTimeString()}`,
+      `  v${s.system.version}   uptime: ${s.system.uptime}   health: ${fmtStatus(s.system.health)}   refresh: ${refreshMs}ms   time: ${now.toLocaleTimeString()}`,
     ),
   )
   console.log()
@@ -646,20 +646,26 @@ export function renderHelp(w: number): void {
 
 // ── Dispatcher ────────────────────────────────────────────────────────────
 
-export function renderScreen(screen: Screen, s: Snapshot, w: number, refreshSec: number): void {
+export function renderScreen(screen: Screen, s: Snapshot, w: number, refreshMs: number): void {
   switch (screen) {
     case 'overview':
-      return renderOverview(s, w, refreshSec)
+      renderOverview(s, w, refreshMs)
+      break
     case 'watcher':
-      return renderWatcher(s, w)
+      renderWatcher(s, w)
+      break
     case 'quarantine':
-      return renderQuarantine(s, w)
+      renderQuarantine(s, w)
+      break
     case 'pool':
-      return renderPool(s, w)
+      renderPool(s, w)
+      break
     case 'agent':
-      return renderAgent(s, w)
+      renderAgent(s, w)
+      break
     case 'help':
-      return renderHelp(w)
+      renderHelp(w)
+      break
   }
 }
 
@@ -774,6 +780,7 @@ export const watchCommand = new Command('watch')
   .description('Launch live dashboard')
   .option('-r, --refresh <ms>', 'Refresh interval in ms', '1000')
   .action((options) => {
-    const refreshMs = parseInt(options.refresh, 10)
+    const parsed = parseInt(options.refresh, 10)
+    const refreshMs = Number.isFinite(parsed) && !Number.isNaN(parsed) && parsed > 0 ? parsed : 1000
     startDashboard(refreshMs)
   })

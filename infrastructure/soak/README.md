@@ -1,4 +1,4 @@
-# @tracehound/soak
+# tracehound soak testing
 
 Local Node.js soak test harness for validating Tracehound integration under realistic sustained load.
 
@@ -15,13 +15,23 @@ This is **not** a replacement for the full 15-day soak defined in the security h
 
 ## Traffic mix
 
-| Lane       | Share | Source IP        | Threat headers     |
-| ---------- | ----- | ---------------- | ------------------ |
-| Clean      | ~75%  | 20 rotating IPs  | None               |
-| Injection  | ~12%  | `192.168.100.10` | `injection / high` |
-| DDoS       | ~5%   | `192.168.100.20` | `ddos / critical`  |
-| Flood      | ~4%   | `192.168.100.30` | `flood / medium`   |
-| Rate probe | ~4%   | `192.168.100.40` | None               |
+The soak harness drives a mixed request stream using several logical "lanes".
+The exact weights are defined in the generator's `pickLane()` function, but,
+at a high level, you can expect the following behaviour:
+
+| Lane           | Approx share         | Behaviour / purpose                                                 |
+| -------------- | -------------------- | ------------------------------------------------------------------- |
+| Realistic user | Majority of traffic  | Rotating IPs, varied paths/methods/bodies, no threat headers.       |
+| Clean          | Significant baseline | 20 rotating IPs, simple requests, no threat headers.                |
+| Injection      | Small fraction       | Fixed IP `192.168.100.10`, `x-soak-threat: injection / high`.       |
+| DDoS           | Small fraction       | Fixed IP `192.168.100.20`, `x-soak-threat: ddos / critical`.        |
+| Flood          | Small fraction       | Fixed IP `192.168.100.30`, `x-soak-threat: flood / medium`.         |
+| Rate probe     | Small fraction       | Fixed IP `192.168.100.40`, no threat headers, stresses rate limits. |
+| Oversized      | Rare edge cases      | Oversized bodies to exercise raw-body handling and quarantine.      |
+| Burst          | Occasional spikes    | Short high-intensity bursts to test behaviour under load spikes.    |
+
+The relative proportions may change over time; if you need the exact current
+distribution, inspect `pickLane()` in the soak traffic generator source.
 
 ## Getting started
 
@@ -31,16 +41,16 @@ pnpm --filter @tracehound/core build
 pnpm --filter @tracehound/express build
 
 # Build the soak package
-pnpm --filter @tracehound/soak build
+pnpm --filter tracehound-soak-testing build
 
 # Run
-node packages/soak/dist/main.js
+node infrastructure/soak/dist/main.js
 ```
 
 Or use the convenience script from the soak package directory:
 
 ```bash
-cd packages/soak
+cd infrastructure/soak
 pnpm dev       # tsc + node dist/main.js
 ```
 
@@ -57,7 +67,7 @@ All options are environment variables — no config file needed.
 Example — higher load:
 
 ```log
-SOAK_RPS=50 SOAK_INTERVAL=2000 node packages/soak/dist/main.js
+SOAK_RPS=50 SOAK_INTERVAL=2000 node infrastructure/soak/dist/main.js
 ```
 
 ## Metrics output
@@ -70,13 +80,13 @@ Status lines are printed to stdout every `SOAK_INTERVAL` ms:
   Q[75 items / 0MB] | tx=497 ok=422 403=75 429=0 5xx=0 tErr=0
 ```
 
-Each sample is also appended as a JSONL record to `packages/soak/logs/metrics.jsonl`.
+Each sample is also appended as a JSONL record to `infrastructure/soak/logs/metrics.jsonl`.
 Analyse with `jq`:
 
 ```bash
-jq '.memory.heapUsedMb' packages/soak/logs/metrics.jsonl   # heap trend
-jq '.quarantine.count'  packages/soak/logs/metrics.jsonl   # quarantine fill
-jq '.agent.quarantined' packages/soak/logs/metrics.jsonl   # cumulative quarantine events
+jq '.memory.heapUsedMb' infrastructure/soak/logs/metrics.jsonl   # heap trend
+jq '.quarantine.count'  infrastructure/soak/logs/metrics.jsonl   # quarantine fill
+jq '.agent.quarantined' infrastructure/soak/logs/metrics.jsonl   # cumulative quarantine events
 ```
 
 ## Stopping

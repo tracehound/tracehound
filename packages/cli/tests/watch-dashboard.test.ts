@@ -249,6 +249,44 @@ describe('watch dashboard rendering', () => {
     expect(output).toContain('unknown')
   })
 
+  it('should render last alert type from live snapshot when lastAlert is set', () => {
+    const snapshotPath = join(fixtureDir, 'system-snapshot.json')
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
+
+    const now = Date.now()
+    const snapshotWithAlert: SystemSnapshot = {
+      ...createFixtureSnapshot(),
+      watcher: {
+        uptimeMs: 65_000,
+        threats: {
+          total: 3,
+          byCategory: { injection: 3 },
+          bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+        },
+        totalAlerts: 1,
+        alertsInWindow: 1,
+        lastAlert: {
+          id: 'alert-test-01',
+          type: 'quarantine_high',
+          severity: 'warning',
+          message: 'Quarantine high watermark reached',
+          timestamp: now,
+        } as unknown as SystemSnapshot['watcher']['lastAlert'],
+        overloaded: false,
+        snapshotTime: now,
+        quarantine: { count: 4, bytes: 4096, capacityPercent: 50 },
+      },
+    }
+    writeFixtureSnapshotToDisk(snapshotWithAlert, snapshotPath, SNAPSHOT_SECRET)
+
+    watchCommand.exitOverride()
+    watchCommand.parse(['watch', '--refresh', '250'], { from: 'user' })
+
+    const output = logSpy.mock.calls.map((call) => String(call[0])).join('\n')
+    expect(output).toContain('quarantine_high')
+  })
+
   it('should render exhausted pool status from live snapshot mapping', () => {
     const snapshotPath = join(fixtureDir, 'system-snapshot.json')
     process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
@@ -678,6 +716,12 @@ describe('renderScreen', () => {
     const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
     expect(out).toContain('NAVIGATION')
   })
+
+  it('should render overview in extended mode when width exceeds 140', () => {
+    renderScreen('overview', makeSnapshot(), 160, 1)
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('SUBSYSTEMS')
+  })
 })
 
 // ── renderDashboard (overview) ────────────────────────────────────────────
@@ -755,5 +799,243 @@ describe('renderDashboard overview branches', () => {
     renderScreen('overview', makeSnapshot(), 120, 1)
     const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
     expect(out).toContain('NOMINAL')
+  })
+
+  it('should render nextExpiryAt duration in SUBSYSTEMS when nextExpiryAt is set', () => {
+    const frozenNow = 1_700_000_000_000
+    vi.setSystemTime(frozenNow)
+    renderScreen(
+      'overview',
+      makeSnapshot({
+        quarantine: {
+          count: 3,
+          bytes: 1024,
+          maxBytes: 8192,
+          bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+          archiveFailures: 0,
+          dropped: 0,
+          nextExpiryAt: frozenNow + 120_000,
+        },
+      }),
+      120,
+      1,
+    )
+    vi.useRealTimers()
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('SUBSYSTEMS')
+    // fmtDuration for exactly 120s produces "2m"
+    expect(out).toContain('2m')
+  })
+})
+
+// ── renderQuarantine edge branches ───────────────────────────────────────
+
+describe('renderQuarantine edge branches', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    logSpy.mockRestore()
+  })
+
+  it('should render 0.0% usage when maxBytes is zero', () => {
+    renderQuarantine(
+      makeSnapshot({
+        quarantine: {
+          count: 0,
+          bytes: 0,
+          maxBytes: 0,
+          bySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
+          archiveFailures: 0,
+          dropped: 0,
+          nextExpiryAt: null,
+        },
+      }),
+      120,
+    )
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('0.0%')
+  })
+})
+
+// ── startDashboard TTY key navigation ────────────────────────────────────
+
+describe('startDashboard TTY mode', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>
+  let setIntervalSpy: ReturnType<typeof vi.spyOn>
+  let exitSpy: ReturnType<typeof vi.spyOn>
+  let processOnSpy: ReturnType<typeof vi.spyOn>
+  let stdinOnSpy: ReturnType<typeof vi.spyOn>
+  let setRawModeMock: ReturnType<typeof vi.fn>
+  let stdinDataHandler: ((key: string) => void) | null = null
+  let sigintHandler: (() => void) | null = null
+  let previousSnapshotPath: string | undefined
+  let previousSnapshotSecret: string | undefined
+  let fixtureDir = ''
+
+  beforeEach(() => {
+    fixtureDir = mkdtempSync(join(tmpdir(), 'tracehound-tty-'))
+    previousSnapshotPath = process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+    previousSnapshotSecret = process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
+
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    setIntervalSpy = vi
+      .spyOn(globalThis, 'setInterval')
+      .mockImplementation(() => 0 as unknown as NodeJS.Timeout) as ReturnType<typeof vi.spyOn>
+    exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never) as ReturnType<
+      typeof vi.spyOn
+    >
+    processOnSpy = vi.spyOn(process, 'on').mockImplementation(((
+      event: string,
+      listener: (...args: unknown[]) => void,
+    ) => {
+      if (event === 'SIGINT') sigintHandler = () => listener()
+      return process
+    }) as typeof process.on) as ReturnType<typeof vi.spyOn>
+
+    // Simulate a TTY stdin
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    })
+    setRawModeMock = vi.fn().mockReturnValue(process.stdin)
+    Object.defineProperty(process.stdin, 'setRawMode', {
+      value: setRawModeMock,
+      configurable: true,
+      writable: true,
+    })
+    vi.spyOn(process.stdin, 'resume').mockReturnValue(process.stdin)
+    vi.spyOn(process.stdin, 'setEncoding').mockReturnValue(process.stdin)
+    stdinOnSpy = vi.spyOn(process.stdin, 'on').mockImplementation(((
+      event: string,
+      handler: (...args: unknown[]) => void,
+    ) => {
+      if (event === 'data') stdinDataHandler = handler as (key: string) => void
+      return process.stdin
+    }) as typeof process.stdin.on) as ReturnType<typeof vi.spyOn>
+  })
+
+  afterEach(() => {
+    logSpy.mockRestore()
+    setIntervalSpy.mockRestore()
+    exitSpy.mockRestore()
+    processOnSpy.mockRestore()
+    stdinOnSpy.mockRestore()
+    vi.restoreAllMocks()
+    stdinDataHandler = null
+    sigintHandler = null
+    rmSync(fixtureDir, { recursive: true, force: true })
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    })
+
+    if (previousSnapshotPath === undefined) {
+      delete process.env[SYSTEM_SNAPSHOT_ENV.PATH]
+    } else {
+      process.env[SYSTEM_SNAPSHOT_ENV.PATH] = previousSnapshotPath
+    }
+    if (previousSnapshotSecret === undefined) {
+      delete process.env[SYSTEM_SNAPSHOT_ENV.SECRET]
+    } else {
+      process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = previousSnapshotSecret
+    }
+  })
+
+  function launchTTYDashboard(): void {
+    const snapshotPath = join(fixtureDir, 'system-snapshot.json')
+    process.env[SYSTEM_SNAPSHOT_ENV.PATH] = snapshotPath
+    process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
+    writeFixtureSnapshotToDisk(createFixtureSnapshot(), snapshotPath, SNAPSHOT_SECRET)
+    watchCommand.exitOverride()
+    watchCommand.parse(['watch', '--refresh', '250'], { from: 'user' })
+  }
+
+  it('should enter raw mode and register key handler when stdin is TTY', () => {
+    launchTTYDashboard()
+    expect(setRawModeMock).toHaveBeenCalledWith(true)
+    expect(stdinDataHandler).not.toBeNull()
+  })
+
+  it('should switch to overview screen on key "1"', () => {
+    launchTTYDashboard()
+    stdinDataHandler?.('2') // navigate away first
+    logSpy.mockClear()
+    stdinDataHandler?.('1')
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('Tracehound Watcher')
+  })
+
+  it('should switch to watcher screen on key "2"', () => {
+    launchTTYDashboard()
+    logSpy.mockClear()
+    stdinDataHandler?.('2')
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('Watcher')
+  })
+
+  it('should switch to quarantine screen on key "3"', () => {
+    launchTTYDashboard()
+    logSpy.mockClear()
+    stdinDataHandler?.('3')
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('Quarantine')
+  })
+
+  it('should switch to pool screen on key "4"', () => {
+    launchTTYDashboard()
+    logSpy.mockClear()
+    stdinDataHandler?.('4')
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('Hound Pool')
+  })
+
+  it('should switch to agent screen on key "5"', () => {
+    launchTTYDashboard()
+    logSpy.mockClear()
+    stdinDataHandler?.('5')
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('Agent')
+  })
+
+  it('should switch to help screen on key "h"', () => {
+    launchTTYDashboard()
+    logSpy.mockClear()
+    stdinDataHandler?.('h')
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('NAVIGATION')
+  })
+
+  it('should re-render current screen on key "r"', () => {
+    launchTTYDashboard()
+    logSpy.mockClear()
+    stdinDataHandler?.('r')
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('Tracehound Watcher')
+  })
+
+  it('should call cleanup with setRawMode(false) on key "q"', () => {
+    launchTTYDashboard()
+    stdinDataHandler?.('q')
+    expect(setRawModeMock).toHaveBeenCalledWith(false)
+    expect(exitSpy).toHaveBeenCalledWith(0)
+  })
+
+  it('should call cleanup on Ctrl+C (\\u0003) key', () => {
+    launchTTYDashboard()
+    stdinDataHandler?.('\u0003')
+    expect(setRawModeMock).toHaveBeenCalledWith(false)
+    expect(exitSpy).toHaveBeenCalledWith(0)
+  })
+
+  it('should call setRawMode(false) on SIGINT when stdin is TTY', () => {
+    launchTTYDashboard()
+    sigintHandler?.()
+    expect(setRawModeMock).toHaveBeenCalledWith(false)
+    expect(exitSpy).toHaveBeenCalledWith(0)
   })
 })

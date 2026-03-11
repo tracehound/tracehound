@@ -78,6 +78,12 @@ describe('CLI format utilities', () => {
   })
 
   describe('fmtUptime', () => {
+    it('should format seconds for sub-minute uptimes', () => {
+      expect(fmtUptime(30)).toBe('30s')
+      expect(fmtUptime(1)).toBe('1s')
+      expect(fmtUptime(59)).toBe('59s')
+    })
+
     it('should format minutes only', () => {
       expect(fmtUptime(65)).toBe('1m')
     })

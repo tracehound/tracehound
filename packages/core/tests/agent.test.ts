@@ -716,6 +716,7 @@ describe('Agent', () => {
               hash: evidence.hash,
               size: evidence.size,
               compressed: evidence.compressed,
+              monoNs: 0n,
             }) as EvidenceCreationResult,
         ),
       }
@@ -773,6 +774,7 @@ describe('Agent', () => {
               hash: evidence.hash,
               size: evidence.size,
               compressed: evidence.compressed,
+              monoNs: 0n,
             }) as EvidenceCreationResult,
         ),
       }
@@ -886,7 +888,11 @@ describe('Agent', () => {
       const source = {
         ip: '203.0.113.10',
         userAgent: 'immutable-ua',
-        tls: { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3', alpn: 'h2' },
+        tls: {
+          cipherSuite: 'TLS_AES_256_GCM_SHA384', // DevSkim: ignore DS440010
+          version: 'TLSv1.3', // DevSkim: ignore DS440000
+          alpn: 'h2',
+        },
       }
       const scent: Scent = {
         id: 'source-snapshot-test',
@@ -904,20 +910,24 @@ describe('Agent', () => {
 
       source.userAgent = 'mutated-ua'
       if (source.tls) {
-        source.tls.cipherSuite = 'TLS_CHACHA20_POLY1305_SHA256'
+        source.tls.cipherSuite = 'TLS_CHACHA20_POLY1305_SHA256' // DevSkim: ignore DS440010
       }
 
       expect(result.handle.source).toEqual({
         ip: '203.0.113.10',
         userAgent: 'immutable-ua',
-        tls: { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3', alpn: 'h2' },
+        tls: {
+          cipherSuite: 'TLS_AES_256_GCM_SHA384', // DevSkim: ignore DS440010
+          version: 'TLSv1.3', // DevSkim: ignore DS440000
+          alpn: 'h2',
+        },
       })
       expect(Object.isFrozen(result.handle.source)).toBe(true)
       expect(Object.isFrozen(result.handle.source.tls)).toBe(true)
       if (result.handle.source.tls !== undefined) {
         expect(() => {
           ;(result.handle.source.tls as { cipherSuite: string }).cipherSuite =
-            'TLS_CHACHA20_POLY1305_SHA256'
+            'TLS_CHACHA20_POLY1305_SHA256' // DevSkim: ignore DS440010
         }).toThrow()
       }
     })
@@ -936,6 +946,7 @@ describe('Agent', () => {
               hash: evidence.hash,
               size: evidence.size,
               compressed: evidence.compressed,
+              monoNs: 0n,
             }) as EvidenceCreationResult,
         ),
       }
@@ -986,6 +997,7 @@ describe('Agent', () => {
               hash: evidence.hash,
               size: evidence.size,
               compressed: evidence.compressed,
+              monoNs: 0n,
             }) as EvidenceCreationResult,
         ),
       }
@@ -1016,8 +1028,8 @@ describe('Agent', () => {
       ;(evidence as unknown as { _source: unknown })._source = {
         ip: '203.0.113.9',
         tls: {
-          cipherSuite: 'TLS_AES_256_GCM_SHA384',
-          version: 'TLSv1.3',
+          cipherSuite: 'TLS_AES_256_GCM_SHA384', // DevSkim: ignore DS440010
+          version: 'TLSv1.3', // DevSkim: ignore DS440000
           alpn: 7,
         },
       }
@@ -1032,6 +1044,7 @@ describe('Agent', () => {
               hash: evidence.hash,
               size: evidence.size,
               compressed: evidence.compressed,
+              monoNs: 0n,
             }) as EvidenceCreationResult,
         ),
       }

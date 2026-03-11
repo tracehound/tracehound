@@ -16,7 +16,7 @@ import type { TrafficCounters } from './traffic.js'
 // Paths
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PKG_ROOT = join(fileURLToPath(import.meta.url), '..', '..') // packages/soak/
+const PKG_ROOT = join(fileURLToPath(import.meta.url), '..', '..') // infrastructure/soak/
 const LOGS_DIR = join(PKG_ROOT, 'logs')
 const METRICS_FILE = join(LOGS_DIR, 'metrics.jsonl')
 
@@ -167,8 +167,12 @@ export function createMetricsCollector(
     // Human-readable stdout
     process.stdout.write(renderStatus(s) + '\n')
 
-    // Structured JSONL append — suitable for grep / jq analysis
-    appendFileSync(METRICS_FILE, JSON.stringify(s) + '\n', 'utf8')
+    // Structured JSONL append — suitable for grep / jq analysis; best-effort
+    try {
+      appendFileSync(METRICS_FILE, JSON.stringify(s) + '\n', 'utf8')
+    } catch {
+      // Non-fatal: metrics loss is preferable to crashing the soak run
+    }
   }
 
   return {

@@ -34,7 +34,7 @@ interface ArtifactMeta {
   ts: number
 }
 
-const PKG_ROOT = join(fileURLToPath(import.meta.url), '..', '..') // packages/soak/
+const PKG_ROOT = join(fileURLToPath(import.meta.url), '..', '..') // infrastructure/soak/
 export const DEFAULT_COLD_STORAGE_DIR = join(PKG_ROOT, 'logs', 'cold-storage')
 
 function sanitizeId(id: string): string {
@@ -82,7 +82,8 @@ export function createFileColdStorage(dir: string = DEFAULT_COLD_STORAGE_DIR): I
         // the Buffer.alloc-only rule and avoid sharing the quarantine's Uint8Array.
         const buf = Buffer.alloc(payload.compressed.byteLength)
         buf.set(payload.compressed)
-        await writeFile(binPath(dir, id), buf)
+        const binFilePath = binPath(dir, id)
+        await writeFile(binFilePath, buf)
 
         const meta: ArtifactMeta = {
           id,
@@ -91,7 +92,20 @@ export function createFileColdStorage(dir: string = DEFAULT_COLD_STORAGE_DIR): I
           compressedSize: payload.compressedSize,
           ts: Date.now(),
         }
-        await writeFile(metaPath(dir, id), JSON.stringify(meta), 'utf8')
+        try {
+          await writeFile(metaPath(dir, id), JSON.stringify(meta), 'utf8')
+        } catch (metaErr) {
+          // Roll back the binary to avoid leaving an orphaned artifact
+          try {
+            await unlink(binFilePath)
+          } catch {
+            /* best-effort */
+          }
+          return {
+            success: false,
+            error: metaErr instanceof Error ? metaErr.message : String(metaErr),
+          }
+        }
 
         return { success: true, id }
       } catch (err) {
@@ -119,12 +133,11 @@ export function createFileColdStorage(dir: string = DEFAULT_COLD_STORAGE_DIR): I
     },
 
     async delete(id: string): Promise<boolean> {
-      try {
-        await Promise.allSettled([unlink(binPath(dir, id)), unlink(metaPath(dir, id))])
-        return true
-      } catch {
-        return false
-      }
+      const results = await Promise.allSettled([
+        unlink(binPath(dir, id)),
+        unlink(metaPath(dir, id)),
+      ])
+      return results.every((r) => r.status === 'fulfilled')
     },
 
     async isAvailable(): Promise<boolean> {

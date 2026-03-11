@@ -60,7 +60,7 @@ export interface SoakServer {
 // Factory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function createSoakServer(port: number): SoakServer {
+export function createSoakServer(port: number): Promise<SoakServer> {
   const th = createTracehound({
     coldStorage: createFileColdStorage(),
     maxPayloadSize: 512_000,
@@ -206,7 +206,13 @@ export function createSoakServer(port: number): SoakServer {
   })
 
   const httpServer = createServer(app)
-  httpServer.listen(port)
 
-  return { tracehound: th, httpServer, port }
+  return new Promise<SoakServer>((resolve, reject) => {
+    httpServer.once('error', reject)
+    httpServer.listen(port, () => {
+      const addr = httpServer.address()
+      const boundPort = addr !== null && typeof addr === 'object' ? addr.port : port
+      resolve({ tracehound: th, httpServer, port: boundPort })
+    })
+  })
 }

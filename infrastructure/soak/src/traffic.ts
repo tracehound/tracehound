@@ -2,11 +2,11 @@
  * Traffic generator for the soak harness.
  *
  * Sends a realistic mixed-profile request stream against the soak server:
- *   75%  clean traffic (random routes, diverse source IPs)
- *   12%  injection threats   (single POST /api/data, threat headers set)
- *    5%  ddos threats        (single IP hammering /api/search)
- *    4%  flood threats       (credential-stuffing pattern on /api/login)
- *    4%  rate-limit probes   (same IP, burst of requests until 429)
+ *   clean traffic (random routes, diverse source IPs)
+ *   injection threats   (single POST /api/data, threat headers set)
+ *   ddos threats        (single IP hammering /api/search)
+ *   flood threats       (credential-stuffing pattern on /api/login)
+ *   rate-limit probes   (same IP, burst of requests until 429)
  *
  * The generator explicitly avoids crypto-strength RNG (Math.random is fine
  * here — this is simulation logic, not forensic path code).
@@ -455,6 +455,9 @@ export interface TrafficGenerator {
 }
 
 export function createTrafficGenerator(port: number, targetRps: number = 10): TrafficGenerator {
+  if (!Number.isFinite(targetRps) || targetRps <= 0) {
+    throw new RangeError(`targetRps must be a positive finite number, got: ${targetRps}`)
+  }
   const counters: TrafficCounters = {
     total: 0,
     sent: 0,

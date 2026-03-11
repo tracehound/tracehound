@@ -5,9 +5,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Agent, createAgent } from '../src/core/agent.js'
 import { AuditChain } from '../src/core/audit-chain.js'
-import { Evidence } from '../src/core/evidence.js'
 import type { EvidenceCreationResult, IEvidenceFactory } from '../src/core/evidence-factory.js'
 import { createEvidenceFactory } from '../src/core/evidence-factory.js'
+import { Evidence } from '../src/core/evidence.js'
 import type { IHoundPool } from '../src/core/hound-pool.js'
 import type { INotificationEmitter } from '../src/core/notification-emitter.js'
 import { SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
@@ -89,7 +89,7 @@ describe('Agent', () => {
           activeCallbacks: 0,
           activeSubscribers: 0,
           activeWebhooks: 0,
-        } as any
+        } as INotificationEmitter['stats']
       },
     } as unknown as INotificationEmitter
 
@@ -620,7 +620,7 @@ describe('Agent', () => {
     it('returns error for invalid payload', () => {
       const scent: Scent = {
         id: 'test',
-        payload: { value: NaN } as any,
+        payload: { value: NaN },
         source: { ip: '127.0.0.1' },
         timestamp: Date.now(),
         threat: { category: 'injection', severity: 'high' },
@@ -708,14 +708,16 @@ describe('Agent', () => {
       }
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+              monoNs: 0n,
+            }) as EvidenceCreationResult,
         ),
       }
       const quarantineMock = {
@@ -764,14 +766,16 @@ describe('Agent', () => {
       }
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+              monoNs: 0n,
+            }) as EvidenceCreationResult,
         ),
       }
       const quarantineMock = {
@@ -884,7 +888,11 @@ describe('Agent', () => {
       const source = {
         ip: '203.0.113.10',
         userAgent: 'immutable-ua',
-        tls: { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3', alpn: 'h2' },
+        tls: {
+          cipherSuite: 'TLS_AES_256_GCM_SHA384', // DevSkim: ignore DS440010
+          version: 'TLSv1.3', // DevSkim: ignore DS440000
+          alpn: 'h2',
+        },
       }
       const scent: Scent = {
         id: 'source-snapshot-test',
@@ -902,20 +910,24 @@ describe('Agent', () => {
 
       source.userAgent = 'mutated-ua'
       if (source.tls) {
-        source.tls.cipherSuite = 'TLS_CHACHA20_POLY1305_SHA256'
+        source.tls.cipherSuite = 'TLS_CHACHA20_POLY1305_SHA256' // DevSkim: ignore DS440010
       }
 
       expect(result.handle.source).toEqual({
         ip: '203.0.113.10',
         userAgent: 'immutable-ua',
-        tls: { cipherSuite: 'TLS_AES_256_GCM_SHA384', version: 'TLSv1.3', alpn: 'h2' },
+        tls: {
+          cipherSuite: 'TLS_AES_256_GCM_SHA384', // DevSkim: ignore DS440010
+          version: 'TLSv1.3', // DevSkim: ignore DS440000
+          alpn: 'h2',
+        },
       })
       expect(Object.isFrozen(result.handle.source)).toBe(true)
       expect(Object.isFrozen(result.handle.source.tls)).toBe(true)
       if (result.handle.source.tls !== undefined) {
         expect(() => {
           ;(result.handle.source.tls as { cipherSuite: string }).cipherSuite =
-            'TLS_CHACHA20_POLY1305_SHA256'
+            'TLS_CHACHA20_POLY1305_SHA256' // DevSkim: ignore DS440010
         }).toThrow()
       }
     })
@@ -926,14 +938,16 @@ describe('Agent', () => {
 
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+              monoNs: 0n,
+            }) as EvidenceCreationResult,
         ),
       }
 
@@ -975,14 +989,16 @@ describe('Agent', () => {
 
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+              monoNs: 0n,
+            }) as EvidenceCreationResult,
         ),
       }
 
@@ -1012,22 +1028,24 @@ describe('Agent', () => {
       ;(evidence as unknown as { _source: unknown })._source = {
         ip: '203.0.113.9',
         tls: {
-          cipherSuite: 'TLS_AES_256_GCM_SHA384',
-          version: 'TLSv1.3',
+          cipherSuite: 'TLS_AES_256_GCM_SHA384', // DevSkim: ignore DS440010
+          version: 'TLSv1.3', // DevSkim: ignore DS440000
           alpn: 7,
         },
       }
 
       const evidenceFactory: IEvidenceFactory = {
         create: vi.fn(
-          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult => ({
-            ok: true,
-            evidence,
-            signature: evidence.signature,
-            hash: evidence.hash,
-            size: evidence.size,
-            compressed: evidence.compressed,
-          }),
+          (_scent, _threat, _maxPayloadSize): EvidenceCreationResult =>
+            ({
+              ok: true,
+              evidence,
+              signature: evidence.signature,
+              hash: evidence.hash,
+              size: evidence.size,
+              compressed: evidence.compressed,
+              monoNs: 0n,
+            }) as EvidenceCreationResult,
         ),
       }
 

@@ -38,8 +38,10 @@ program.addCommand(historyCommand)
 program.addCommand(diskCommand)
 
 // Only parse if executed directly
+const _selfPath = fileURLToPath(import.meta.url).replace(/\\/g, '/')
+const _callerPath = process.argv[1] ? process.argv[1].replace(/\\/g, '/') : ''
 const isMain =
-  process.argv[1] && fileURLToPath(import.meta.url).endsWith(process.argv[1].replace(/\\/g, '/'))
+  _callerPath !== '' && (_selfPath.endsWith(_callerPath) || _selfPath.endsWith(_callerPath + '.js'))
 
 if (isMain || process.env.NODE_ENV === 'cli-run') {
   program.parse()

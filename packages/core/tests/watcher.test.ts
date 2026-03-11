@@ -265,10 +265,11 @@ describe('Watcher', () => {
 
   describe('No EventEmitter', () => {
     it('has no on/off/emit methods', () => {
-      expect((watcher as any).on).toBeUndefined()
-      expect((watcher as any).off).toBeUndefined()
-      expect((watcher as any).emit).toBeUndefined()
-      expect((watcher as any).addEventListener).toBeUndefined()
+      const w = watcher as unknown as Record<string, unknown>
+      expect(w['on']).toBeUndefined()
+      expect(w['off']).toBeUndefined()
+      expect(w['emit']).toBeUndefined()
+      expect(w['addEventListener']).toBeUndefined()
     })
   })
 

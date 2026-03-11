@@ -1,17 +1,75 @@
 # @tracehound/cli
 
-Tracehound CLI evaluation runtime and forensic inspection tool.
+CLI and TUI tools for inspecting a running Tracehound runtime.
 
 ## Installation
 
 ```bash
+pnpm add -g @tracehound/cli
+# or
 npm install -g @tracehound/cli
 ```
 
-## Usage
+Local usage:
 
 ```bash
-tracehound --help
+pnpm dlx @tracehound/cli --help
 ```
 
-For more information, visit the [main repository](https://github.com/tracehound/tracehound).
+## Commands
+
+```bash
+tracehound status [--json]
+tracehound stats [--json] [--since <duration>]
+tracehound inspect [trace-id] [--trace-id <id>] [--signature <sig>] [--limit <n>] [--json]
+tracehound watch [--refresh <ms>]
+tracehound history clear [--json]
+tracehound disk clear [--json]
+```
+
+## Snapshot-backed Commands
+
+`status`, `stats`, and `watch` read signed runtime snapshots written by `@tracehound/core`.
+
+Required environment variables:
+
+- `TRACEHOUND_SYSTEM_SNAPSHOT_PATH`
+- `TRACEHOUND_SNAPSHOT_SECRET`
+
+Optional validation overrides:
+
+- `TRACEHOUND_SNAPSHOT_MAX_AGE_MS` (default `5000`)
+- `TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS` (default `5000`)
+
+Example:
+
+```bash
+export TRACEHOUND_SYSTEM_SNAPSHOT_PATH=/var/run/tracehound/system-snapshot.json
+export TRACEHOUND_SNAPSHOT_SECRET=replace-me
+tracehound status
+```
+
+## Inspect and Trace Registry Workflow
+
+`inspect`, `history clear`, and `disk clear` operate on the local trace registry.
+
+Typical flow:
+
+1. Enable `emitTraceIdHeader: true` in Express/Fastify adapter.
+2. Capture `x-tracehound-trace-id` from a quarantined response.
+3. Run `tracehound inspect --trace-id <id>`.
+
+## Output Modes
+
+- Human-readable table output by default
+- `--json` for machine-readable pipelines
+
+## Related Packages
+
+- [@tracehound/core](../core/README.md)
+- [@tracehound/express](../express/README.md)
+- [@tracehound/fastify](../fastify/README.md)
+
+## License
+
+Apache-2.0

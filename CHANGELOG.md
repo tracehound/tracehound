@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.7] - 2026-03-18 - Evidence Ownership Hardening and Test Type Safety
+
+### Security
+
+- **`Evidence` constructor now copies the caller-provided `ArrayBuffer` before hashing and storing it.**
+  Previously the constructor stored the caller's buffer by reference; any code retaining the original
+  reference could silently mutate forensic bytes after the one-time hash check, bypassing tamper
+  detection entirely. The owned copy is now created first (`bytes.slice(0)`), and the hash is
+  verified against that copy — closing the post-construction mutation window.
+
+### Performance
+
+- **Added `Evidence._bytesRef` internal getter** that returns the raw buffer reference without
+  allocating a defensive copy. The public `bytes` getter continues to return a copy on every call
+  (required for external callers). `HoundPool` IPC send (`_send`) now uses `_bytesRef` to avoid a
+  redundant allocation per evidence dispatch in the hot path.
+
+### Tests
+
+- **Regression test added to `evidence.test.ts`**: "should not be affected by caller mutating the
+  original buffer after construction" — verifies that filling the caller-retained buffer with `0xde`
+  bytes after construction does not alter the evidence's stored bytes.
+- **Fixed remaining TypeScript strict-mode errors** across the test suite (`tsconfig.tests.json`):
+  - `verbatimModuleSyntax`: `SystemPanicPayload` import in `tracehound.test.ts` changed to
+    `import type`.
+  - All previously failing `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, and
+    `exactOptionalPropertyTypes` violations resolved — `npx tsc -p tsconfig.tests.json --noEmit`
+    now exits clean.
+
+### Operational Impact
+
+- No breaking changes to the public API.
+- No configuration contract changes.
+- `Evidence._bytesRef` is an internal getter (underscore-prefixed); external consumers should
+  continue using `evidence.bytes`.
+
 ## [1.8.6] - 2026-03-12 - Package README Modernization (Docs-Only)
 
 This patch release refreshes stale package-level documentation and aligns examples with the current public API and runtime behavior. No runtime code paths or package contracts were changed.

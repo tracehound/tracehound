@@ -12,7 +12,7 @@ import {
   HOUND_PRESSURE_ERRORS,
   type HoundResult,
 } from '../src/core/hound-pool.js'
-import { SystemPanicPayload } from '../src/core/notification-emitter.js'
+import type { SystemPanicPayload } from '../src/core/notification-emitter.js'
 import { formatHoundErrorReason, SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk, SYSTEM_SNAPSHOT_ENV } from '../src/utils/system-snapshot.js'

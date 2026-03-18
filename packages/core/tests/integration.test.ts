@@ -79,7 +79,7 @@ describe('Integration: Full System Flow', () => {
       payload,
       source: { ip: `source-${id}` },
       timestamp: Date.now(),
-      threat: threat ? { category: 'injection', severity: 'high' } : undefined,
+      ...(threat ? { threat: { category: 'injection', severity: 'high' } as const } : {}),
     }
   }
 
@@ -450,7 +450,7 @@ describe('Integration: Full System Flow', () => {
       const snapshot = watcher.snapshot()
 
       expect(snapshot.threats.total).toBe(5)
-      expect(snapshot.threats.byCategory.injection).toBe(5)
+      expect(snapshot.threats.byCategory['injection']).toBe(5)
     })
 
     it('alerts on quarantine high watermark', () => {

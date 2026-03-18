@@ -279,7 +279,7 @@ describe('Tracehound Factory', () => {
 
       const panics: Array<{ reason: string }> = []
       tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: event.payload.reason })
+        panics.push({ reason: (event.payload as { reason: string }).reason })
       })
 
       tracehound.agent.intercept({
@@ -290,7 +290,7 @@ describe('Tracehound Factory', () => {
         payload: { a: 1 },
       })
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const errorMessage = encodeHoundMessage({
         type: 'status',
         state: 'error',
@@ -329,7 +329,7 @@ describe('Tracehound Factory', () => {
       })
       const panics: Array<{ reason: string }> = []
       tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: event.payload.reason })
+        panics.push({ reason: (event.payload as { reason: string }).reason })
       })
 
       const second = tracehound.agent.intercept({
@@ -349,7 +349,7 @@ describe('Tracehound Factory', () => {
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const analysisMessage = encodeHoundMessage({
         type: 'analysis',
         hash: 'a1b2c3',
@@ -414,7 +414,7 @@ describe('Tracehound Factory', () => {
 
       const panics: Array<{ reason: string }> = []
       tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: event.payload.reason })
+        panics.push({ reason: (event.payload as { reason: string }).reason })
       })
 
       tracehound.agent.intercept({
@@ -447,7 +447,7 @@ describe('Tracehound Factory', () => {
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const analysisMessage = encodeHoundMessage({
         type: 'analysis',
         hash: 'a1b2c3',
@@ -555,7 +555,7 @@ describe('Tracehound Factory', () => {
 
       const panics: Array<{ reason: string }> = []
       tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: event.payload.reason })
+        panics.push({ reason: (event.payload as { reason: string }).reason })
       })
 
       const first = tracehound.agent.intercept({
@@ -583,7 +583,7 @@ describe('Tracehound Factory', () => {
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const analysisMessage = encodeHoundMessage({
         type: 'analysis',
         hash: 'a1b2c3',
@@ -862,7 +862,7 @@ describe('Tracehound Factory', () => {
 
         const panics: Array<{ reason: string }> = []
         tracehound.notifications.on('system.panic', (event) => {
-          panics.push({ reason: event.payload.reason })
+          panics.push({ reason: (event.payload as { reason: string }).reason })
         })
 
         tracehound.shutdown()
@@ -922,7 +922,7 @@ describe('Tracehound Factory', () => {
 
         const panics: Array<{ reason: string }> = []
         tracehound.notifications.on('system.panic', (event) => {
-          panics.push({ reason: event.payload.reason })
+          panics.push({ reason: (event.payload as { reason: string }).reason })
         })
 
         await vi.advanceTimersByTimeAsync(100)

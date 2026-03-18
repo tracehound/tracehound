@@ -67,7 +67,12 @@ export class Evidence implements EvidenceHandle {
     if (this._disposed) {
       throw Errors.evidenceAlreadyDisposed(this._signature)
     }
-    return this._bytes!
+    // Defensive copy: callers must not be able to mutate the internal buffer
+    // in-place via a Uint8Array view. Without this copy a caller could open a
+    // view on the returned ArrayBuffer and silently overwrite forensic bytes
+    // while the Evidence handle remains non-disposed — a post-capture tampering
+    // path not covered by the construction-time hash check.
+    return this._bytes!.slice(0)
   }
 
   get size(): number {

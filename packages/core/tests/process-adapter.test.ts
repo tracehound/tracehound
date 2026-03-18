@@ -192,14 +192,14 @@ describe('process-adapter', () => {
   })
 
   it('includes mixed-case Path in child env when PATH is missing', async () => {
-    const previousPathUpper = process.env.PATH
-    const previousPathMixed = process.env.Path
+    const previousPathUpper = process.env['PATH']
+    const previousPathMixed = process.env['Path']
     const mixedPathValue = 'C:\\Windows\\System32'
     let capturedEnv: NodeJS.ProcessEnv | undefined
 
     try {
-      delete process.env.PATH
-      process.env.Path = mixedPathValue
+      delete process.env['PATH']
+      process.env['Path'] = mixedPathValue
 
       vi.resetModules()
       vi.doMock('node:child_process', () => ({
@@ -219,17 +219,17 @@ describe('process-adapter', () => {
       const adapter = createProcessAdapter()
       adapter.spawn('noop.js')
 
-      expect(capturedEnv?.Path).toBe(mixedPathValue)
+      expect(capturedEnv?.['Path']).toBe(mixedPathValue)
     } finally {
       if (previousPathUpper === undefined) {
-        delete process.env.PATH
+        delete process.env['PATH']
       } else {
-        process.env.PATH = previousPathUpper
+        process.env['PATH'] = previousPathUpper
       }
       if (previousPathMixed === undefined) {
-        delete process.env.Path
+        delete process.env['Path']
       } else {
-        process.env.Path = previousPathMixed
+        process.env['Path'] = previousPathMixed
       }
       vi.doUnmock('node:child_process')
     }

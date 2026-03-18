@@ -582,7 +582,7 @@ export class Quarantine {
 
       if (archiveAttempted) {
         try {
-          const archiveBytes = new Uint8Array(evidence.bytes.slice(0))
+          const archiveBytes = new Uint8Array(evidence.bytes)
           const archiveResult = await this.archiveEvidence(signature, archiveBytes)
           archived = archiveResult.archived
           storageId = archiveResult.storageId

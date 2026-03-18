@@ -243,7 +243,7 @@ describe('Cross-Component Consistency', () => {
 
         const records = auditChain.export()
         expect(records.length).toBe(1)
-        expect(records[0].signature).toBe(signature)
+        expect(records[0]!.signature).toBe(signature)
       }
     })
   })

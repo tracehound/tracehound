@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { JsonSerializable } from '../../src/types/common.js'
 import { compareSignatures, generateSignature } from '../../src/types/signature.js'
 import { FUZZ_SEED, runDeterministicProperty } from './helpers.js'
 
@@ -26,7 +27,7 @@ describe('Fuzz Invariant: Integrity Enforcement', () => {
         scent: {
           ...baseThreat.scent,
           payload: {
-            original: payload,
+            original: payload as JsonSerializable,
             mutationTag: `mutation-${i}`,
           },
         },

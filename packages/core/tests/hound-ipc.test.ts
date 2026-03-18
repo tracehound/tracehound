@@ -415,7 +415,7 @@ describe('HoundIPC', () => {
       const messages = parser.feed(encoded)
 
       expect(messages.length).toBe(1)
-      const decoded = decodeHoundMessage(messages[0])
+      const decoded = decodeHoundMessage(messages[0]!)
       expect(decoded.type).toBe('status')
       if (decoded.type === 'status') {
         expect(decoded.state).toBe('complete')

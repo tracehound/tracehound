@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto'
 import { createTracehound, type ITracehound } from '../../src/core/tracehound.js'
 import type { Severity } from '../../src/types/common.js'
+import type { JsonSerializable } from '../../src/types/common.js'
 import type { ThreatCategory } from '../../src/types/scent.js'
 
 function parseDeterministicEnvInt(
@@ -58,8 +59,8 @@ export const SEVERITIES: Severity[] = ['low', 'medium', 'high', 'critical']
 
 export function buildThreat(i: number) {
   return {
-    category: THREAT_CATEGORIES[i % THREAT_CATEGORIES.length],
-    severity: SEVERITIES[i % SEVERITIES.length],
+    category: THREAT_CATEGORIES[i % THREAT_CATEGORIES.length]!,
+    severity: SEVERITIES[i % SEVERITIES.length]!,
   } as const
 }
 
@@ -98,7 +99,7 @@ function createDeterministicCryptoRandom(seed: number): DeterministicCryptoRando
       refillPool()
     }
 
-    const value = pool[offset]
+    const value = pool[offset]!
     offset += 1
     return value
   }
@@ -200,17 +201,17 @@ function shrinkValue(value: unknown): unknown[] {
 
 export function runDeterministicProperty(
   name: string,
-  property: (value: unknown, index: number) => void,
+  property: (value: JsonSerializable, index: number) => void,
   options?: {
     runs?: number
     seed?: number
-    generator?: (rand: DeterministicCryptoRandom, i: number) => unknown
+    generator?: (rand: DeterministicCryptoRandom, i: number) => JsonSerializable
   },
 ): void {
   const seed = options?.seed ?? FUZZ_SEED
   const runs = options?.runs ?? FUZZ_NUM_RUNS
   const generator =
-    options?.generator ?? ((rand: DeterministicCryptoRandom) => randomJsonValue(rand))
+    options?.generator ?? ((rand: DeterministicCryptoRandom) => randomJsonValue(rand) as JsonSerializable)
   const rand = createDeterministicCryptoRandom(seed)
 
   for (let i = 0; i < runs; i++) {
@@ -218,12 +219,12 @@ export function runDeterministicProperty(
     try {
       property(candidate, i)
     } catch (error: unknown) {
-      let minimized = candidate
+      let minimized: JsonSerializable = candidate
       for (const shrunk of shrinkValue(candidate)) {
         try {
-          property(shrunk, i)
+          property(shrunk as JsonSerializable, i)
         } catch {
-          minimized = shrunk
+          minimized = shrunk as JsonSerializable
         }
       }
       throw new Error(

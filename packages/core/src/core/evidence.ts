@@ -46,16 +46,21 @@ export class Evidence implements EvidenceHandle {
       throw Errors.evidenceEmpty()
     }
 
+    // Take ownership of the buffer immediately so any caller-retained reference
+    // to the original ArrayBuffer cannot mutate forensic bytes after construction.
+    // The hash check below runs on our copy, not the caller's buffer.
+    const ownedBytes = bytes.slice(0)
+
     // Verify hash matches bytes ONLY for uncompressed evidence
     // For compressed evidence, hash is of uncompressed content (per RFC)
     if (!compressed) {
-      const actualHash = hashBuffer(bytes)
+      const actualHash = hashBuffer(ownedBytes)
       if (!constantTimeEqual(actualHash, _expectedHash)) {
         throw Errors.evidenceHashMismatch(_expectedHash, actualHash)
       }
     }
 
-    this._bytes = bytes
+    this._bytes = ownedBytes
     this._compressed = compressed
     this._now = now
     this._source = snapshotSourceMetadata(source)
@@ -64,6 +69,26 @@ export class Evidence implements EvidenceHandle {
   // ─── Getters ────────────────────────────────────────────────────────────────
 
   get bytes(): ArrayBuffer {
+    if (this._disposed) {
+      throw Errors.evidenceAlreadyDisposed(this._signature)
+    }
+    // Defensive copy: callers must not be able to mutate the internal buffer
+    // in-place via a Uint8Array view. Without this copy a caller could open a
+    // view on the returned ArrayBuffer and silently overwrite forensic bytes
+    // while the Evidence handle remains non-disposed — a post-capture tampering
+    // path not covered by the construction-time hash check.
+    return this._bytes!.slice(0)
+  }
+
+  /**
+   * Raw buffer reference for internal trusted callers.
+   * Returns the internal buffer WITHOUT copying — avoids allocation on every
+   * call in hot paths (e.g. HoundPool IPC send, cold-storage archive).
+   *
+   * INTERNAL USE ONLY. Callers MUST NOT mutate the returned buffer.
+   * The public `bytes` getter is the correct API for all other consumers.
+   */
+  get _bytesRef(): ArrayBuffer {
     if (this._disposed) {
       throw Errors.evidenceAlreadyDisposed(this._signature)
     }

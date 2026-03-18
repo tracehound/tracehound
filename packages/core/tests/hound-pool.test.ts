@@ -157,14 +157,14 @@ describe('HoundPool', () => {
 
       // Get spawned process PID
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
 
       // Simulate completion
       simulateProcessComplete(pid)
 
       expect(results.length).toBe(1)
-      expect(results[0].status).toBe('processed')
-      expect(results[0].signature).toBe(evidence.signature)
+      expect(results[0]!.status).toBe('processed')
+      expect(results[0]!.signature).toBe(evidence.signature)
     })
 
     it('result includes processId and durationMs', () => {
@@ -174,11 +174,11 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('test'))
 
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessComplete(pid)
 
-      expect(results[0].processId).toMatch(/^hound-\d+$/)
-      expect(results[0].durationMs).toBeGreaterThanOrEqual(0)
+      expect(results[0]!.processId).toMatch(/^hound-\d+$/)
+      expect(results[0]!.durationMs).toBeGreaterThanOrEqual(0)
     })
 
     it('includes analysis metadata when process sends analysis message', () => {
@@ -188,11 +188,11 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('analysis'))
 
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessComplete(pid)
 
       expect(results.length).toBe(1)
-      expect(results[0].analysis).toEqual({
+      expect(results[0]!.analysis).toEqual({
         hash: 'a1b2c3',
         entropy: 7.1,
         contentType: 'json',
@@ -205,7 +205,7 @@ describe('HoundPool', () => {
       expect(pool.stats.activeProcesses).toBe(1)
 
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessComplete(pid)
 
       expect(pool.stats.activeProcesses).toBe(0)
@@ -215,7 +215,7 @@ describe('HoundPool', () => {
       for (let i = 0; i < 105; i++) {
         pool.activate(createEvidence(`bounded-${i}`))
         const processes = mockAdapter.getMockProcesses()
-        const pid = [...processes.keys()][0]
+        const pid = [...processes.keys()][0]!
         simulateProcessComplete(pid)
       }
 
@@ -260,7 +260,7 @@ describe('HoundPool', () => {
 
       pool.activate(createEvidence('test-overflow'))
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessComplete(pid)
 
       expect(droppedHandlerCalled).toBe(false)
@@ -279,7 +279,7 @@ describe('HoundPool', () => {
 
       pool.activate(createEvidence('handler-throw'))
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessComplete(pid)
 
       expect(successfulHandlerCalls).toBe(1)
@@ -327,7 +327,7 @@ describe('HoundPool', () => {
 
       pool.activate(createEvidence('analysis-timeout'))
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessAnalysis(pid)
 
       await vi.advanceTimersByTimeAsync(6)
@@ -448,7 +448,7 @@ describe('HoundPool', () => {
 
       // Complete first one
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessComplete(pid)
 
       // Next deferred item should start
@@ -464,7 +464,7 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('test'))
 
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
 
       // Send invalid message
       const invalidPayload = new Uint8Array([0xff, 0xff, 0xff]).buffer
@@ -509,7 +509,7 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('test'))
 
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
 
       // Send error status
       const errorMessage = encodeHoundMessage({
@@ -524,8 +524,8 @@ describe('HoundPool', () => {
 
       const errorResults = results.filter((r) => r.status === 'error')
       expect(errorResults.length).toBeGreaterThan(0)
-      expect(errorResults[0].error).toBeDefined()
-      expect(errorResults[0].analysis).toEqual({
+      expect(errorResults[0]!.error).toBeDefined()
+      expect(errorResults[0]!.analysis).toEqual({
         hash: 'a1b2c3',
         entropy: 7.1,
         contentType: 'json',
@@ -540,7 +540,7 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('missing-analysis'))
 
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
       simulateProcessComplete(pid, false)
 
       const errorResult = results.find((result) => result.status === 'error')
@@ -555,7 +555,7 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('test'))
 
       const processes = mockAdapter.getMockProcesses()
-      const pid = [...processes.keys()][0]
+      const pid = [...processes.keys()][0]!
 
       // Simulate unexpected exit
       mockAdapter.simulateExit(pid, 1)
@@ -569,7 +569,7 @@ describe('HoundPool', () => {
       pool.activate(createEvidence('test-1'))
 
       const processes1 = mockAdapter.getMockProcesses()
-      const pid1 = [...processes1.keys()][0]
+      const pid1 = [...processes1.keys()][0]!
 
       // Crash the process
       mockAdapter.simulateExit(pid1, 1)

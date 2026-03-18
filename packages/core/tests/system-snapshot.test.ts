@@ -39,6 +39,12 @@ function createQuarantineStats(): QuarantineStats {
     bytes: 1024,
     droppedCount: 0,
     droppedBytes: 0,
+    evictedCount: 0,
+    decayedCount: 0,
+    archivedCount: 0,
+    archiveFailureCount: 0,
+    ttlEnabled: false,
+    nextExpiryAt: null,
     bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
   }
 }
@@ -293,7 +299,7 @@ describe('system-snapshot utilities', () => {
     const snapshot = exportSystemSnapshot(
       createMockTracehound(
         createWatcherSnapshot(),
-        createHoundPoolStats({ isolationTelemetry: undefined }),
+        createHoundPoolStats({}),
       ),
     )
 

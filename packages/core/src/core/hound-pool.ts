@@ -448,7 +448,7 @@ export class HoundPool implements IHoundPool {
     }, this.config.timeout)
 
     // Send evidence to process
-    this.adapter.send(processState.handle, evidence.bytes)
+    this.adapter.send(processState.handle, evidence._bytesRef)
   }
 
   private handleProcessMessage(processState: ProcessState, payload: ArrayBuffer): void {

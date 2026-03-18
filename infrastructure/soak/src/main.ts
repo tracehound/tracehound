@@ -17,7 +17,7 @@
 
 import { createAuditLogger } from './audit.js'
 import { createMetricsCollector } from './metrics.js'
-import { createSoakServer } from './server.js'
+import { createSoakServer, resolveSoakSnapshotSecret } from './server.js'
 import { createTrafficGenerator } from './traffic.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   // 1. Start server
   const server = await createSoakServer(PORT)
 
-  const snapshotSecret = process.env['TRACEHOUND_SNAPSHOT_SECRET'] ?? 'soak-test-snapshot-secret'
+  const snapshotSecret = resolveSoakSnapshotSecret()
   const snapshotPath = server.snapshotPath
 
   process.stdout.write(`[soak] Server listening on http://127.0.0.1:${PORT}\n`)

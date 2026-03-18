@@ -192,22 +192,22 @@ describe('trace inspection registry', () => {
   })
 
   it('resolves registry path by option, env, then default', () => {
-    const previous = process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+    const previous = process.env['TRACEHOUND_TRACE_REGISTRY_PATH']
     const envPath = join(tmpdir(), 'tracehound-env-registry.ndjson')
     const optionPath = join(tmpdir(), 'tracehound-option-registry.ndjson')
 
     try {
-      process.env.TRACEHOUND_TRACE_REGISTRY_PATH = envPath
+      process.env['TRACEHOUND_TRACE_REGISTRY_PATH'] = envPath
       expect(resolveTraceRegistryPath({ path: optionPath })).toBe(optionPath)
       expect(resolveTraceRegistryPath()).toBe(envPath)
 
-      delete process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+      delete process.env['TRACEHOUND_TRACE_REGISTRY_PATH']
       expect(resolveTraceRegistryPath()).toContain(join('tracehound', 'trace-registry.ndjson'))
     } finally {
       if (previous === undefined) {
-        delete process.env.TRACEHOUND_TRACE_REGISTRY_PATH
+        delete process.env['TRACEHOUND_TRACE_REGISTRY_PATH']
       } else {
-        process.env.TRACEHOUND_TRACE_REGISTRY_PATH = previous
+        process.env['TRACEHOUND_TRACE_REGISTRY_PATH'] = previous
       }
     }
   })

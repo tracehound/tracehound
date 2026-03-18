@@ -43,8 +43,8 @@ describe('Watcher', () => {
       const snapshot = watcher.snapshot()
 
       expect(snapshot.threats.total).toBe(2)
-      expect(snapshot.threats.byCategory.injection).toBe(1)
-      expect(snapshot.threats.byCategory.ddos).toBe(1)
+      expect(snapshot.threats.byCategory['injection']).toBe(1)
+      expect(snapshot.threats.byCategory['ddos']).toBe(1)
       expect(snapshot.threats.bySeverity.high).toBe(1)
       expect(snapshot.threats.bySeverity.critical).toBe(1)
     })
@@ -75,8 +75,8 @@ describe('Watcher', () => {
 
       const snapshot = watcher.snapshot()
 
-      expect(snapshot.threats.byCategory.injection).toBe(2)
-      expect(snapshot.threats.byCategory.ddos).toBe(1)
+      expect(snapshot.threats.byCategory['injection']).toBe(2)
+      expect(snapshot.threats.byCategory['ddos']).toBe(1)
     })
 
     it('tracks by severity', () => {

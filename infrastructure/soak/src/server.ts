@@ -7,6 +7,7 @@
  */
 
 import {
+  SYSTEM_SNAPSHOT_ENV,
   createTracehound,
   generateSecureId,
   type ITracehound,
@@ -17,18 +18,17 @@ import {
 import { tracehound } from '@tracehound/express'
 import express, { type Express } from 'express'
 import { createServer, type Server } from 'node:http'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFileColdStorage } from './file-cold-storage.js'
 
-export const SOAK_SNAPSHOT_PATH = join(
-  fileURLToPath(import.meta.url),
-  '..',
-  '..',
-  'logs',
-  'snapshot',
-  'system-snapshot.json',
-)
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+export const SOAK_SNAPSHOT_PATH = join(__dirname, '..', 'logs', 'snapshot', 'system-snapshot.json')
+
+export function resolveSoakSnapshotSecret(): string {
+  return process.env[SYSTEM_SNAPSHOT_ENV.SECRET] ?? 'soak-test-snapshot-secret'
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation helpers
@@ -102,7 +102,7 @@ export function createSoakServer(port: number): Promise<SoakServer> {
     },
     snapshot: {
       path: SOAK_SNAPSHOT_PATH,
-      secret: process.env['TRACEHOUND_SNAPSHOT_SECRET'] ?? 'soak-test-snapshot-secret',
+      secret: resolveSoakSnapshotSecret(),
       intervalMs: 1_000,
     },
   })

@@ -12,6 +12,7 @@ import {
   HOUND_PRESSURE_ERRORS,
   type HoundResult,
 } from '../src/core/hound-pool.js'
+import { SystemPanicPayload } from '../src/core/notification-emitter.js'
 import { formatHoundErrorReason, SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk, SYSTEM_SNAPSHOT_ENV } from '../src/utils/system-snapshot.js'
@@ -278,7 +279,7 @@ describe('Tracehound Factory', () => {
       })
 
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
         panics.push({ reason: event.payload.reason })
       })
 
@@ -290,7 +291,7 @@ describe('Tracehound Factory', () => {
         payload: { a: 1 },
       })
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const errorMessage = encodeHoundMessage({
         type: 'status',
         state: 'error',
@@ -328,7 +329,7 @@ describe('Tracehound Factory', () => {
         payload: { first: true },
       })
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
         panics.push({ reason: event.payload.reason })
       })
 
@@ -349,7 +350,7 @@ describe('Tracehound Factory', () => {
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const analysisMessage = encodeHoundMessage({
         type: 'analysis',
         hash: 'a1b2c3',
@@ -413,7 +414,7 @@ describe('Tracehound Factory', () => {
       })
 
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
         panics.push({ reason: event.payload.reason })
       })
 
@@ -447,7 +448,7 @@ describe('Tracehound Factory', () => {
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const analysisMessage = encodeHoundMessage({
         type: 'analysis',
         hash: 'a1b2c3',
@@ -554,7 +555,7 @@ describe('Tracehound Factory', () => {
       })
 
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
         panics.push({ reason: event.payload.reason })
       })
 
@@ -583,7 +584,7 @@ describe('Tracehound Factory', () => {
       ).toBe(true)
       expect(tracehound.watcher.snapshot().overloaded).toBe(true)
 
-      const pid = [...adapter.getMockProcesses().keys()][0]
+      const pid = [...adapter.getMockProcesses().keys()][0]!
       const analysisMessage = encodeHoundMessage({
         type: 'analysis',
         hash: 'a1b2c3',
@@ -861,7 +862,7 @@ describe('Tracehound Factory', () => {
         internal.snapshotPath = snapshotTarget
 
         const panics: Array<{ reason: string }> = []
-        tracehound.notifications.on('system.panic', (event) => {
+        tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
           panics.push({ reason: event.payload.reason })
         })
 
@@ -921,7 +922,7 @@ describe('Tracehound Factory', () => {
         })
 
         const panics: Array<{ reason: string }> = []
-        tracehound.notifications.on('system.panic', (event) => {
+        tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
           panics.push({ reason: event.payload.reason })
         })
 

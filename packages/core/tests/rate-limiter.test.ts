@@ -3,7 +3,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRateLimiter, RateLimiter, RateLimitResult } from '../src/core/rate-limiter.js'
+import { createRateLimiter, RateLimiter } from '../src/core/rate-limiter.js'
+import type { RateLimitResult } from '../src/core/rate-limiter.js'
 import type { RateLimitConfig } from '../src/types/config.js'
 import type { ScentSource } from '../src/types/scent.js'
 

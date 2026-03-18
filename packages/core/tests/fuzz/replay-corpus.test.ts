@@ -133,7 +133,7 @@ describe.skipIf(!CORPUS_AVAILABLE)('Corpus Replay Regression', () => {
 
         const accepted = runtime.agent.intercept({
           id: 'partial-ok',
-          source: 'corpus',
+          source: { ip: 'corpus' },
           timestamp: 1,
           payload: entry.acceptedPayload,
           threat: { category: 'injection', severity: 'high' },
@@ -143,7 +143,7 @@ describe.skipIf(!CORPUS_AVAILABLE)('Corpus Replay Regression', () => {
 
         const rejected = runtime.agent.intercept({
           id: 'partial-reject',
-          source: 'corpus',
+          source: { ip: 'corpus' },
           timestamp: 2,
           payload: entry.rejectedPayload,
           threat: { category: 'injection', severity: 'high' },

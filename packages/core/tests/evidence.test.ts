@@ -552,4 +552,87 @@ describe('Evidence', () => {
       expect(evidence).toBeNull()
     })
   })
+
+  describe('bytes immutability', () => {
+    it('should return a copy so caller mutation does not affect internal buffer', () => {
+      const data = new TextEncoder().encode('forensic payload')
+      const bytes = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      const evidence = new Evidence(
+        bytes,
+        validSignature,
+        hashBuffer(bytes),
+        'high',
+        Date.now(),
+        defaultSource,
+      )
+
+      // Capture original content via a second clean read
+      const before = new Uint8Array(evidence.bytes.slice(0))
+
+      // Attempt in-place mutation through the returned buffer
+      const view = new Uint8Array(evidence.bytes)
+      view.fill(0xff)
+
+      // Internal buffer must be unchanged — a subsequent read must equal the original
+      const after = new Uint8Array(evidence.bytes)
+      expect(after).toEqual(before)
+    })
+
+    it('should return a distinct ArrayBuffer instance on each call', () => {
+      const evidence = new Evidence(
+        validBytes,
+        validSignature,
+        validHash,
+        'high',
+        Date.now(),
+        defaultSource,
+      )
+
+      const first = evidence.bytes
+      const second = evidence.bytes
+
+      expect(first).not.toBe(second)
+      expect(first.byteLength).toBe(second.byteLength)
+    })
+
+    it('should preserve correct byte content across multiple reads', () => {
+      const data = new TextEncoder().encode('integrity check')
+      const bytes = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      const evidence = new Evidence(
+        bytes,
+        validSignature,
+        hashBuffer(bytes),
+        'high',
+        Date.now(),
+        defaultSource,
+      )
+
+      const read1 = new Uint8Array(evidence.bytes)
+      const read2 = new Uint8Array(evidence.bytes)
+
+      expect(read1).toEqual(read2)
+      expect(read1).toEqual(data)
+    })
+
+    it('should not be affected by caller mutating the original buffer after construction', () => {
+      const data = new TextEncoder().encode('forensic payload')
+      const original = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      const originalSnapshot = new Uint8Array(original.slice(0))
+
+      const evidence = new Evidence(
+        original,
+        validSignature,
+        hashBuffer(original),
+        'high',
+        Date.now(),
+        defaultSource,
+      )
+
+      // Caller mutates the buffer they passed to the constructor
+      new Uint8Array(original).fill(0xde)
+
+      // Internal evidence bytes must be unchanged
+      expect(new Uint8Array(evidence.bytes)).toEqual(originalSnapshot)
+    })
+  })
 })

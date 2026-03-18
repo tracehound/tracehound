@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import type { JsonSerializable } from '../../src/types/common.js'
 import { createTestRuntime, FUZZ_SEED, runDeterministicProperty } from './helpers.js'
 
-function buildThreatScent(id: string, payload: unknown, timestamp: number) {
+function buildThreatScent(id: string, payload: JsonSerializable, timestamp: number) {
   return {
     id,
     source: { ip: 'state-machine-fuzz' },
@@ -34,7 +35,7 @@ describe('Fuzz Phase 4: State Machine Adversarial Testing', () => {
         const signaturesA = new Set<string>()
         for (let idx = 0; idx < payloads.length; idx++) {
           const result = runtimeA.agent.intercept(
-            buildThreatScent(`a-${i}-${idx}`, payloads[idx], idx + 1),
+            buildThreatScent(`a-${i}-${idx}`, payloads[idx]!, idx + 1),
           )
           if (result.status === 'quarantined') {
             signaturesA.add(result.handle.signature)
@@ -47,7 +48,7 @@ describe('Fuzz Phase 4: State Machine Adversarial Testing', () => {
         const signaturesB = new Set<string>()
         for (let idx = payloads.length - 1; idx >= 0; idx--) {
           const result = runtimeB.agent.intercept(
-            buildThreatScent(`b-${i}-${idx}`, payloads[idx], idx + 1),
+            buildThreatScent(`b-${i}-${idx}`, payloads[idx]!, idx + 1),
           )
           if (result.status === 'quarantined') {
             signaturesB.add(result.handle.signature)

@@ -28,7 +28,7 @@ function createThreatScent(
   return {
     id,
     timestamp: Date.now(),
-    source: `regression-${id}`,
+    source: { ip: `regression-${id}` },
     payload,
     threat: { category: 'injection', severity },
   }

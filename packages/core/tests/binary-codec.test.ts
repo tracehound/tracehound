@@ -229,7 +229,8 @@ describe('BinaryCodec', () => {
 
       // Flip a byte
       const tamperedCompressed = new Uint8Array(encoded.compressed)
-      tamperedCompressed[10] = (tamperedCompressed[10] as number) ^ 0xff
+      const flipIndex = Math.min(10, tamperedCompressed.length - 1)
+      tamperedCompressed[flipIndex] = (tamperedCompressed[flipIndex] as number) ^ 0xff
 
       const tampered = {
         ...encoded,

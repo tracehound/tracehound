@@ -7,6 +7,7 @@
  */
 
 import {
+  SYSTEM_SNAPSHOT_ENV,
   createTracehound,
   generateSecureId,
   type ITracehound,
@@ -23,16 +24,10 @@ import { createFileColdStorage } from './file-cold-storage.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-export const SOAK_SNAPSHOT_PATH = join(
-  __dirname,
-  '..',
-  'logs',
-  'snapshot',
-  'system-snapshot.json',
-)
+export const SOAK_SNAPSHOT_PATH = join(__dirname, '..', 'logs', 'snapshot', 'system-snapshot.json')
 
 export function resolveSoakSnapshotSecret(): string {
-  return process.env['TRACEHOUND_SNAPSHOT_SECRET'] ?? 'soak-test-snapshot-secret'
+  return process.env[SYSTEM_SNAPSHOT_ENV.SECRET] ?? 'soak-test-snapshot-secret'
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

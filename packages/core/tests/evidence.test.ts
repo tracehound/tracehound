@@ -613,5 +613,26 @@ describe('Evidence', () => {
       expect(read1).toEqual(read2)
       expect(read1).toEqual(data)
     })
+
+    it('should not be affected by caller mutating the original buffer after construction', () => {
+      const data = new TextEncoder().encode('forensic payload')
+      const original = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+      const originalSnapshot = new Uint8Array(original.slice(0))
+
+      const evidence = new Evidence(
+        original,
+        validSignature,
+        hashBuffer(original),
+        'high',
+        Date.now(),
+        defaultSource,
+      )
+
+      // Caller mutates the buffer they passed to the constructor
+      new Uint8Array(original).fill(0xde)
+
+      // Internal evidence bytes must be unchanged
+      expect(new Uint8Array(evidence.bytes)).toEqual(originalSnapshot)
+    })
   })
 })

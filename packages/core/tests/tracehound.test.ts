@@ -12,6 +12,7 @@ import {
   HOUND_PRESSURE_ERRORS,
   type HoundResult,
 } from '../src/core/hound-pool.js'
+import { SystemPanicPayload } from '../src/core/notification-emitter.js'
 import { formatHoundErrorReason, SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
 import { readSystemSnapshotFromDisk, SYSTEM_SNAPSHOT_ENV } from '../src/utils/system-snapshot.js'
@@ -278,8 +279,8 @@ describe('Tracehound Factory', () => {
       })
 
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: (event.payload as { reason: string }).reason })
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
       })
 
       tracehound.agent.intercept({
@@ -328,8 +329,8 @@ describe('Tracehound Factory', () => {
         payload: { first: true },
       })
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: (event.payload as { reason: string }).reason })
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
       })
 
       const second = tracehound.agent.intercept({
@@ -413,8 +414,8 @@ describe('Tracehound Factory', () => {
       })
 
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: (event.payload as { reason: string }).reason })
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
       })
 
       tracehound.agent.intercept({
@@ -554,8 +555,8 @@ describe('Tracehound Factory', () => {
       })
 
       const panics: Array<{ reason: string }> = []
-      tracehound.notifications.on('system.panic', (event) => {
-        panics.push({ reason: (event.payload as { reason: string }).reason })
+      tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
+        panics.push({ reason: event.payload.reason })
       })
 
       const first = tracehound.agent.intercept({
@@ -861,8 +862,8 @@ describe('Tracehound Factory', () => {
         internal.snapshotPath = snapshotTarget
 
         const panics: Array<{ reason: string }> = []
-        tracehound.notifications.on('system.panic', (event) => {
-          panics.push({ reason: (event.payload as { reason: string }).reason })
+        tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
+          panics.push({ reason: event.payload.reason })
         })
 
         tracehound.shutdown()
@@ -921,8 +922,8 @@ describe('Tracehound Factory', () => {
         })
 
         const panics: Array<{ reason: string }> = []
-        tracehound.notifications.on('system.panic', (event) => {
-          panics.push({ reason: (event.payload as { reason: string }).reason })
+        tracehound.notifications.on<SystemPanicPayload>('system.panic', (event) => {
+          panics.push({ reason: event.payload.reason })
         })
 
         await vi.advanceTimersByTimeAsync(100)

@@ -39,6 +39,28 @@ export interface TracehoundPluginOptions {
   emitTraceIdHeader?: boolean
 
   /**
+   * Maximum payload size in bytes used to guard body clone operations.
+   * Should match the agent's maxPayloadSize. When set and Content-Length
+   * exceeds this value, body clone is skipped to prevent memory amplification
+   * (JSON.stringify + JSON.parse on multi-MB bodies before agent rejection).
+   * ingressBytes (rawBody) is still captured for signature computation.
+   */
+  maxPayloadSize?: number
+
+  /**
+   * Custom IP resolver. Override to control which IP is recorded in the scent source.
+   *
+   * SECURITY: req.ip in Fastify follows the trustProxy setting. If misconfigured
+   * behind a CDN/LB, an attacker may spoof the IP via X-Forwarded-For to bypass
+   * rate limiting. Provide this function to use a trusted source.
+   *
+   * @example
+   * // Always use the direct connection IP, ignoring X-Forwarded-For:
+   * resolveSourceIp: (req) => req.socket.remoteAddress ?? 'unknown'
+   */
+  resolveSourceIp?: (req: FastifyRequest) => string
+
+  /**
    * Custom scent extraction function.
    * Default extracts IP, path, method, and headers safely.
    */
@@ -64,6 +86,31 @@ function safeClone(value: unknown): JsonSerializable | undefined {
   } catch {
     return undefined // Unsafe to clone or cyclical, omit silently
   }
+}
+
+/**
+ * Returns true if Content-Length is present and exceeds maxPayloadSize.
+ * Used as a best-effort pre-filter to avoid memory amplification from body
+ * cloning before the agent's size enforcement runs.
+ * Note: Content-Length can be absent (chunked) or incorrect; this is a guard,
+ * not a security enforcement — the agent enforces the hard limit.
+ */
+function isBodyOversized(req: FastifyRequest, maxPayloadSize: number | undefined): boolean {
+  if (maxPayloadSize === undefined) return false
+  const raw = req.headers['content-length']
+  if (raw === undefined) return false
+  const values = Array.isArray(raw) ? raw : [raw]
+  let maxContentLength: number | undefined
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+    const parsed = parseInt(value, 10)
+    if (!Number.isNaN(parsed)) {
+      if (maxContentLength === undefined || parsed > maxContentLength) {
+        maxContentLength = parsed
+      }
+    }
+  }
+  return maxContentLength !== undefined && maxContentLength > maxPayloadSize
 }
 
 function toIngressBytes(value: unknown): Uint8Array | undefined {
@@ -100,17 +147,27 @@ function extractIngressBytes(req: FastifyRequest): Uint8Array | undefined {
 /**
  * Default scent extraction from Fastify request.
  */
-function defaultExtractScent(req: FastifyRequest): Scent {
-  const ip = req.ip || 'unknown'
+function defaultExtractScent(
+  req: FastifyRequest,
+  opts: Pick<TracehoundPluginOptions, 'maxPayloadSize' | 'resolveSourceIp'>,
+): Scent {
+  const ip = opts.resolveSourceIp?.(req) ?? (req.ip || 'unknown')
   const rawUserAgentHeader = req.headers['user-agent'] as string | string[] | undefined
-  const userAgentHeader =
-    typeof rawUserAgentHeader === 'string'
-      ? rawUserAgentHeader
-      : Array.isArray(rawUserAgentHeader)
-        ? rawUserAgentHeader.join(',')
-        : undefined
+  // Multiple User-Agent headers are anomalous (RFC 7230 §3.2.2 forbids duplicates for
+  // fields that must not be repeated). Take the first value as canonical and record the
+  // anomaly in the payload for forensic context.
+  let userAgentHeader: string | undefined
+  let hasMultipleUserAgents = false
+  if (typeof rawUserAgentHeader === 'string') {
+    userAgentHeader = rawUserAgentHeader
+  } else if (Array.isArray(rawUserAgentHeader) && rawUserAgentHeader.length > 0) {
+    userAgentHeader = rawUserAgentHeader[0]
+    hasMultipleUserAgents = rawUserAgentHeader.length > 1
+  }
   const query = safeClone(req.query) ?? {}
-  const body = safeClone(req.body)
+  // Guard: skip body clone when Content-Length signals an oversized payload.
+  // Prevents memory amplification (2x JSON.stringify+parse) before agent rejection.
+  const body = isBodyOversized(req, opts.maxPayloadSize) ? undefined : safeClone(req.body)
   const ingressBytes = extractIngressBytes(req)
 
   // Extract TLS information if available
@@ -127,14 +184,28 @@ function defaultExtractScent(req: FastifyRequest): Scent {
   const tlsAlpn =
     typeof alpnProtocol === 'string' && alpnProtocol.length > 0 ? alpnProtocol : undefined
 
+  // Extract path without query string for consistency with Express adapter.
+  // req.url includes the query string (e.g. /path?foo=bar); query is captured separately.
+  const qIndex = req.url.indexOf('?')
+  const urlPath = qIndex === -1 ? req.url : req.url.slice(0, qIndex)
+
+  const contentType =
+    typeof req.headers['content-type'] === 'string' ? req.headers['content-type'] : ''
+  const headers: Record<string, JsonSerializable> = {
+    'user-agent': userAgentHeader || '',
+    'content-type': contentType,
+  }
+  if (hasMultipleUserAgents) {
+    // Forensic anomaly flag: multiple User-Agent headers are non-standard and
+    // may indicate request smuggling or header injection attempts.
+    headers['x-multiple-user-agents'] = 'true'
+  }
+
   const payload: Record<string, JsonSerializable> = {
-    method: req.method,
-    path: req.url,
+    method: req.method ?? '',
+    path: urlPath,
     query,
-    headers: {
-      'user-agent': userAgentHeader || '',
-      'content-type': req.headers['content-type'] || '',
-    },
+    headers,
   }
 
   if (body !== undefined) {
@@ -243,7 +314,9 @@ export const tracehoundPlugin: FastifyPluginCallback<TracehoundPluginOptions> = 
   options,
   done,
 ) => {
-  const { agent, extractScent = defaultExtractScent, onIntercept } = options
+  const { agent, onIntercept } = options
+  const extractScent =
+    options.extractScent ?? ((req: FastifyRequest) => defaultExtractScent(req, options))
 
   fastify.addHook('onRequest', (req, reply, hookDone) => {
     try {

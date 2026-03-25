@@ -230,7 +230,7 @@ The input data structure representing a request:
 
 ```typescript
 interface Scent {
-  id: string // Unique ID (UUIDv7)
+  id: string // Unique ID (crypto.randomUUID)
   timestamp: number // Unix timestamp
   source: string // Client IP or identifier
   payload: unknown // Request data

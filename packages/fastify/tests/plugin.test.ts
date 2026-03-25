@@ -546,7 +546,7 @@ describe('tracehoundPlugin', () => {
       expect(scent.source.tls?.version).toBe('unknown')
     })
 
-    it('joins user-agent header arrays and falls back to unknown IP when blank', () => {
+    it('takes first user-agent when multiple are present and adds anomaly flag', () => {
       const agent = createMockAgent({ status: 'clean' })
       const fastify = createMockFastify()
 
@@ -566,11 +566,102 @@ describe('tracehoundPlugin', () => {
       hookHandler(req, reply, next)
 
       const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+      // IP falls back to 'unknown' when blank
       expect(scent.source.ip).toBe('unknown')
-      expect(scent.source.userAgent).toBe('ua-a,ua-b')
-      expect((scent.payload as Record<string, unknown>)['headers']).toEqual(
-        expect.objectContaining({ 'user-agent': 'ua-a,ua-b' }),
+      // source.userAgent uses first value only — prevents comma-split confusion downstream
+      expect(scent.source.userAgent).toBe('ua-a')
+      const headers = (scent.payload as Record<string, unknown>)['headers'] as Record<string, unknown>
+      expect(headers['user-agent']).toBe('ua-a')
+      // Forensic anomaly flag signals the non-standard duplicate header
+      expect(headers['x-multiple-user-agents']).toBe('true')
+    })
+
+    it('should extract path without query string from url', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as unknown as FastifyInstance, { agent }, () => {})
+
+      const req = createMockReq({
+        url: '/api/resource?foo=bar&baz=1',
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = fastify.addHook.mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+      expect((scent.payload as Record<string, unknown>)['path']).toBe('/api/resource')
+    })
+
+    it('should use resolveSourceIp when provided', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(
+        fastify as unknown as FastifyInstance,
+        { agent, resolveSourceIp: () => '10.10.10.10' },
+        () => {},
       )
+
+      const req = createMockReq({ ip: '1.2.3.4' })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = fastify.addHook.mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+      expect(scent.source.ip).toBe('10.10.10.10')
+    })
+
+    it('should skip body clone when Content-Length exceeds maxPayloadSize', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, maxPayloadSize: 100 }, () => {})
+
+      const req = createMockReq({
+        body: { data: 'some content' },
+        headers: {
+          'user-agent': 'test-agent',
+          'content-type': 'application/json',
+          'content-length': '200',
+        } as unknown as FastifyRequest['headers'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = fastify.addHook.mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+      expect((scent.payload as Record<string, unknown>)['body']).toBeUndefined()
+    })
+
+    it('should clone body when Content-Length is within maxPayloadSize', () => {
+      const agent = createMockAgent({ status: 'clean' })
+      const fastify = createMockFastify()
+
+      tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, maxPayloadSize: 1000 }, () => {})
+
+      const req = createMockReq({
+        body: { data: 'small' },
+        headers: {
+          'user-agent': 'test-agent',
+          'content-type': 'application/json',
+          'content-length': '50',
+        } as unknown as FastifyRequest['headers'],
+      })
+      const reply = createMockReply()
+      const next = vi.fn()
+
+      const hookHandler = fastify.addHook.mock.calls[0][1]
+      hookHandler(req, reply, next)
+
+      const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+      expect((scent.payload as Record<string, unknown>)['body']).toEqual({ data: 'small' })
     })
 
     it('omits source.userAgent when user-agent header is absent', () => {

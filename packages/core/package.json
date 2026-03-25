@@ -41,12 +41,9 @@
     "lint:tests": "tsc --noEmit --project tsconfig.tests.json",
     "clean": "node ../../scripts/build/clean-dist.mjs dist"
   },
-  "dependencies": {
-    "uuid": "^10.0.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/uuid": "^10.0.0",
     "vitest": "^2.0.0"
   },
   "peerDependencies": {

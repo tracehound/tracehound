@@ -21,11 +21,11 @@
 ## Required local setup
 
 - Node is required (CI runs on Node 20/22; see `/.github/workflows/ci.yml`).
-- Package manager is **pnpm** (`packageManager` in `/package.json` is `pnpm@9.1.4`).
+- Package manager is **pnpm** (`packageManager` in `/package.json` is `pnpm@10.33.0`).
 - If `pnpm` is missing in the environment, bootstrap it with Corepack:
   ```bash
   corepack enable
-  corepack prepare pnpm@9.1.4 --activate
+  corepack prepare pnpm@10.33.0 --activate
   ```
 
 ## Commands that match CI
@@ -75,4 +75,4 @@ Additional CI/security checks used by workflows:
 - **Potential issue:** `pnpm: command not found`.
 - **Workaround used during onboarding:** Enable Corepack and activate the pinned pnpm version:
   - `corepack enable`
-  - `corepack prepare pnpm@9.1.4 --activate`
+  - `corepack prepare pnpm@10.33.0 --activate`

@@ -39,6 +39,29 @@ export interface TracehoundMiddlewareOptions {
   emitTraceIdHeader?: boolean
 
   /**
+   * Maximum payload size in bytes used to guard body clone operations.
+   * Should match the agent's maxPayloadSize. When set and Content-Length
+   * exceeds this value, body clone is skipped to prevent memory amplification
+   * (JSON.stringify + JSON.parse on multi-MB bodies before agent rejection).
+   * ingressBytes (rawBody) is still captured for signature computation.
+   */
+  maxPayloadSize?: number
+
+  /**
+   * Custom IP resolver. Override to control which IP is recorded in the scent source.
+   *
+   * SECURITY: Express's req.ip follows the trust proxy setting. If trust proxy is
+   * misconfigured or the app sits behind a CDN/LB, an attacker may spoof the IP via
+   * X-Forwarded-For to bypass rate limiting. Provide this function to use a trusted
+   * source (e.g. req.socket.remoteAddress for the direct connection IP).
+   *
+   * @example
+   * // Always use the direct connection IP, ignoring X-Forwarded-For:
+   * resolveSourceIp: (req) => req.socket.remoteAddress ?? 'unknown'
+   */
+  resolveSourceIp?: (req: Request) => string
+
+  /**
    * Custom scent extraction function.
    * Default extracts IP, path, method, and headers safely.
    */
@@ -64,6 +87,21 @@ function safeClone(obj: unknown): JsonSerializable | undefined {
   } catch {
     return undefined // Unsafe to clone or cyclical, omit silently
   }
+}
+
+/**
+ * Returns true if Content-Length is present and exceeds maxPayloadSize.
+ * Used as a best-effort pre-filter to avoid memory amplification from body
+ * cloning before the agent's size enforcement runs.
+ * Note: Content-Length can be absent (chunked) or incorrect; this is a guard,
+ * not a security enforcement — the agent enforces the hard limit.
+ */
+function isBodyOversized(req: Request, maxPayloadSize: number | undefined): boolean {
+  if (maxPayloadSize === undefined) return false
+  const raw = req.get('content-length')
+  if (!raw) return false
+  const contentLength = parseInt(raw, 10)
+  return !Number.isNaN(contentLength) && contentLength > maxPayloadSize
 }
 
 function toIngressBytes(value: unknown): Uint8Array | undefined {
@@ -100,11 +138,16 @@ function extractIngressBytes(req: Request): Uint8Array | undefined {
 /**
  * Default scent extraction from Express request.
  */
-function defaultExtractScent(req: Request): Scent {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown'
+function defaultExtractScent(
+  req: Request,
+  opts: Pick<TracehoundMiddlewareOptions, 'maxPayloadSize' | 'resolveSourceIp'>,
+): Scent {
+  const ip = opts.resolveSourceIp?.(req) ?? req.ip ?? req.socket.remoteAddress ?? 'unknown'
   const userAgentHeader = req.get('user-agent')
   const query = safeClone(req.query) ?? {}
-  const body = safeClone(req.body)
+  // Guard: skip body clone when Content-Length signals an oversized payload.
+  // Prevents memory amplification (2x JSON.stringify+parse) before agent rejection.
+  const body = isBodyOversized(req, opts.maxPayloadSize) ? undefined : safeClone(req.body)
   const ingressBytes = extractIngressBytes(req)
 
   // Extract TLS information if available
@@ -230,7 +273,8 @@ function defaultOnIntercept(
  * ```
  */
 export function tracehound(options: TracehoundMiddlewareOptions): RequestHandler {
-  const { agent, extractScent = defaultExtractScent, onIntercept } = options
+  const { agent, onIntercept } = options
+  const extractScent = options.extractScent ?? ((req: Request) => defaultExtractScent(req, options))
 
   const interceptHandler =
     onIntercept ||

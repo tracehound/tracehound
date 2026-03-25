@@ -193,6 +193,38 @@ Agent stats are available via:
 const stats = th.agent.getStats()
 ```
 
+### Adapter Options (Express/Fastify)
+
+The Express (`@tracehound/express`) and Fastify (`@tracehound/fastify`) adapters share a common options model (Express uses `Request`/`Response`; Fastify uses `FastifyRequest`/`FastifyReply`). Refer to each adapter’s README for the exact option surface:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `agent` | `IAgent` | **required** | Agent instance from `createTracehound()` |
+| `maxPayloadSize` | `number` | `undefined` | Body clone guard in bytes. Should match the agent's `maxPayloadSize`. When set and `Content-Length` exceeds this value, body clone is skipped to prevent memory amplification before agent rejection. `ingressBytes` (rawBody) is still captured for signature computation. |
+| `resolveSourceIp` | `(req) => string` | `undefined` | Custom IP resolver. **Security**: `req.ip` follows the framework's trust proxy setting. If misconfigured behind a CDN or load balancer, an attacker may spoof the IP via `X-Forwarded-For` to bypass rate limiting. Provide this function to use a trusted source. |
+| `emitSignatureInResponse` | `boolean` | `false` | Include the evidence `signature` in HTTP 403 response bodies. Disabled by default to prevent correlation attacks. |
+| `emitTraceIdHeader` | `boolean` | `false` | Emit `x-tracehound-trace-id` on quarantined responses. Disabled by default for privacy-sensitive environments. |
+| `extractScent` | `(req) => Scent` | default extractor | Override the full scent extraction logic. When set, `maxPayloadSize` and `resolveSourceIp` are ignored (the custom function takes full responsibility). |
+| `onIntercept` | `(result, req, res) => void` | default handler | Override the HTTP response logic for non-clean results. |
+
+**`resolveSourceIp` example** — use the direct connection IP, ignoring `X-Forwarded-For`:
+
+```ts
+// Express
+app.use(tracehound({
+  agent: th.agent,
+  maxPayloadSize: 1_000_000,
+  resolveSourceIp: (req) => req.socket.remoteAddress ?? 'unknown',
+}))
+
+// Fastify
+app.register(tracehoundPlugin, {
+  agent: th.agent,
+  maxPayloadSize: 1_000_000,
+  resolveSourceIp: (req) => req.socket.remoteAddress ?? 'unknown',
+})
+```
+
 ### Adapter Runtime Guarantees (Express/Fastify)
 
 1. `payload_too_large` outcomes map to graceful HTTP `413`.
@@ -396,7 +428,7 @@ Input to the security pipeline.
 
 ```ts
 interface Scent {
-  id: string // Unique ID (UUIDv7)
+  id: string // Unique ID (crypto.randomUUID)
   timestamp: number // Capture time (ms)
   source: ScentSource // Origin with extended entropy
   payload: JsonSerializable
@@ -476,7 +508,7 @@ const provider: CoordinationProvider = {
 ```ts
 import { generateSecureId, isValidSecureId } from '@tracehound/core'
 
-const id = generateSecureId() // UUIDv7
+const id = generateSecureId() // crypto.randomUUID
 isValidSecureId(id) // true
 ```
 

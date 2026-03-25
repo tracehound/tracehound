@@ -2,21 +2,20 @@
  * Secure ID generation.
  */
 
-import { randomBytes } from 'node:crypto'
-import { v7 as uuidv7 } from 'uuid'
+import { randomBytes, randomUUID } from 'node:crypto'
 
 /**
- * Generate a secure, time-ordered unique ID.
- * Combines UUIDv7 (time-ordered) with random suffix for unpredictability.
+ * Generate a secure unique ID.
+ * Combines UUIDv4 (crypto.randomUUID) with random suffix for additional entropy.
  *
- * Format: {uuidv7}-{random8chars}
+ * Format: {uuidv4}-{random8chars}
  *
  * @returns Unique ID string
  */
 export function generateSecureId(): string {
-  const timeOrdered = uuidv7()
+  const base = randomUUID()
   const randomSuffix = randomBytes(4).toString('hex')
-  return `${timeOrdered}-${randomSuffix}`
+  return `${base}-${randomSuffix}`
 }
 
 /**
@@ -26,7 +25,7 @@ export function generateSecureId(): string {
  * @returns True if valid format
  */
 export function isValidSecureId(id: string): boolean {
-  // UUIDv7 (36 chars) + hyphen + 8 hex chars = 45 chars
+  // UUIDv4 (36 chars) + hyphen + 8 hex chars = 45 chars
   if (id.length !== 45) return false
 
   const [uuid, suffix] = id.split('-').reduce(
@@ -41,8 +40,8 @@ export function isValidSecureId(id: string): boolean {
     ['', ''] as [string, string],
   )
 
-  // Validate UUID format (basic check)
-  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+  // Validate UUIDv4 format
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-7][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
   if (!uuidPattern.test(uuid)) return false
 
   // Validate suffix (8 hex chars)

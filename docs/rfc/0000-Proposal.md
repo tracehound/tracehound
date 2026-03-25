@@ -308,13 +308,13 @@ function neutralize(): NeutralizationRecord {
 
 ### Secure ID Generation
 
-UUIDv7 + random suffix for unpredictability.
+crypto.randomUUID + random suffix for unpredictability.
 
 ```ts
 function generateSecureId(): string {
-  const timeOrdered = uuidv7()
+  const uuid = crypto.randomUUID()
   const randomSuffix = crypto.getRandomValues(new Uint8Array(4))
-  return `${timeOrdered}-${toHex(randomSuffix)}`
+  return `${uuid}-${toHex(randomSuffix)}`
 }
 ```
 
@@ -779,7 +779,7 @@ interface TracehoundConfig {
 | Process escape          | OS isolation + read-only IPC | ✅     |
 | Pool exhaustion DoS     | Rate limiting + timeout      | ✅     |
 | Memory exhaustion       | Priority eviction + alerts   | ✅     |
-| ID predictability       | UUIDv7 + random suffix       | ✅     |
+| ID predictability       | crypto.randomUUID + random suffix       | ✅     |
 | Scheduler timing attack | Jittered rotation            | ✅     |
 | Payload overflow        | maxPayloadSize               | ✅     |
 | Alert fatigue           | Rate-limited alerts          | ✅     |
@@ -1049,7 +1049,7 @@ interface TrustBoundaryConfig {
 ## Kodlama Sırası
 
 1. Core types + interfaces
-2. Secure ID generation (UUIDv7 + suffix)
+2. Secure ID generation (crypto.randomUUID + suffix)
 3. Rate limiter
 4. EvidenceHandle (atomic ownership)
 5. Audit chain

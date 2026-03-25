@@ -88,7 +88,7 @@ describe('generateSecureId', () => {
 
   it('generates IDs with correct length', () => {
     const id = generateSecureId()
-    // UUIDv7 (36) + hyphen (1) + suffix (8) = 45
+    // UUIDv4 (36) + hyphen (1) + suffix (8) = 45
     expect(id.length).toBe(45)
   })
 

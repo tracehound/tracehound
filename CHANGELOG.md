@@ -2,6 +2,66 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.8] - 2026-03-25 - Adapter Security Hardening and Zero-Dependency Core
+
+### Security
+
+- **Memory amplification prevention (`@tracehound/express`, `@tracehound/fastify`)**: New `maxPayloadSize`
+  option added to both adapters. When `Content-Length` exceeds the configured limit the body clone
+  (`JSON.stringify + JSON.parse`) is skipped before `agent.intercept()` is called, preventing adversarial
+  oversized payloads from causing 2–3× peak memory pressure. `ingressBytes` (rawBody) is still captured
+  for deterministic signature computation.
+
+- **IP spoofing / rate-limit bypass (`@tracehound/express`, `@tracehound/fastify`)**: New `resolveSourceIp`
+  option allows deployments behind a CDN or load balancer to override `req.ip` (which follows the
+  framework's `trust proxy` setting) with a trusted source such as `req.socket.remoteAddress`. A
+  misconfigured trust-proxy deployment allows `X-Forwarded-For` spoofing to exhaust a victim's rate-limit
+  budget — this option closes that gap.
+
+- **Fastify duplicate path+query in `Scent` (`@tracehound/fastify`)**: `req.url` includes the query string
+  (e.g. `/path?foo=bar`), causing the same data to appear in both the `path` and `query` fields of every
+  captured scent. Fixed with `indexOf`-based path extraction, consistent with Express `req.path`.
+
+- **Multi-value `User-Agent` handling (`@tracehound/fastify`)**: Multiple `User-Agent` headers are
+  non-standard per RFC 7230 §3.2.2 and may indicate header injection or request smuggling. The adapter
+  now takes the first value as the canonical source and adds an `x-multiple-user-agents: true` forensic
+  flag to the captured headers when duplicates are present.
+
+- **`flatted` prototype pollution (dev dependency chain)**: Patched GHSA-rf6f-7fwh-wjgh via
+  `pnpm.overrides: { "flatted": ">=3.4.2" }`. Affected the `eslint → file-entry-cache → flat-cache →
+  flatted` chain only. Production builds were unaffected.
+
+- **`pnpm` upgrade 9.1.4 → 10.33.0**: Addresses CVE-2024-53866 and CVE-2025-69262 in the package
+  manager used across all CI workflows.
+
+### Refactor
+
+- **Zero runtime dependencies in `@tracehound/core`**: Replaced the `uuid` runtime dependency with
+  Node.js built-in `crypto.randomUUID()` + `crypto.randomBytes()`. `generateSecureId()` output format
+  is unchanged (`{uuidv4}-{8 hex chars}`); `isValidSecureId()` continues to validate the same format.
+  `@tracehound/core` now has zero runtime dependencies.
+
+### Fixed
+
+- **Fastify `peerDependency` mismatch**: `fastify` peer was declared as `^4.0.0` but the package
+  targets and is tested against Fastify v5. Updated to `^5.0.0`.
+
+### Documentation
+
+- **`docs/API.md`**: Added "Adapter Options (Express/Fastify)" reference section covering
+  `maxPayloadSize`, `resolveSourceIp`, `emitSignatureInResponse`, `emitTraceIdHeader`, `extractScent`,
+  and `onIntercept` with security rationale for each option.
+- **`docs/GETTING-STARTED.md`**: Updated quickstart examples to reflect new adapter options.
+
+### Operational Impact
+
+- No breaking changes to any public API.
+- `maxPayloadSize` and `resolveSourceIp` are additive optional options — existing deployments are
+  unaffected. Both options are strongly recommended for production use behind a proxy or CDN.
+- `generateSecureId()` output is format-compatible with prior versions.
+
+---
+
 ## [1.8.7] - 2026-03-18 - Evidence Ownership Hardening and Test Type Safety
 
 ### Security

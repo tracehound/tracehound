@@ -1,6 +1,6 @@
 {
   "name": "@tracehound/express",
-  "version": "1.8.7",
+  "version": "1.8.8",
   "description": "Express middleware for Tracehound security buffer",
   "license": "Apache-2.0",
   "author": "Erdem Arslan <me@erdem.work>",

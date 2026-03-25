@@ -396,6 +396,82 @@ describe('tracehound middleware', () => {
     })
   })
 
+  it('should use resolveSourceIp when provided', () => {
+    const agent = createMockAgent({ status: 'clean' })
+    const middleware = tracehound({
+      agent,
+      resolveSourceIp: () => '10.10.10.10',
+    })
+    const req = createMockReq({ ip: '1.2.3.4' })
+
+    middleware(req, createMockRes(), next)
+
+    const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+    expect(scent.source.ip).toBe('10.10.10.10')
+  })
+
+  it('should fall back to req.ip when resolveSourceIp is not provided', () => {
+    const agent = createMockAgent({ status: 'clean' })
+    const middleware = tracehound({ agent })
+    const req = createMockReq({ ip: '5.6.7.8' })
+
+    middleware(req, createMockRes(), next)
+
+    const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+    expect(scent.source.ip).toBe('5.6.7.8')
+  })
+
+  it('should skip body clone when Content-Length exceeds maxPayloadSize', () => {
+    const agent = createMockAgent({ status: 'clean' })
+    const middleware = tracehound({ agent, maxPayloadSize: 100 })
+    const req = createMockReq({ body: { data: 'some content' } })
+    req.get = vi.fn((header: string) => {
+      if (header === 'content-length') return '200'
+      if (header === 'user-agent') return 'test-agent'
+      if (header === 'content-type') return 'application/json'
+      return ''
+    }) as unknown as typeof req.get
+
+    middleware(req, createMockRes(), next)
+
+    const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+    expect((scent.payload as Record<string, unknown>)['body']).toBeUndefined()
+  })
+
+  it('should clone body when Content-Length is within maxPayloadSize', () => {
+    const agent = createMockAgent({ status: 'clean' })
+    const middleware = tracehound({ agent, maxPayloadSize: 1000 })
+    const req = createMockReq({ body: { data: 'small' } })
+    req.get = vi.fn((header: string) => {
+      if (header === 'content-length') return '50'
+      if (header === 'user-agent') return 'test-agent'
+      if (header === 'content-type') return 'application/json'
+      return ''
+    }) as unknown as typeof req.get
+
+    middleware(req, createMockRes(), next)
+
+    const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+    expect((scent.payload as Record<string, unknown>)['body']).toEqual({ data: 'small' })
+  })
+
+  it('should clone body when maxPayloadSize is not set regardless of Content-Length', () => {
+    const agent = createMockAgent({ status: 'clean' })
+    const middleware = tracehound({ agent })
+    const req = createMockReq({ body: { data: 'content' } })
+    req.get = vi.fn((header: string) => {
+      if (header === 'content-length') return '99999'
+      if (header === 'user-agent') return 'test-agent'
+      if (header === 'content-type') return 'application/json'
+      return ''
+    }) as unknown as typeof req.get
+
+    middleware(req, createMockRes(), next)
+
+    const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+    expect((scent.payload as Record<string, unknown>)['body']).toEqual({ data: 'content' })
+  })
+
   it('should use custom extractScent function', () => {
     const agent = createMockAgent({ status: 'clean' })
     const customScent = {

@@ -195,7 +195,7 @@ const stats = th.agent.getStats()
 
 ### Adapter Options (Express/Fastify)
 
-Both `@tracehound/express` and `@tracehound/fastify` accept the same set of options (Express uses `Request`/`Response`; Fastify uses `FastifyRequest`/`FastifyReply`):
+The Express (`@tracehound/express`) and Fastify (`@tracehound/fastify`) adapters share a common options model (Express uses `Request`/`Response`; Fastify uses `FastifyRequest`/`FastifyReply`). Refer to each adapter’s README for the exact option surface:
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -428,7 +428,7 @@ Input to the security pipeline.
 
 ```ts
 interface Scent {
-  id: string // Unique ID (UUIDv7)
+  id: string // Unique ID (crypto.randomUUID)
   timestamp: number // Capture time (ms)
   source: ScentSource // Origin with extended entropy
   payload: JsonSerializable
@@ -508,7 +508,7 @@ const provider: CoordinationProvider = {
 ```ts
 import { generateSecureId, isValidSecureId } from '@tracehound/core'
 
-const id = generateSecureId() // UUIDv7
+const id = generateSecureId() // crypto.randomUUID
 isValidSecureId(id) // true
 ```
 

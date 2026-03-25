@@ -98,9 +98,19 @@ function safeClone(value: unknown): JsonSerializable | undefined {
 function isBodyOversized(req: FastifyRequest, maxPayloadSize: number | undefined): boolean {
   if (maxPayloadSize === undefined) return false
   const raw = req.headers['content-length']
-  if (typeof raw !== 'string') return false
-  const contentLength = parseInt(raw, 10)
-  return !Number.isNaN(contentLength) && contentLength > maxPayloadSize
+  if (raw === undefined) return false
+  const values = Array.isArray(raw) ? raw : [raw]
+  let maxContentLength: number | undefined
+  for (const value of values) {
+    if (typeof value !== 'string') continue
+    const parsed = parseInt(value, 10)
+    if (!Number.isNaN(parsed)) {
+      if (maxContentLength === undefined || parsed > maxContentLength) {
+        maxContentLength = parsed
+      }
+    }
+  }
+  return maxContentLength !== undefined && maxContentLength > maxPayloadSize
 }
 
 function toIngressBytes(value: unknown): Uint8Array | undefined {

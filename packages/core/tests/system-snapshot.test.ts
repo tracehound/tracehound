@@ -247,6 +247,27 @@ describe('system-snapshot utilities', () => {
     expect(critical.systemHealth).toBe('critical')
   })
 
+  it('should keep pool exhaustion critical even when pressure mode is elevated', () => {
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot({
+          overloaded: false,
+          alertsInWindow: 0,
+          pressure: {
+            ...createWatcherSnapshot().pressure,
+            mode: 'elevated',
+          },
+        }),
+        createHoundPoolStats({
+          activeProcesses: 4,
+          totalProcesses: 4,
+        }),
+      ),
+    )
+
+    expect(snapshot.systemHealth).toBe('critical')
+  })
+
   it('should derive degraded and healthy health states', () => {
     const degraded = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot({ alertsInWindow: 2 }), createHoundPoolStats()),

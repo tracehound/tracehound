@@ -282,12 +282,12 @@ function deriveSystemHealth(
     return 'critical'
   }
 
-  if (watcher.pressure.mode === 'elevated') {
-    return 'degraded'
-  }
-
   if (pool.totalProcesses > 0 && pool.activeProcesses >= pool.totalProcesses) {
     return 'critical'
+  }
+
+  if (watcher.pressure.mode === 'elevated') {
+    return 'degraded'
   }
 
   if (watcher.alertsInWindow > 0) {

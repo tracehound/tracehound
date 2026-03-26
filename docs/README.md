@@ -41,7 +41,7 @@
 | [0000-Proposal.md](./rfc/0000-Proposal.md)                                                 | 🔒 Locked      | Core architecture (normative)                             |
 | [0009-CoordinationProviderContract.md](./rfc/0009-CoordinationProviderContract.md)         | ✅ Implemented | External coordination contract                            |
 | [0010-OneWayMembrane.md](./rfc/0010-OneWayMembrane.md)                                     | ✅ Implemented | One-way membrane and trace id signaling                   |
-| [0011-PressureContainment.md](./rfc/0011-PressureContainment.md)                           | ⚠️ Draft       | Pressure containment and graceful shielding               |
+| [0011-PressureContainment.md](./rfc/0011-PressureContainment.md)                           | ✅ Implemented | Pressure containment and graceful shielding               |
 | [0013-OperationalTruthAndHoundAnalysis.md](./rfc/0013-OperationalTruthAndHoundAnalysis.md) | ✅ Implemented | Signed operational truth and deterministic hound analysis |
 
 ---

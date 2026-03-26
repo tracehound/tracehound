@@ -8,10 +8,30 @@
 | Status         | Draft                  |
 | Author         | Tracehound Engineering |
 | Created        | 2026-03-03             |
-| Updated        | 2026-03-03             |
+| Updated        | 2026-03-26             |
 | Depends on     | RFC-0000, RFC-0010     |
 | Supersedes     | None                   |
 | Implemented in | TBD                    |
+
+## Implementation Status
+
+As of 2026-03-26, this RFC is only partially implemented.
+
+Implemented building blocks:
+
+1. Deterministic Drop and Count exists in Quarantine via bounded insert/drop behavior and observable `droppedCount` metrics.
+2. Memory-first cold storage buffering exists, and disk buffering remains explicit opt-in.
+3. Express and Fastify adapters return graceful `413 Payload Too Large` responses without destructive socket-reset behavior by default.
+4. Overload signaling exists through `Watcher.setOverloaded()` and is wired from HoundPool pressure/error outcomes.
+
+Open implementation gaps:
+
+1. No first-class `PressureMode` / `PressureState` runtime type currently exists in core public APIs.
+2. No deterministic threshold engine currently transitions the system between `normal`, `elevated`, and `critical`.
+3. Archive suppression is not yet driven by pressure mode; archival behavior is currently configuration-driven, not pressure-state-driven.
+4. Pressure state is not exported through `SystemSnapshot`, CLI status surfaces, or watcher snapshots as a first-class `PressureState` structure; current snapshot surfaces expose watcher overload state only.
+5. Recovery rules from sustained `critical` pressure back to `normal` are implicit and fragmented, not defined as one canonical state machine.
+6. RFC metadata still lists `Implemented in: TBD` because the design is not yet fully closed.
 
 ## Motivation
 
@@ -80,6 +100,16 @@ interface PressureState {
 2. Future pressure controls are expected to be additive behind configuration defaults.
 3. Adapter status map remains unchanged.
 4. Existing deployments can remain on current behavior until pressure controls are explicitly enabled.
+
+## Implementation Plan
+
+1. Introduce canonical `PressureMode` and `PressureState` types in core and expose them through public type exports.
+2. Add a bounded pressure controller that derives mode transitions from deterministic signals already present in the system:
+   quarantine byte pressure, quarantine drop counters, cold-storage degradation, and HoundPool pressure outcomes.
+3. Extend `Watcher` and `SystemSnapshot` to expose pressure state explicitly instead of relying only on the `overloaded` boolean.
+4. Gate optional archival forwarding on pressure mode so `critical` pressure suppresses non-essential archive work deterministically.
+5. Add integration tests for mode transitions, sustained pressure recovery, and cold-storage degradation while preserving fail-open host behavior.
+6. Update RFC metadata from `Draft` to `Implemented` only after the above state machine, observability surface, and tests exist together.
 
 ## Test Plan
 

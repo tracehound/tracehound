@@ -1,16 +1,16 @@
 # RFC-0000: Tracehound – Core [Locked]
 
-## Özet
+## Summary
 
-Tracehound, **immune system** modelini referans alan, runtime-independent, deterministic bir **security buffer** sistemidir. Threat detection, isolation, ve neutralization için tasarlanmıştır.
+Tracehound is a runtime-independent, deterministic **security buffer** inspired by an **immune system** model. It is designed for threat isolation, evidence preservation, and neutralization workflows.
 
-**Değil:**
+**Not:**
 
-- APM / Observability aracı
-- Logging framework
-- Caching sistemi
+- An APM / observability tool
+- A logging framework
+- A caching system
 
-**Evet:**
+**Yes:**
 
 - Threat quarantine buffer
 - Evidence preservation layer
@@ -18,22 +18,22 @@ Tracehound, **immune system** modelini referans alan, runtime-independent, deter
 
 ---
 
-## Temel İlkeler
+## Core Principles
 
-| Prensip              | Açıklama                                  |
-| -------------------- | ----------------------------------------- |
-| **Decision-free**    | Policy, retry, backoff kararı almaz       |
-| **Zero-tolerance**   | Her threat izole edilir, exception yok    |
-| **Deterministic**    | GC-independent, explicit lifecycle        |
-| **Ownership-based**  | Memory yönetimi explicit dispose ile      |
-| **Sync hot-path**    | Tüm kritik operasyonlar sync              |
-| **Defense-in-depth** | Her layer kendi güvenlik garantisi sağlar |
+| Principle | Description |
+| --- | --- |
+| **Decision-free** | Makes no policy, retry, or backoff decisions |
+| **Zero-tolerance** | Every threat is isolated, with no exceptions |
+| **Deterministic** | GC-independent with explicit lifecycle control |
+| **Ownership-based** | Memory is managed through explicit disposal |
+| **Sync hot-path** | All critical operations stay synchronous |
+| **Defense-in-depth** | Each layer provides its own security guarantee |
 
 ---
 
-## Mimari
+## Architecture
 
-```
+```md
 ┌─────────────────────────────────────────────────────────────────┐
 │                         WATCHER                                 │
 │  ─────────────────────────────────────────                      │
@@ -91,15 +91,15 @@ Tracehound, **immune system** modelini referans alan, runtime-independent, deter
 
 ## Detection Model
 
-### Temel Prensip
+### Core Principle
 
-**Tracehound threat detection YAPMAZ.**
+**Tracehound does NOT perform threat detection.**
 
-Detection external layer sorumluluğundadır. Tracehound yalnızca external layer'dan gelen threat sinyallerini işler.
+Detection belongs to an external layer. Tracehound only processes threat signals provided by that external layer.
 
 ### External Detection Sources
 
-| Source        | Açıklama                           |
+| Source        | Description                        |
 | ------------- | ---------------------------------- |
 | WAF           | Cloudflare, AWS WAF, ModSecurity   |
 | Custom Rules  | Regex patterns, signature matching |
@@ -141,7 +141,7 @@ app.use((req, res, next) => {
 
 ### API Contract
 
-`intercept()` iki şekilde çağrılabilir:
+`intercept()` can be called in two ways:
 
 1. **Pre-classified threat** (external detection)
 
@@ -163,15 +163,15 @@ intercept({ id, payload, source, timestamp })
 // → { status: 'clean' }, NO quarantine
 ```
 
-**No external threat signal = no quarantine.** Tracehound kendi başına karar almaz.
+**No external threat signal = no quarantine.** Tracehound does not make decisions on its own.
 
 ---
 
-## Bileşen Tanımları
+## Component Definitions
 
 ### Scent
 
-Agent'a giren request unit.
+The request unit entering the Agent.
 
 ```ts
 interface Scent {
@@ -186,7 +186,7 @@ interface Scent {
 
 ### Threat
 
-Tespit edilen malicious scent.
+A malicious Scent identified by an external detector.
 
 ```ts
 interface Threat {
@@ -205,7 +205,7 @@ Content-based, collision-resistant signature generation.
 
 ```ts
 // Signature = category + content hash
-// Farklı payload = farklı signature (collision impossible)
+// Different payload should produce a different signature (collision-resistant; collisions are computationally infeasible)
 function generateSignature(threat: Threat): string {
   const contentHash = sha256(serialize(threat.scent.payload))
   return `${threat.category}:${contentHash}`
@@ -216,20 +216,20 @@ function generateSignature(threat: Threat): string {
 
 ---
 
-## Davranış Kuralları
+## Behavioral Rules
 
-### Aynı Intent (Known Threat)
+### Same Intent (Known Threat)
 
-→ **IGNORE**. Zaten quarantine'de evidence var.
+→ **IGNORE**. Evidence already exists in Quarantine.
 
-### Aynı Intent, Farklı Payload
+### Same Intent, Different Payload
 
-**İmkansız.** Signature = content hash. Farklı payload = farklı signature by definition.
+**Impossible.** Signature = content hash. A different payload produces a different signature by definition.
 
-### Yeni Intent (New Threat)
+### New Intent (New Threat)
 
 → **ENCODE + QUARANTINE**
-→ Eski intent flush edilmez (security: evidence preserve)
+→ Existing intent is not flushed (security: preserve evidence)
 
 ---
 
@@ -258,7 +258,7 @@ interface RateLimitConfig {
 
 ## Memory Model: Atomic Ownership
 
-GC-independent, deterministic, tamper-resistant memory yönetimi.
+GC-independent, deterministic, tamper-resistant memory management.
 
 ```ts
 interface EvidenceHandle {
@@ -391,7 +391,7 @@ Hound MUST execute in a **separate OS process**.
 | ------------------------- | ---------------------------------------------------- |
 | Independent crash domain  | Hound crash does not affect Core                     |
 | OS-level memory isolation | No shared memory with Core                           |
-| Resource limits           | Enforced via OS primitives (cgroup, ulimit, seccomp) |
+| Process constraints       | Memory limit enforced where available; other denies are declarative/best-effort |
 | Bounded pool              | No unbounded spawn                                   |
 | Binary IPC                | Length-prefixed protocol over stdio                  |
 
@@ -412,56 +412,45 @@ Hound MAY execute inside a **WASM sandbox**.
 
 The following isolation models are **permanently rejected**:
 
-| Model                | Reason                                                                       |
-| -------------------- | ---------------------------------------------------------------------------- |
-| Child Processes      | Insufficient isolation, shared failure domain, non-deterministic termination |
-| In-process execution | No isolation, violates security assumptions                                  |
+| Model                | Reason                                      |
+| -------------------- | ------------------------------------------- |
+| In-process execution | No isolation, violates security assumptions |
+| Worker threads       | Shared process failure domain               |
 
 ---
 
 ## Hound Pool (Process-Based)
 
-Pre-spawned, isolated, timeout-protected **child processes**.
+Bounded, isolated, timeout-protected **child processes** managed through a pool abstraction.
 
 ```ts
 interface HoundPool {
-  readonly dormant: number
-  readonly active: number
-  readonly total: number
-
-  activate(threat: Threat): Hound
-  deactivate(hound: Hound): void
-  terminate(hound: Hound): void
-}
-
-interface Hound {
-  readonly id: string
-  readonly pid: number // OS process ID
-  readonly state: 'dormant' | 'active' | 'disposing'
-  readonly createdAt: number
-  readonly activatedAt: number | null
-
-  send(buffer: ArrayBuffer): void
-  kill(): void
+  activate(evidence: Evidence): void
+  terminate(signature: string): void
+  readonly stats: HoundPoolStats
+  onResult(handler: (result: HoundResult) => void): void
+  shutdown(): void
 }
 ```
 
 ### Strict Pool Semantics (REQUIRED)
 
-Hound processes MUST be managed by a **bounded pool**.
+Hound processes MUST be managed by a **bounded pool of process slots**.
 
-```
+```md
 HoundPool
- ├─ dormant: N   (pre-spawned)
- ├─ active: ≤ maxActive
- └─ spawning: rate-limited
+ ├─ process slots: N
+ ├─ active: ≤ poolSize
+ └─ overflow handling: drop | escalate | defer
 ```
 
 **Rules:**
 
-- No on-demand spawn without pool admission
-- `maxActive` is a **hard limit**
+- No process may be spawned outside pool admission
+- `poolSize` is a **hard limit**
+- Lazy spawn inside admitted slots is allowed
 - Spawn outside pool is **forbidden**
+- Deferred overflow MUST remain bounded
 
 > Hound creation is **capacity-bound**, not demand-driven.
 
@@ -471,13 +460,26 @@ When pool is exhausted, Core MUST:
 type PoolExhaustedAction = 'drop' | 'escalate' | 'defer'
 ```
 
-This prevents **fork bomb** attacks.
+Current runtime configuration also bounds deferred overflow explicitly:
+
+```ts
+interface HoundPoolConfig {
+  poolSize: number
+  timeout: number
+  rotationJitterMs: number
+  onPoolExhausted?: PoolExhaustedAction
+  deferQueueLimit?: number
+  processConstraints?: Partial<HoundProcessConstraints>
+}
+```
+
+This prevents **spawn amplification** and unbounded queue growth.
 
 ### Binary IPC Protocol (REQUIRED)
 
 Inter-process communication between Core and Hound MUST use a **length-prefixed binary protocol** over stdio pipes.
 
-```
+```md
 [4 bytes length BE][N bytes payload]
 ```
 
@@ -485,8 +487,9 @@ Inter-process communication between Core and Hound MUST use a **length-prefixed 
 
 ```ts
 interface HoundIPC {
-  send(handle: HoundHandle, payload: ArrayBuffer): void
-  receive(handle: HoundHandle): AsyncIterable<ArrayBuffer>
+  encodeMessage(payload: ArrayBuffer): Buffer
+  decodeHoundMessage(payload: ArrayBuffer): HoundMessage
+  createMessageParser(): MessageParser
 }
 ```
 
@@ -500,10 +503,11 @@ interface HoundIPC {
 
 ```ts
 interface HoundProcessAdapter {
-  spawn(script: string): HoundHandle
-  send(handle: HoundHandle, msg: ArrayBuffer): void
+  spawn(script: string, constraints?: Partial<HoundProcessConstraints>): HoundHandle
+  send(handle: HoundHandle, payload: ArrayBuffer): void
   kill(handle: HoundHandle): void
-  onExit(handle: HoundHandle, cb: (code: number) => void): void
+  onExit(handle: HoundHandle, cb: (code: number | null, signal: string | null) => void): void
+  onMessage(handle: HoundHandle, cb: (payload: ArrayBuffer) => void): void
 }
 ```
 
@@ -520,32 +524,27 @@ interface HoundProcessAdapter {
 
 ```ts
 interface HoundProcessConstraints {
-  // Resource limits (Linux/macOS)
-  maxMemoryMB: number // ulimit -v
-  maxCPUSeconds: number // ulimit -t
-  maxFileDescriptors: number // ulimit -n
+  // Best-effort resource constraint
+  maxMemoryMB?: number
 
-  // Denied capabilities
+  // Declarative denied capabilities
   networkAccess: false
   fileSystemWrite: false
   childSpawn: false
-
-  // Allowed capabilities
-  stdio: true
-  crypto: true
 }
 ```
 
 ### Read-Only Return Channel
 
 ```ts
-// Hound process can ONLY send status reports
+// Hound process can ONLY send bounded metadata messages
 type HoundMessage =
   | { type: 'status'; state: 'processing' | 'complete' | 'error' }
   | { type: 'metrics'; processingTime: number; memoryUsed: number }
+  | { type: 'analysis'; hash: string; entropy: number; contentType: string; sizeBytes: number }
 
 // Hound process CANNOT send:
-// - Arbitrary data
+// - Raw payload bytes
 // - Code
 // - Commands to main process
 ```
@@ -553,43 +552,34 @@ type HoundMessage =
 ### Processing Timeout
 
 ```ts
-interface HoundConfig {
-  minimumDormant: number
-  maxActive: number
-  maxLifeTimeCycle: number
-  maxProcessingTime: number // timeout (default: 5000ms)
-  replenishDelay: number
-  onPoolExhausted: PoolExhaustedAction
+interface HoundPoolConfig {
+  poolSize: number
+  timeout: number
+  rotationJitterMs: number
+  onPoolExhausted?: PoolExhaustedAction
+  deferQueueLimit?: number
 }
 
 // Force-kill stuck Hounds
-function monitorHound(hound: Hound): void {
+function monitorHound(processState: ProcessState): void {
   const timeout = setTimeout(() => {
-    if (hound.state === 'active') {
-      log({ type: 'hound.timeout', id: hound.id, pid: hound.pid })
-      hound.kill() // SIGKILL
-      pool.replenish()
+    if (processState.busy) {
+      terminateProcess(processState, 'timeout')
     }
-  }, config.maxProcessingTime)
-
-  hound.onComplete = () => clearTimeout(timeout)
+  }, config.timeout)
 }
+
+// The timeout is cleared when processing completes, errors, or the process is terminated.
 ```
 
-### Jittered Rotation
+### Rotation Jitter
 
-Prevent timing attacks via unpredictable rotation.
+`rotationJitterMs` is reserved in the current pool configuration as a rotation-jitter control surface.
+The current OSS runtime does not implement active timed rotation yet, so no normative runtime guarantee depends on it today.
 
 ```ts
-interface SchedulerConfig {
-  rotationInterval: number // base interval
-  jitterMax: number // random addition (default: 10_000)
-  skipIfBusy: boolean
-}
-
-function getNextRotationTime(): number {
-  const jitter = Math.random() * config.jitterMax
-  return config.rotationInterval + jitter
+interface HoundPoolConfig {
+  rotationJitterMs: number
 }
 ```
 
@@ -675,7 +665,7 @@ interface TracehoundError {
 
 **Kurallar:**
 
-- Her state kendi error management'ına sahip
+- Each state owns its own error management
 - Error → log + state-specific recovery
 - Hound error → terminate + replenish
 - Quarantine error → alert + continue
@@ -779,7 +769,7 @@ interface TracehoundConfig {
 | Process escape          | OS isolation + read-only IPC | ✅     |
 | Pool exhaustion DoS     | Rate limiting + timeout      | ✅     |
 | Memory exhaustion       | Priority eviction + alerts   | ✅     |
-| ID predictability       | crypto.randomUUID + random suffix       | ✅     |
+| ID predictability       | crypto.randomUUID + random suffix | ✅ |
 | Scheduler timing attack | Jittered rotation            | ✅     |
 | Payload overflow        | maxPayloadSize               | ✅     |
 | Alert fatigue           | Rate-limited alerts          | ✅     |
@@ -791,7 +781,7 @@ interface TracehoundConfig {
 
 ### Trust Boundaries
 
-```
+```md
                     ┌───────────────────────────┐
                     │     UNTRUSTED ZONE        │
                     │  External HTTP Requests   │
@@ -875,7 +865,7 @@ interface PurgeRecord {
 }
 ```
 
-**Davranış:**
+**Behavior:**
 
 - Main thread NEVER waits for Purge completion
 - Evidence preserved in cold storage (hash + metadata)
@@ -990,7 +980,7 @@ interface ColdStorageConfig {
 }
 ```
 
-**Trust model:** Fire-and-forget. URL verirler, biz POST/PUT yaparız, response beklemeyiz.
+**Trust model:** Fire-and-forget. Operators provide a URL, Tracehound performs POST/PUT, and no response payload is trusted.
 
 ---
 
@@ -1042,11 +1032,11 @@ interface TrustBoundaryConfig {
 }
 ```
 
-**Felsefe:** Biz default'ları sağlıyoruz, sınırları developer çiziyor.
+**Philosophy:** Tracehound provides the defaults; the developer defines the trust boundaries.
 
 ---
 
-## Kodlama Sırası
+## Implementation Order
 
 1. Core types + interfaces
 2. Secure ID generation (crypto.randomUUID + suffix)
@@ -1065,15 +1055,15 @@ interface TrustBoundaryConfig {
 
 ## Non-Goals
 
-- Logging framework olmak
-- Metrics backend'i olmak
-- Alerting engine (sadece notification, rate-limited)
+- Become a logging framework
+- Become a metrics backend
+- An alerting engine (notification only, rate-limited)
 - WAF / Firewall replacement
 - ML-based detection (external concern)
 
 ---
 
-## Açık Konular
+## Open Questions
 
 - Compression algorithm selection (gzip vs brotli)
 - Cold storage integration spec
@@ -1123,4 +1113,4 @@ Before Phase 5, full flow must be tested:
 
 **Status: LOCKED**
 
-RFC bilinçli olarak dar tutulmuştur. Security-hardened. Genişleme yalnızca production kullanım ve security audit sonrası yapılmalıdır.
+This RFC is intentionally narrow and security-hardened. Expansion should happen only after production use and security audit.

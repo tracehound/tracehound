@@ -5,13 +5,13 @@
 | Field          | Value                  |
 | -------------- | ---------------------- |
 | RFC            | 0009                   |
-| Status         | Draft                  |
+| Status         | Implemented            |
 | Author         | Tracehound Engineering |
 | Created        | 2026-03-03             |
-| Updated        | 2026-03-03             |
+| Updated        | 2026-03-26             |
 | Depends on     | RFC-0000               |
 | Supersedes     | None                   |
-| Implemented in | TBD                    |
+| Implemented in | `packages/core/src/types/coordination.ts`, `packages/core/src/core/agent.ts`, `packages/core/tests/coordination-contract.test.ts`, `packages/core/tests/rfc-compliance.test.ts` |
 
 ## Motivation
 
@@ -85,7 +85,7 @@ export interface CoordinationProvider {
 
 ## Backward Compatibility
 
-1. No runtime breaking changes are introduced in this draft phase.
+1. No runtime breaking changes are introduced in this phase.
 2. Integration is opt-in; existing deployments remain local-only by default.
 3. No changes to current adapter response status mapping.
 4. Migration path for future implementation: add provider config with default `disabled`.

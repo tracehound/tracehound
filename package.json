@@ -41,6 +41,7 @@
   "pnpm": {
     "overrides": {
       "minimatch": ">=10.2.3",
+      "picomatch": ">=4.0.4",
       "rollup": ">=4.59.0",
       "esbuild": ">=0.25.0",
       "flatted": ">=3.4.2"

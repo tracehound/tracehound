@@ -63,6 +63,21 @@ function createWatcherSnapshot(
   partial: Partial<WatcherSnapshot> = {},
   now = Date.now(),
 ): WatcherSnapshot {
+  const pressure = {
+    mode: 'normal' as const,
+    archiveSuppressed: false,
+    updatedAt: now,
+    signals: {
+      quarantineBytes: 1024,
+      quarantineCount: 3,
+      quarantineCapacityPercent: 20,
+      droppedEvents: 0,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+      overloaded: false,
+    },
+  }
+
   return {
     uptimeMs: 5000,
     threats: {
@@ -79,6 +94,7 @@ function createWatcherSnapshot(
     alertsInWindow: 0,
     lastAlert: null,
     overloaded: false,
+    pressure,
     snapshotTime: now,
     ...partial,
   }
@@ -297,10 +313,7 @@ describe('system-snapshot utilities', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
     const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
-      createMockTracehound(
-        createWatcherSnapshot(),
-        createHoundPoolStats({}),
-      ),
+      createMockTracehound(createWatcherSnapshot(), createHoundPoolStats({})),
     )
 
     writeSystemSnapshotToDisk(snapshot, path, 'secret')

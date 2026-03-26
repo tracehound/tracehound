@@ -23,6 +23,20 @@ const SNAPSHOT_SECRET = 'tracehound-cli-watch-dashboard-secret'
 
 function createFixtureSnapshot(partial?: Partial<SystemSnapshot['houndPool']>): SystemSnapshot {
   const now = Date.now()
+  const pressure = {
+    mode: 'normal' as const,
+    archiveSuppressed: false,
+    updatedAt: now,
+    signals: {
+      quarantineBytes: 4096,
+      quarantineCount: 4,
+      quarantineCapacityPercent: 50,
+      droppedEvents: 1,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+      overloaded: false,
+    },
+  }
   return {
     generatedAt: now,
     systemHealth: 'degraded',
@@ -77,6 +91,7 @@ function createFixtureSnapshot(partial?: Partial<SystemSnapshot['houndPool']>): 
       alertsInWindow: 1,
       lastAlert: null,
       overloaded: false,
+      pressure,
       snapshotTime: now,
       quarantine: {
         count: 4,
@@ -84,6 +99,7 @@ function createFixtureSnapshot(partial?: Partial<SystemSnapshot['houndPool']>): 
         capacityPercent: 50,
       },
     },
+    pressure,
     houndPool: {
       activeProcesses: 1,
       totalProcesses: 2,
@@ -255,8 +271,9 @@ describe('watch dashboard rendering', () => {
     process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = SNAPSHOT_SECRET
 
     const now = Date.now()
+    const fixture = createFixtureSnapshot()
     const snapshotWithAlert: SystemSnapshot = {
-      ...createFixtureSnapshot(),
+      ...fixture,
       watcher: {
         uptimeMs: 65_000,
         threats: {
@@ -274,9 +291,11 @@ describe('watch dashboard rendering', () => {
           timestamp: now,
         } as unknown as SystemSnapshot['watcher']['lastAlert'],
         overloaded: false,
+        pressure: fixture.pressure,
         snapshotTime: now,
         quarantine: { count: 4, bytes: 4096, capacityPercent: 50 },
       },
+      pressure: fixture.pressure,
     }
     writeFixtureSnapshotToDisk(snapshotWithAlert, snapshotPath, SNAPSHOT_SECRET)
 
@@ -323,6 +342,14 @@ describe('watch dashboard rendering', () => {
           version: 'test-version',
           uptime: '10m',
           health: 'critical',
+        },
+        pressure: {
+          mode: 'critical',
+          archiveSuppressed: true,
+          capacityPercent: 80,
+          droppedEvents: 0,
+          archiveFailureCount: 0,
+          houndPressureEvents: 1,
         },
         quarantine: {
           count: 10,
@@ -396,6 +423,14 @@ function makeSnapshot(
       errors: 0,
     },
     system: { version: '1.0.0', uptime: '5m', health: 'healthy' },
+    pressure: {
+      mode: 'normal',
+      archiveSuppressed: false,
+      capacityPercent: 50,
+      droppedEvents: 0,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+    },
     quarantine: {
       count: 10,
       bytes: 4096,

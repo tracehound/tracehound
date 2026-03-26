@@ -9,6 +9,7 @@
 
 import { isIP } from 'node:net'
 import { Errors } from '../types/errors.js'
+import type { PressureMode, PressureState } from '../types/pressure.js'
 import { generateSecureId } from '../utils/id.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,6 +24,8 @@ export type EventType =
   | 'evidence.quarantined'
   | 'evidence.evicted'
   | 'rate_limit.exceeded'
+  | 'pressure.transition'
+  | 'pressure.archive_suppressed'
   | 'system.panic'
   | 'license.validated'
   | 'license.expired'
@@ -66,6 +69,21 @@ export interface EvidenceEvictedPayload {
 export interface RateLimitExceededPayload {
   source: string
   retryAfterMs: number
+}
+
+export interface PressureTransitionPayload {
+  previousMode: PressureMode
+  currentMode: PressureMode
+  reason: string
+  archiveSuppressed: boolean
+  pressure: PressureState
+}
+
+export interface PressureArchiveSuppressedPayload {
+  mode: PressureMode
+  suppressed: boolean
+  reason: string
+  pressure: PressureState
 }
 
 export interface SystemPanicPayload {
@@ -668,6 +686,8 @@ function createEmptyEventTypeRecord(): Record<EventType, number> {
     'evidence.quarantined': 0,
     'evidence.evicted': 0,
     'rate_limit.exceeded': 0,
+    'pressure.transition': 0,
+    'pressure.archive_suppressed': 0,
     'system.panic': 0,
     'license.validated': 0,
     'license.expired': 0,

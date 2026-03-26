@@ -54,6 +54,10 @@ const th = createTracehound({
     alertWindowMs: 60_000,
     quarantineHighWatermark: 0.85,
   },
+  pressure: {
+    elevatedWatermark: 0.85,
+    criticalWatermark: 0.95,
+  },
   houndPool: {
     poolSize: 8,
     timeout: 30_000,
@@ -139,6 +143,20 @@ interface TracehoundOptions {
     rotationJitterMs?: number
   }
 
+  /** Pressure containment configuration (RFC-0011 OSS scope). */
+  pressure?: {
+    /** Capacity ratio (0-1) that raises pressure mode to elevated. Default: watcher.quarantineHighWatermark or 0.8 */
+    elevatedWatermark?: number
+    /** Capacity ratio (0-1) that raises pressure mode to critical. Default: 0.95 */
+    criticalWatermark?: number
+    /** Capacity ratio (0-1) required to recover from critical to elevated. Default: derived from elevated/critical */
+    recoverToElevatedWatermark?: number
+    /** Capacity ratio (0-1) required to recover from elevated to normal. Default: derived from elevated */
+    recoverToNormalWatermark?: number
+    /** Minimum quiet period before recovery in ms. Default: 5000 */
+    recoveryCooldownMs?: number
+  }
+
   /** Signed runtime snapshot export configuration. */
   snapshot?: {
     /** Output file path (required when enabled) */
@@ -197,25 +215,27 @@ const stats = th.agent.getStats()
 
 The Express (`@tracehound/express`) and Fastify (`@tracehound/fastify`) adapters share a common options model (Express uses `Request`/`Response`; Fastify uses `FastifyRequest`/`FastifyReply`). Refer to each adapter’s README for the exact option surface:
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `agent` | `IAgent` | **required** | Agent instance from `createTracehound()` |
-| `maxPayloadSize` | `number` | `undefined` | Body clone guard in bytes. Should match the agent's `maxPayloadSize`. When set and `Content-Length` exceeds this value, body clone is skipped to prevent memory amplification before agent rejection. `ingressBytes` (rawBody) is still captured for signature computation. |
-| `resolveSourceIp` | `(req) => string` | `undefined` | Custom IP resolver. **Security**: `req.ip` follows the framework's trust proxy setting. If misconfigured behind a CDN or load balancer, an attacker may spoof the IP via `X-Forwarded-For` to bypass rate limiting. Provide this function to use a trusted source. |
-| `emitSignatureInResponse` | `boolean` | `false` | Include the evidence `signature` in HTTP 403 response bodies. Disabled by default to prevent correlation attacks. |
-| `emitTraceIdHeader` | `boolean` | `false` | Emit `x-tracehound-trace-id` on quarantined responses. Disabled by default for privacy-sensitive environments. |
-| `extractScent` | `(req) => Scent` | default extractor | Override the full scent extraction logic. When set, `maxPayloadSize` and `resolveSourceIp` are ignored (the custom function takes full responsibility). |
-| `onIntercept` | `(result, req, res) => void` | default handler | Override the HTTP response logic for non-clean results. |
+| Option                    | Type                         | Default           | Description                                                                                                                                                                                                                                                                 |
+| ------------------------- | ---------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent`                   | `IAgent`                     | **required**      | Agent instance from `createTracehound()`                                                                                                                                                                                                                                    |
+| `maxPayloadSize`          | `number`                     | `undefined`       | Body clone guard in bytes. Should match the agent's `maxPayloadSize`. When set and `Content-Length` exceeds this value, body clone is skipped to prevent memory amplification before agent rejection. `ingressBytes` (rawBody) is still captured for signature computation. |
+| `resolveSourceIp`         | `(req) => string`            | `undefined`       | Custom IP resolver. **Security**: `req.ip` follows the framework's trust proxy setting. If misconfigured behind a CDN or load balancer, an attacker may spoof the IP via `X-Forwarded-For` to bypass rate limiting. Provide this function to use a trusted source.          |
+| `emitSignatureInResponse` | `boolean`                    | `false`           | Include the evidence `signature` in HTTP 403 response bodies. Disabled by default to prevent correlation attacks.                                                                                                                                                           |
+| `emitTraceIdHeader`       | `boolean`                    | `false`           | Emit `x-tracehound-trace-id` on quarantined responses. Disabled by default for privacy-sensitive environments.                                                                                                                                                              |
+| `extractScent`            | `(req) => Scent`             | default extractor | Override the full scent extraction logic. When set, `maxPayloadSize` and `resolveSourceIp` are ignored (the custom function takes full responsibility).                                                                                                                     |
+| `onIntercept`             | `(result, req, res) => void` | default handler   | Override the HTTP response logic for non-clean results.                                                                                                                                                                                                                     |
 
 **`resolveSourceIp` example** — use the direct connection IP, ignoring `X-Forwarded-For`:
 
 ```ts
 // Express
-app.use(tracehound({
-  agent: th.agent,
-  maxPayloadSize: 1_000_000,
-  resolveSourceIp: (req) => req.socket.remoteAddress ?? 'unknown',
-}))
+app.use(
+  tracehound({
+    agent: th.agent,
+    maxPayloadSize: 1_000_000,
+    resolveSourceIp: (req) => req.socket.remoteAddress ?? 'unknown',
+  }),
+)
 
 // Fastify
 app.register(tracehoundPlugin, {
@@ -291,6 +311,7 @@ Pull-based observability for threat statistics and alerts.
 ```ts
 const snapshot = th.watcher.snapshot()
 console.log(snapshot.threats)
+console.log(snapshot.pressure.mode)
 ```
 
 ### Runtime Snapshot (`th.snapshot()`)
@@ -300,7 +321,29 @@ Operational snapshot API for signed disk export / CLI consumption:
 ```ts
 const runtime = th.snapshot()
 console.log(runtime.systemHealth)
+console.log(runtime.pressure.archiveSuppressed)
 console.log(runtime.houndPool.isolationTelemetry?.capabilities)
+```
+
+Runtime and watcher snapshots now expose first-class pressure state:
+
+```ts
+type PressureMode = 'normal' | 'elevated' | 'critical'
+
+interface PressureState {
+  mode: PressureMode
+  archiveSuppressed: boolean
+  updatedAt: number
+  signals: {
+    quarantineBytes: number
+    quarantineCount: number
+    quarantineCapacityPercent: number
+    droppedEvents: number
+    archiveFailureCount: number
+    houndPressureEvents: number
+    overloaded: boolean
+  }
+}
 ```
 
 For disk transport:
@@ -381,6 +424,14 @@ th.notifications.on('system.panic', (payload) => {
   if (payload.reason === timeoutReasonExample) {
     // exact timeout match for known signature
   }
+})
+
+th.notifications.on('pressure.transition', (event) => {
+  console.log(event.payload.currentMode, event.payload.reason)
+})
+
+th.notifications.on('pressure.archive_suppressed', (event) => {
+  console.log(event.payload.suppressed)
 })
 ```
 

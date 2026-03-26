@@ -27,6 +27,7 @@ import type { RateLimiterStats } from '../core/rate-limiter.js'
 import type { ITracehound } from '../core/tracehound.js'
 import { WATCHER_ALERT_TYPES, type WatcherSnapshot } from '../core/watcher.js'
 import { Errors } from '../types/errors.js'
+import type { PressureState } from '../types/pressure.js'
 import { constantTimeEqual } from './compare.js'
 
 export type SystemHealth = 'healthy' | 'degraded' | 'critical'
@@ -38,6 +39,7 @@ export interface SystemSnapshot {
   quarantine: Readonly<QuarantineStats>
   quarantineMaxBytes: number
   watcher: Readonly<WatcherSnapshot>
+  pressure: Readonly<PressureState>
   houndPool: Readonly<HoundPoolStats>
   rateLimiter: Readonly<RateLimiterStats>
 }
@@ -120,6 +122,7 @@ export function exportSystemSnapshot(tracehound: ITracehound): SystemSnapshot {
     quarantine: tracehound.quarantine.stats,
     quarantineMaxBytes: tracehound.quarantine.maxBytes,
     watcher,
+    pressure: watcher.pressure,
     houndPool: pool,
     rateLimiter: tracehound.rateLimiter.stats,
   })
@@ -270,6 +273,14 @@ function deriveSystemHealth(
     return 'critical'
   }
 
+  if (watcher.pressure.mode === 'critical') {
+    return 'critical'
+  }
+
+  if (watcher.pressure.mode === 'elevated') {
+    return 'degraded'
+  }
+
   if (pool.totalProcesses > 0 && pool.activeProcesses >= pool.totalProcesses) {
     return 'critical'
   }
@@ -315,6 +326,7 @@ function isSystemSnapshot(value: unknown): value is SystemSnapshot {
     agent?: unknown
     quarantine?: unknown
     watcher?: unknown
+    pressure?: unknown
     houndPool?: unknown
     rateLimiter?: unknown
   }
@@ -336,6 +348,9 @@ function isSystemSnapshot(value: unknown): value is SystemSnapshot {
     return false
   }
   if (!isWatcherSnapshot(snapshot.watcher)) {
+    return false
+  }
+  if (!isPressureState(snapshot.pressure)) {
     return false
   }
   if (!isHoundPoolStats(snapshot.houndPool)) {
@@ -423,6 +438,7 @@ function isWatcherSnapshot(value: unknown): value is WatcherSnapshot {
     alertsInWindow?: unknown
     lastAlert?: unknown
     overloaded?: unknown
+    pressure?: unknown
     snapshotTime?: unknown
   }
 
@@ -453,7 +469,50 @@ function isWatcherSnapshot(value: unknown): value is WatcherSnapshot {
     isNonNegativeInteger(snapshot.alertsInWindow) &&
     isAlertOrNull(snapshot.lastAlert) &&
     typeof snapshot.overloaded === 'boolean' &&
+    isPressureState(snapshot.pressure) &&
     isNonNegativeFiniteNumber(snapshot.snapshotTime)
+  )
+}
+
+function isPressureState(value: unknown): value is PressureState {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  const state = value as {
+    mode?: unknown
+    archiveSuppressed?: unknown
+    updatedAt?: unknown
+    signals?: unknown
+  }
+
+  if (
+    (state.mode !== 'normal' && state.mode !== 'elevated' && state.mode !== 'critical') ||
+    typeof state.archiveSuppressed !== 'boolean' ||
+    !isNonNegativeFiniteNumber(state.updatedAt) ||
+    !isRecord(state.signals)
+  ) {
+    return false
+  }
+
+  const signals = state.signals as {
+    quarantineBytes?: unknown
+    quarantineCount?: unknown
+    quarantineCapacityPercent?: unknown
+    droppedEvents?: unknown
+    archiveFailureCount?: unknown
+    houndPressureEvents?: unknown
+    overloaded?: unknown
+  }
+
+  return (
+    isNonNegativeInteger(signals.quarantineBytes) &&
+    isNonNegativeInteger(signals.quarantineCount) &&
+    isNonNegativeFiniteNumber(signals.quarantineCapacityPercent) &&
+    isNonNegativeInteger(signals.droppedEvents) &&
+    isNonNegativeInteger(signals.archiveFailureCount) &&
+    isNonNegativeInteger(signals.houndPressureEvents) &&
+    typeof signals.overloaded === 'boolean'
   )
 }
 

@@ -211,7 +211,8 @@ export function runDeterministicProperty(
   const seed = options?.seed ?? FUZZ_SEED
   const runs = options?.runs ?? FUZZ_NUM_RUNS
   const generator =
-    options?.generator ?? ((rand: DeterministicCryptoRandom) => randomJsonValue(rand) as JsonSerializable)
+    options?.generator ??
+    ((rand: DeterministicCryptoRandom) => randomJsonValue(rand) as JsonSerializable)
   const rand = createDeterministicCryptoRandom(seed)
 
   for (let i = 0; i < runs; i++) {

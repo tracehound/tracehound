@@ -2,13 +2,13 @@
 
 ## Title and Metadata
 
-| Field | Value |
-| --- | --- |
-| RFC | 0013 |
-| Status | Implemented |
-| Author | Core Maintainers |
-| Created | 2026-03-05 |
-| Depends on | RFC-0000, RFC-0011 |
+| Field          | Value                                                                                                                                                                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| RFC            | 0013                                                                                                                                                                                                                                             |
+| Status         | Implemented                                                                                                                                                                                                                                      |
+| Author         | Core Maintainers                                                                                                                                                                                                                                 |
+| Created        | 2026-03-05                                                                                                                                                                                                                                       |
+| Depends on     | RFC-0000, RFC-0011                                                                                                                                                                                                                               |
 | Implemented in | `packages/core/src/core/tracehound.ts`, `packages/core/src/utils/system-snapshot.ts`, `packages/core/src/core/hound-process.ts`, `packages/core/src/core/hound-ipc.ts`, `packages/core/src/core/hound-pool.ts`, `packages/cli/src/commands/*.ts` |
 
 ## Motivation

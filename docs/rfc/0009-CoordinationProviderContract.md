@@ -2,15 +2,15 @@
 
 ## Title and Metadata
 
-| Field          | Value                  |
-| -------------- | ---------------------- |
-| RFC            | 0009                   |
-| Status         | Implemented            |
-| Author         | Tracehound Engineering |
-| Created        | 2026-03-03             |
-| Updated        | 2026-03-26             |
-| Depends on     | RFC-0000               |
-| Supersedes     | None                   |
+| Field          | Value                                                                                                                                                                           |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RFC            | 0009                                                                                                                                                                            |
+| Status         | Implemented                                                                                                                                                                     |
+| Author         | Tracehound Engineering                                                                                                                                                          |
+| Created        | 2026-03-03                                                                                                                                                                      |
+| Updated        | 2026-03-26                                                                                                                                                                      |
+| Depends on     | RFC-0000                                                                                                                                                                        |
+| Supersedes     | None                                                                                                                                                                            |
 | Implemented in | `packages/core/src/types/coordination.ts`, `packages/core/src/core/agent.ts`, `packages/core/tests/coordination-contract.test.ts`, `packages/core/tests/rfc-compliance.test.ts` |
 
 ## Motivation

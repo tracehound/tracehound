@@ -29,7 +29,7 @@ All notable changes to this project will be documented in this file.
 
 - **`flatted` prototype pollution (dev dependency chain)**: Patched GHSA-rf6f-7fwh-wjgh via
   `pnpm.overrides: { "flatted": ">=3.4.2" }`. Affected the `eslint → file-entry-cache → flat-cache →
-  flatted` chain only. Production builds were unaffected.
+flatted` chain only. Production builds were unaffected.
 
 - **`pnpm` upgrade 9.1.4 → 10.33.0**: Addresses CVE-2024-53866 and CVE-2025-69262 in the package
   manager used across all CI workflows.

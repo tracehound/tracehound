@@ -122,6 +122,11 @@ export class Agent implements IAgent {
     private readonly houndPool?: IHoundPool,
     private readonly watcher?: IWatcher,
     private readonly notifications?: INotificationEmitter,
+    private readonly onQuarantineTelemetry?: (
+      count: number,
+      bytes: number,
+      maxBytes: number,
+    ) => void,
   ) {
     // Validate config
     if (config.maxPayloadSize <= 0) {
@@ -212,6 +217,7 @@ export class Agent implements IAgent {
 
       if (insertResult.status === 'dropped') {
         // Pressure containment: quarantine may shed deterministically under hard caps.
+        this.emitQuarantineTelemetry()
         this.stats.ignoredCount++
         return {
           status: 'ignored',
@@ -241,9 +247,7 @@ export class Agent implements IAgent {
           sizeBytes: qStats.bytes,
         })
       })
-      this.runTelemetryHook(() => {
-        this.watcher?.updateQuarantine(qStats.count, qStats.bytes, this.quarantine.maxBytes)
-      })
+      this.emitQuarantineTelemetry(qStats.count, qStats.bytes)
 
       // Success
       this.stats.quarantinedCount++
@@ -482,6 +486,24 @@ export class Agent implements IAgent {
     }
   }
 
+  private emitQuarantineTelemetry(count?: number, bytes?: number): void {
+    const telemetrySource = getQuarantineTelemetrySource(this.quarantine)
+    if (telemetrySource === null) {
+      return
+    }
+
+    const nextCount = count ?? telemetrySource.stats.count
+    const nextBytes = bytes ?? telemetrySource.stats.bytes
+    this.runTelemetryHook(() => {
+      if (this.onQuarantineTelemetry) {
+        this.onQuarantineTelemetry(nextCount, nextBytes, telemetrySource.maxBytes)
+        return
+      }
+
+      this.watcher?.updateQuarantine(nextCount, nextBytes, telemetrySource.maxBytes)
+    })
+  }
+
   private trackCoordinationFallbackTransition(nextKey: string | null): void {
     if (nextKey === null) {
       this.lastCoordinationFallbackKey = null
@@ -621,6 +643,7 @@ export function createAgent(
   houndPool?: IHoundPool,
   watcher?: IWatcher,
   notifications?: INotificationEmitter,
+  onQuarantineTelemetry?: (count: number, bytes: number, maxBytes: number) => void,
 ): IAgent {
   return new Agent(
     config,
@@ -630,5 +653,36 @@ export function createAgent(
     houndPool,
     watcher,
     notifications,
+    onQuarantineTelemetry,
   )
+}
+
+function getQuarantineTelemetrySource(
+  value: unknown,
+): { stats: { count: number; bytes: number }; maxBytes: number } | null {
+  if (value === null || typeof value !== 'object') {
+    return null
+  }
+
+  const candidate = value as {
+    stats?: { count?: unknown; bytes?: unknown }
+    maxBytes?: unknown
+  }
+
+  if (
+    candidate.stats === undefined ||
+    typeof candidate.stats.count !== 'number' ||
+    typeof candidate.stats.bytes !== 'number' ||
+    typeof candidate.maxBytes !== 'number'
+  ) {
+    return null
+  }
+
+  return {
+    stats: {
+      count: candidate.stats.count,
+      bytes: candidate.stats.bytes,
+    },
+    maxBytes: candidate.maxBytes,
+  }
 }

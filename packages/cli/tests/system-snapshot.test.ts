@@ -9,6 +9,21 @@ import { loadSystemSnapshot } from '../src/lib/system-snapshot.js'
 const SNAPSHOT_SECRET = 'tracehound-cli-test-snapshot-secret'
 
 function createFixtureSnapshot(generatedAt: number): SystemSnapshot {
+  const pressure = {
+    mode: 'normal' as const,
+    archiveSuppressed: false,
+    updatedAt: generatedAt,
+    signals: {
+      quarantineBytes: 4096,
+      quarantineCount: 4,
+      quarantineCapacityPercent: 50,
+      droppedEvents: 1,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+      overloaded: false,
+    },
+  }
+
   return {
     generatedAt,
     systemHealth: 'degraded',
@@ -63,6 +78,7 @@ function createFixtureSnapshot(generatedAt: number): SystemSnapshot {
       alertsInWindow: 1,
       lastAlert: null,
       overloaded: false,
+      pressure,
       snapshotTime: generatedAt,
       quarantine: {
         count: 4,
@@ -70,6 +86,7 @@ function createFixtureSnapshot(generatedAt: number): SystemSnapshot {
         capacityPercent: 50,
       },
     },
+    pressure,
     houndPool: {
       activeProcesses: 1,
       totalProcesses: 2,

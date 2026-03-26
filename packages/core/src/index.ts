@@ -170,6 +170,7 @@ export type {
   WatcherQuarantineStats,
   WatcherSnapshot,
 } from './core/watcher.js'
+export type { PressureMode, PressureSignals, PressureState } from './types/pressure.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utils - Hashing
@@ -336,6 +337,8 @@ export type {
   LicenseValidatedPayload,
   NotificationEmitterOptions,
   NotificationEmitterStats,
+  PressureArchiveSuppressedPayload,
+  PressureTransitionPayload,
   RateLimitExceededPayload,
   SystemPanicPayload,
   ThreatDetectedPayload,

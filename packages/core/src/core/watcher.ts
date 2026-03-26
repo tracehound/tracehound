@@ -9,6 +9,7 @@
  */
 
 import type { Severity } from '../types/common.js'
+import type { PressureState } from '../types/pressure.js'
 import { generateSecureId } from '../utils/id.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -95,6 +96,8 @@ export interface WatcherSnapshot {
   lastAlert: Alert | null
   /** Whether system is in overload state */
   overloaded: boolean
+  /** Current pressure containment state */
+  pressure: Readonly<PressureState>
   /** Timestamp of snapshot */
   snapshotTime: number
 }
@@ -153,6 +156,12 @@ export interface IWatcher {
    * Mark system as overloaded.
    */
   setOverloaded(overloaded: boolean): void
+
+  /**
+   * Update current pressure state.
+   * Internal use only.
+   */
+  setPressure(pressure: PressureState): void
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -182,6 +191,20 @@ export class Watcher implements IWatcher {
 
   // State
   private _overloaded = false
+  private _pressure = Object.freeze({
+    mode: 'normal',
+    archiveSuppressed: false,
+    updatedAt: 0,
+    signals: Object.freeze({
+      quarantineBytes: 0,
+      quarantineCount: 0,
+      quarantineCapacityPercent: 0,
+      droppedEvents: 0,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+      overloaded: false,
+    }),
+  }) as PressureState
   private _lastAlert: Alert | null = null
 
   private readonly maxAlerts: number
@@ -227,6 +250,7 @@ export class Watcher implements IWatcher {
       alertsInWindow: this.alertsInCurrentWindow,
       lastAlert: this._lastAlert,
       overloaded: this._overloaded,
+      pressure: this._pressure,
       snapshotTime: now,
     })
   }
@@ -302,6 +326,15 @@ export class Watcher implements IWatcher {
         message: 'System is overloaded',
       })
     }
+  }
+
+  setPressure(pressure: PressureState): void {
+    this._pressure = Object.freeze({
+      ...pressure,
+      signals: Object.freeze({
+        ...pressure.signals,
+      }),
+    })
   }
 }
 

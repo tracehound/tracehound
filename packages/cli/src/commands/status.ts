@@ -137,6 +137,7 @@ function printStatus(snapshotResult: CliSnapshotLoadResult): void {
     ['Archive', status.pressure.archiveSuppressed ? 'suppressed' : 'active'],
     ['Capacity', `${status.pressure.capacityPercent.toFixed(1)}%`],
     ['Drops', String(status.pressure.droppedEvents)],
+    ['Archive Failures', String(status.pressure.archiveFailureCount)],
     ['Hound Pressure', String(status.pressure.houndPressureEvents)],
   )
   console.log(pressureTable.toString())

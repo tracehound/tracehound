@@ -2,15 +2,15 @@
 
 ## Title and Metadata
 
-| Field          | Value                  |
-| -------------- | ---------------------- |
-| RFC            | 0011                   |
-| Status         | Implemented            |
-| Author         | Tracehound Engineering |
-| Created        | 2026-03-03             |
-| Updated        | 2026-03-26             |
-| Depends on     | RFC-0000, RFC-0010     |
-| Supersedes     | None                   |
+| Field          | Value                                                                                                                                                                                                                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RFC            | 0011                                                                                                                                                                                                                                                                                            |
+| Status         | Implemented                                                                                                                                                                                                                                                                                     |
+| Author         | Tracehound Engineering                                                                                                                                                                                                                                                                          |
+| Created        | 2026-03-03                                                                                                                                                                                                                                                                                      |
+| Updated        | 2026-03-26                                                                                                                                                                                                                                                                                      |
+| Depends on     | RFC-0000, RFC-0010                                                                                                                                                                                                                                                                              |
+| Supersedes     | None                                                                                                                                                                                                                                                                                            |
 | Implemented in | `packages/core/src/core/pressure-controller.ts`, `packages/core/src/core/tracehound.ts`, `packages/core/src/core/quarantine.ts`, `packages/core/src/core/watcher.ts`, `packages/core/src/utils/system-snapshot.ts`, `packages/cli/src/commands/status.ts`, `packages/cli/src/commands/watch.ts` |
 
 ## Implementation Status

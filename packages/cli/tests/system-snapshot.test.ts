@@ -475,4 +475,38 @@ describe('system snapshot freshness', () => {
     if (result.ok) return
     expect(result.code).toBe('INTEGRITY_VIOLATION')
   })
+
+  it('should load legacy signed snapshot when pressure fields are absent', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    const modern = createFixtureSnapshot(now.getTime())
+    const legacyPayload = {
+      ...modern,
+      watcher: {
+        ...modern.watcher,
+      },
+    } as Record<string, unknown>
+
+    delete legacyPayload.pressure
+    delete (legacyPayload.watcher as Record<string, unknown>).pressure
+
+    const payloadText = JSON.stringify(legacyPayload)
+    const signature = createHmac('sha256', SNAPSHOT_SECRET).update(payloadText).digest('hex')
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: legacyPayload,
+        signature,
+      }),
+      'utf8',
+    )
+
+    const result = loadSystemSnapshot()
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.pressure.mode).toBe('normal')
+    expect(result.snapshot.watcher.pressure.mode).toBe('normal')
+  })
 })

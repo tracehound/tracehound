@@ -1,4 +1,4 @@
-import type { PressureMode, PressureState } from '../types/pressure.js'
+import type { PressureMode, PressureState, PressureTransitionReason } from '../types/pressure.js'
 import { isHoundPressureError, type HoundResult } from './hound-pool.js'
 import type { QuarantineStats } from './quarantine.js'
 
@@ -13,14 +13,7 @@ export interface PressureThresholds {
 export interface PressureTransition {
   previous: PressureState
   current: PressureState
-  reason:
-    | 'capacity_elevated'
-    | 'capacity_critical'
-    | 'archive_failure'
-    | 'drop_detected'
-    | 'hound_pressure'
-    | 'recovered_to_elevated'
-    | 'recovered_to_normal'
+  reason: PressureTransitionReason
 }
 
 export class PressureController {

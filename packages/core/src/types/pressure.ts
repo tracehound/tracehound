@@ -3,6 +3,14 @@
  */
 
 export type PressureMode = 'normal' | 'elevated' | 'critical'
+export type PressureTransitionReason =
+  | 'capacity_elevated'
+  | 'capacity_critical'
+  | 'archive_failure'
+  | 'drop_detected'
+  | 'hound_pressure'
+  | 'recovered_to_elevated'
+  | 'recovered_to_normal'
 
 export interface PressureSignals {
   quarantineBytes: number

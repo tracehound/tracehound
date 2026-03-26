@@ -584,6 +584,33 @@ describe('renderQuarantine', () => {
     expect(out).toContain('DEGRADED')
   })
 
+  it('should show SUPPRESSED archive status when pressure containment is active', () => {
+    renderQuarantine(
+      makeSnapshot({
+        pressure: {
+          mode: 'critical',
+          archiveSuppressed: true,
+          capacityPercent: 96,
+          droppedEvents: 2,
+          archiveFailureCount: 0,
+          houndPressureEvents: 1,
+        },
+        quarantine: {
+          count: 5,
+          bytes: 1024,
+          maxBytes: 8192,
+          bySeverity: { critical: 1, high: 1, medium: 1, low: 1 },
+          archiveFailures: 0,
+          dropped: 0,
+          nextExpiryAt: null,
+        },
+      }),
+      120,
+    )
+    const out = logSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(out).toContain('SUPPRESSED')
+  })
+
   it('should render next expiry when nextExpiryAt is set', () => {
     renderQuarantine(
       makeSnapshot({

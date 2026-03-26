@@ -107,6 +107,12 @@ export const Errors = {
       recoverable: false,
     }),
 
+  invalidConfigPressure: (issue: string) =>
+    createError('config', 'CONFIG_PRESSURE_INVALID', `Invalid pressure config: ${issue}`, {
+      context: { issue },
+      recoverable: false,
+    }),
+
   snapshotSecretMissing: () =>
     createError(
       'config',

@@ -15,6 +15,7 @@ import {
 import type { SystemPanicPayload } from '../src/core/notification-emitter.js'
 import { formatHoundErrorReason, SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
+import type { TracehoundError } from '../src/types/errors.js'
 import { readSystemSnapshotFromDisk, SYSTEM_SNAPSHOT_ENV } from '../src/utils/system-snapshot.js'
 
 async function flushMicrotasks(): Promise<void> {
@@ -117,6 +118,82 @@ describe('Tracehound Factory', () => {
       })
 
       expect(tracehound.houndPool).toBeDefined()
+    })
+
+    it('throws when pressure thresholds are not finite numbers', () => {
+      try {
+        createTracehound({
+          pressure: {
+            elevatedWatermark: Number.NaN,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain('pressure thresholds must be finite numbers')
+      }
+    })
+
+    it('throws when pressure thresholds do not satisfy hysteresis ordering', () => {
+      try {
+        createTracehound({
+          pressure: {
+            elevatedWatermark: 0.8,
+            criticalWatermark: 0.85,
+            recoverToElevatedWatermark: 0.86,
+            recoverToNormalWatermark: 0.75,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain(
+          'pressure thresholds must satisfy 0 < recoverToNormal < elevated < recoverToElevated < critical <= 1',
+        )
+      }
+    })
+
+    it('throws when pressure recovery cooldown is not positive', () => {
+      try {
+        createTracehound({
+          pressure: {
+            recoveryCooldownMs: 0,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain('pressure recoveryCooldownMs must be positive')
+      }
+    })
+
+    it('accepts high elevated watermarks by deriving a valid recovery threshold', () => {
+      const tracehound = createTracehound({
+        pressure: {
+          elevatedWatermark: 0.95,
+        },
+      })
+
+      expect(tracehound).toBeDefined()
+      tracehound.shutdown()
+    })
+
+    it('rejects fractional cooldowns that normalize to zero milliseconds', () => {
+      try {
+        createTracehound({
+          pressure: {
+            recoveryCooldownMs: 0.5,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain('pressure recoveryCooldownMs must be positive')
+      }
     })
 
     it('should use default values when config not provided', () => {

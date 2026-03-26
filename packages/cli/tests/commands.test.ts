@@ -296,6 +296,7 @@ describe('CLI Commands', () => {
       expect(logSpy).toHaveBeenCalled()
       const output = readLogOutput(logSpy)
       expect(output).toContain('TRACEHOUND STATUS')
+      expect(output).toContain('Archive Failures')
     })
 
     it('status command action should print JSON', () => {

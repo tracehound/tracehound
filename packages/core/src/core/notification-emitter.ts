@@ -9,7 +9,7 @@
 
 import { isIP } from 'node:net'
 import { Errors } from '../types/errors.js'
-import type { PressureMode, PressureState } from '../types/pressure.js'
+import type { PressureMode, PressureState, PressureTransitionReason } from '../types/pressure.js'
 import { generateSecureId } from '../utils/id.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ export interface RateLimitExceededPayload {
 export interface PressureTransitionPayload {
   previousMode: PressureMode
   currentMode: PressureMode
-  reason: string
+  reason: PressureTransitionReason
   archiveSuppressed: boolean
   pressure: PressureState
 }
@@ -82,7 +82,7 @@ export interface PressureTransitionPayload {
 export interface PressureArchiveSuppressedPayload {
   mode: PressureMode
   suppressed: boolean
-  reason: string
+  reason: PressureTransitionReason
   pressure: PressureState
 }
 

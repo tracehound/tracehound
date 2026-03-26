@@ -170,7 +170,12 @@ export type {
   WatcherQuarantineStats,
   WatcherSnapshot,
 } from './core/watcher.js'
-export type { PressureMode, PressureSignals, PressureState } from './types/pressure.js'
+export type {
+  PressureMode,
+  PressureSignals,
+  PressureState,
+  PressureTransitionReason,
+} from './types/pressure.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Utils - Hashing

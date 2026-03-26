@@ -603,20 +603,22 @@ function normalizePressureThresholds(
       : Math.min(1, elevatedWatermark + 0.01))
   const recoverToElevatedWatermark =
     pressure?.recoverToElevatedWatermark ??
-    Math.max(elevatedWatermark + 0.01, Math.min(criticalWatermark - 0.01, elevatedWatermark + 0.05))
+    deriveRecoverToElevatedWatermark(elevatedWatermark, criticalWatermark)
   const recoverToNormalWatermark =
     pressure?.recoverToNormalWatermark ?? Math.max(0.01, elevatedWatermark - 0.1)
-  const recoveryCooldownMs = pressure?.recoveryCooldownMs ?? 5_000
+  const rawRecoveryCooldownMs = pressure?.recoveryCooldownMs ?? 5_000
 
   if (
     !Number.isFinite(elevatedWatermark) ||
     !Number.isFinite(criticalWatermark) ||
     !Number.isFinite(recoverToElevatedWatermark) ||
     !Number.isFinite(recoverToNormalWatermark) ||
-    !Number.isFinite(recoveryCooldownMs)
+    !Number.isFinite(rawRecoveryCooldownMs)
   ) {
-    throw Errors.invalidConfigSnapshot('pressure thresholds must be finite numbers')
+    throw Errors.invalidConfigPressure('pressure thresholds must be finite numbers')
   }
+
+  const recoveryCooldownMs = Math.floor(rawRecoveryCooldownMs)
 
   if (
     !(
@@ -627,13 +629,13 @@ function normalizePressureThresholds(
       criticalWatermark <= 1
     )
   ) {
-    throw Errors.invalidConfigSnapshot(
+    throw Errors.invalidConfigPressure(
       'pressure thresholds must satisfy 0 < recoverToNormal < elevated < recoverToElevated < critical <= 1',
     )
   }
 
   if (recoveryCooldownMs <= 0) {
-    throw Errors.invalidConfigSnapshot('pressure recoveryCooldownMs must be positive')
+    throw Errors.invalidConfigPressure('pressure recoveryCooldownMs must be positive')
   }
 
   return {
@@ -641,8 +643,20 @@ function normalizePressureThresholds(
     criticalWatermark,
     recoverToElevatedWatermark,
     recoverToNormalWatermark,
-    recoveryCooldownMs: Math.floor(recoveryCooldownMs),
+    recoveryCooldownMs,
   }
+}
+
+function deriveRecoverToElevatedWatermark(
+  elevatedWatermark: number,
+  criticalWatermark: number,
+): number {
+  const preferred = Math.min(criticalWatermark - 0.01, elevatedWatermark + 0.05)
+  if (preferred > elevatedWatermark) {
+    return preferred
+  }
+
+  return elevatedWatermark + (criticalWatermark - elevatedWatermark) / 2
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

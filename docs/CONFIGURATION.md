@@ -75,6 +75,12 @@ Operational meaning:
 4. `recoverToNormalWatermark`: lower bound needed to leave `elevated`.
 5. `recoveryCooldownMs`: quiet period before pressure recovery is allowed.
 
+Runtime invariants:
+
+1. Thresholds must satisfy `0 < recoverToNormalWatermark < elevatedWatermark < recoverToElevatedWatermark < criticalWatermark <= 1`.
+2. `recoveryCooldownMs` must normalize to a positive integer millisecond value.
+3. Invalid combinations fail fast during `createTracehound()` initialization with a pressure config error.
+
 Safety rules remain fixed even when thresholds are customized:
 
 1. `quarantine.maxBytes`, `quarantine.maxCount`, and `maxPayloadSize` remain hard caps.

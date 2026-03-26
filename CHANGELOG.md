@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.9] - 2026-03-26 - OSS Pressure Containment and Operational Truth Alignment
+
+### Features
+
+- **RFC-0011 OSS pressure containment (`@tracehound/core`)**: Added deterministic pressure state transitions (`normal | elevated | critical`), bounded threshold configuration, runtime pressure observation, and critical-mode archive suppression for TTL decay paths. Pressure is now exposed as a first-class runtime signal via watcher snapshots, system snapshots, CLI surfaces, and notification events.
+
+### Fixed
+
+- **Pressure hysteresis and saturation correctness (`@tracehound/core`)**: Hardened Hound pressure recovery behavior so cooldown is honored, added count-based saturation tracking alongside byte capacity, and corrected default threshold normalization for high `elevatedWatermark` values and fractional cooldown inputs.
+- **Snapshot compatibility and health derivation (`@tracehound/core`, `@tracehound/cli`)**: Signed snapshots produced by older versions remain readable; missing pressure fields are normalized to a safe default state on read. System health derivation now keeps Hound pool exhaustion at `critical` precedence even when pressure mode is only `elevated`.
+- **Operator pressure visibility (`@tracehound/cli`)**: Human-readable `status` output now includes archive-failure pressure telemetry, aligning terminal output with the existing JSON snapshot surface.
+
+### Documentation
+
+- **RFC and docs alignment**: Updated RFC-0000 Hound/IPC wording to match the shipped child-process + framed stdio implementation, marked implemented RFCs consistently, and completed RFC-0011 OSS-scope implementation notes.
+- **Configuration and API docs**: Added pressure configuration guidance, enforced threshold-ordering invariants, trace-id signaling/inspect workflow updates, and refreshed API/config references to match the current runtime.
+
+### Operational Impact
+
+- No breaking public API changes.
+- Existing deployments can adopt pressure thresholds incrementally; hard caps and fail-open semantics remain unchanged.
+- Legacy signed snapshots remain valid after upgrade, avoiding CLI/runtime split-brain during rolling updates.
+
+---
+
 ## [1.8.8] - 2026-03-25 - Adapter Security Hardening and Zero-Dependency Core
 
 ### Security

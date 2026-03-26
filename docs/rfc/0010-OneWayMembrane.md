@@ -31,11 +31,11 @@ Problems addressed:
 2. Raw bytes are never returned by runtime intercept APIs.
 3. Forensic retrieval is a separate capability path and not part of request lifecycle.
 
-### Trace ID Signaling (Design-Only in This Sprint)
+### Trace ID Signaling
 
-Proposed response metadata behavior:
+Implemented response metadata behavior:
 
-1. Adapters may emit `x-tracehound-trace-id` for quarantined outcomes.
+1. Adapters emit `x-tracehound-trace-id` for quarantined outcomes when `emitTraceIdHeader` is enabled.
 2. Header value is a non-payload identifier and must not encode raw payload bytes.
 3. Header emission is configuration-gated for privacy-sensitive environments.
 4. Status code mapping remains unchanged (`403`, `429`, `413`, `500` fail-open handling).
@@ -63,8 +63,8 @@ Proposed response metadata behavior:
 
 ## Backward Compatibility
 
-1. No runtime behavior change is shipped in this governance sprint.
-2. Future adapter additions (`x-tracehound-trace-id`) are additive and configuration-gated.
+1. This RFC codifies already-shipped membrane and trace-id behavior.
+2. `x-tracehound-trace-id` is additive and configuration-gated.
 3. Existing status mapping remains normative and unchanged.
 4. Integrations relying on payload visibility in runtime path are explicitly unsupported by design.
 

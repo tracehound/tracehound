@@ -1,8 +1,8 @@
 # Documentation Index
 
-> **Last Updated:** 2026-03-10
+> **Last Updated:** 2026-03-26
 > **Version:** v1.8.2
-> **Model:** Open-Core (Substrate: OSS, Satellites: Commercial)
+> **Model:** Open-Source
 
 ---
 
@@ -34,7 +34,7 @@
 
 ## RFCs (Request for Comments)
 
-`docs/rfc/` contains only the normative RFC set.
+`docs/rfc/` contains authoritative RFC set.
 
 | RFC | Status | Topic |
 | --- | --- | --- |

@@ -205,7 +205,7 @@ Content-based, collision-resistant signature generation.
 
 ```ts
 // Signature = category + content hash
-// Different payload = different signature (collision impossible)
+// Different payload should produce a different signature (collision-resistant; collisions are computationally infeasible)
 function generateSignature(threat: Threat): string {
   const contentHash = sha256(serialize(threat.scent.payload))
   return `${threat.category}:${contentHash}`

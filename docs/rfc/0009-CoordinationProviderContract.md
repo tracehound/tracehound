@@ -85,7 +85,7 @@ export interface CoordinationProvider {
 
 ## Backward Compatibility
 
-1. No runtime breaking changes are introduced in this draft phase.
+1. No runtime breaking changes are introduced in this phase.
 2. Integration is opt-in; existing deployments remain local-only by default.
 3. No changes to current adapter response status mapping.
 4. Migration path for future implementation: add provider config with default `disabled`.

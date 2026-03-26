@@ -145,18 +145,20 @@ Acceptance checks:
 
 ## Alternatives Considered
 
-1. Runtime daemon IPC channel (named pipe/UDS) for CLI
-
+- Runtime daemon IPC channel (named pipe/UDS) for CLI
 - Rejected for patch wave due complexity and rollout risk.
 
-1. Inline fast-check decision path in Agent
+---
 
+- Inline fast-check decision path in Agent
 - Rejected due RFC-0000 decision-free invariant.
 
-1. Per-instance random snapshot secret default
+---
 
+- Per-instance random snapshot secret default
 - Rejected because multi-process operational tooling needs deterministic verification source.
 
-1. Claiming strict Windows ACL enforcement in Node-only path
+---
 
+- Claiming strict Windows ACL enforcement in Node-only path
 - Rejected; only best-effort is possible without host-level controls.

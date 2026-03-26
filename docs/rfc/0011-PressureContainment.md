@@ -8,7 +8,7 @@
 | Status         | Draft                  |
 | Author         | Tracehound Engineering |
 | Created        | 2026-03-03             |
-| Updated        | 2026-03-03             |
+| Updated        | 2026-03-26             |
 | Depends on     | RFC-0000, RFC-0010     |
 | Supersedes     | None                   |
 | Implemented in | TBD                    |
@@ -29,7 +29,7 @@ Open implementation gaps:
 1. No first-class `PressureMode` / `PressureState` runtime type currently exists in core public APIs.
 2. No deterministic threshold engine currently transitions the system between `normal`, `elevated`, and `critical`.
 3. Archive suppression is not yet driven by pressure mode; archival behavior is currently configuration-driven, not pressure-state-driven.
-4. Pressure state is not exported through `SystemSnapshot`, CLI status surfaces, or watcher snapshots as a dedicated structure.
+4. Pressure state is not exported through `SystemSnapshot`, CLI status surfaces, or watcher snapshots as a first-class `PressureState` structure; current snapshot surfaces expose watcher overload state only.
 5. Recovery rules from sustained `critical` pressure back to `normal` are implicit and fragmented, not defined as one canonical state machine.
 6. RFC metadata still lists `Implemented in: TBD` because the design is not yet fully closed.
 

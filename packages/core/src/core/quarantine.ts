@@ -57,6 +57,7 @@ export interface DecayResult {
 export interface QuarantineDependencies {
   coldStorage?: IColdStorageAdapter
   now?: () => number
+  isArchiveSuppressed?: () => boolean
 }
 
 /** Severity ranking for eviction priority */
@@ -95,6 +96,7 @@ export class Quarantine {
   private nextExpiryAt: number | null = null
   private readonly coldStorage: IColdStorageAdapter | undefined
   private readonly now: () => number
+  private readonly isArchiveSuppressed: () => boolean
 
   constructor(
     private config: QuarantineConfig,
@@ -103,6 +105,7 @@ export class Quarantine {
   ) {
     this.coldStorage = dependencies.coldStorage
     this.now = dependencies.now ?? Date.now
+    this.isArchiveSuppressed = dependencies.isArchiveSuppressed ?? (() => false)
   }
 
   /**
@@ -361,6 +364,14 @@ export class Quarantine {
   }
 
   /**
+   * Get the configured maximum count limit.
+   * Used by pressure containment to model count saturation deterministically.
+   */
+  get maxCount(): number {
+    return this.config.maxCount
+  }
+
+  /**
    * Select evidence for eviction based on priority.
    * Lowest severity first, then oldest, then signature for deterministic ties.
    */
@@ -576,11 +587,14 @@ export class Quarantine {
 
     try {
       const archiveAttempted = this.config.archiveOnDecay !== false
+      const archiveSuppressed = archiveAttempted && this.isArchiveSuppressed()
       let archived = false
       let storageId: string | undefined
       let storageError: string | undefined
 
-      if (archiveAttempted) {
+      if (archiveSuppressed) {
+        storageError = 'archive suppressed by pressure'
+      } else if (archiveAttempted) {
         try {
           const archiveBytes = new Uint8Array(evidence.bytes)
           const archiveResult = await this.archiveEvidence(signature, archiveBytes)
@@ -597,7 +611,9 @@ export class Quarantine {
       const current = this.store.get(signature)
       const stillOwned = current === evidence
 
-      if (archiveAttempted && !archived && this.config.archiveFailureMode === 'retain') {
+      const archiveFailed = archiveAttempted && !archiveSuppressed && !archived
+
+      if (archiveFailed && this.config.archiveFailureMode === 'retain') {
         if (stillOwned && !evidence.disposed) {
           // Re-track expiry so the entry is retried on the next decay cycle.
           this.trackExpiry(evidence)
@@ -654,14 +670,14 @@ export class Quarantine {
 
       if (archived) {
         this.archivedCount++
-      } else if (archiveAttempted) {
+      } else if (archiveFailed) {
         this.archiveFailureCount++
       }
 
       return {
         decayedCount: 1,
         archivedCount: archived ? 1 : 0,
-        archiveFailureCount: archiveAttempted && !archived ? 1 : 0,
+        archiveFailureCount: archiveFailed ? 1 : 0,
         retainedCount: 0,
       }
     } finally {

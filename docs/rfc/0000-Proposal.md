@@ -20,13 +20,13 @@ Tracehound is a runtime-independent, deterministic **security buffer** inspired 
 
 ## Core Principles
 
-| Principle | Description |
-| --- | --- |
-| **Decision-free** | Makes no policy, retry, or backoff decisions |
-| **Zero-tolerance** | Every threat is isolated, with no exceptions |
-| **Deterministic** | GC-independent with explicit lifecycle control |
-| **Ownership-based** | Memory is managed through explicit disposal |
-| **Sync hot-path** | All critical operations stay synchronous |
+| Principle            | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| **Decision-free**    | Makes no policy, retry, or backoff decisions   |
+| **Zero-tolerance**   | Every threat is isolated, with no exceptions   |
+| **Deterministic**    | GC-independent with explicit lifecycle control |
+| **Ownership-based**  | Memory is managed through explicit disposal    |
+| **Sync hot-path**    | All critical operations stay synchronous       |
 | **Defense-in-depth** | Each layer provides its own security guarantee |
 
 ---
@@ -35,55 +35,55 @@ Tracehound is a runtime-independent, deterministic **security buffer** inspired 
 
 ```md
 ┌─────────────────────────────────────────────────────────────────┐
-│                         WATCHER                                 │
-│  ─────────────────────────────────────────                      │
-│  Pull-based system monitor                                      │
-│  Gateway traffic, API responses, system events                  │
-│                                                                 │
-│                    suspicious activity                          │
-│                           │                                     │
-│                           ▼                                     │
+│ WATCHER │
+│ ───────────────────────────────────────── │
+│ Pull-based system monitor │
+│ Gateway traffic, API responses, system events │
+│ │
+│ suspicious activity │
+│ │ │
+│ ▼ │
 ├─────────────────────────────────────────────────────────────────┤
-│                      RATE LIMITER                               │
-│  ─────────────────────────────────────────                      │
-│  Per-source request limiting                                    │
-│  Early rejection before AGENT                                  │
-│                                                                 │
-│                    within limits                                │
-│                           │                                     │
-│                           ▼                                     │
+│ RATE LIMITER │
+│ ───────────────────────────────────────── │
+│ Per-source request limiting │
+│ Early rejection before AGENT │
+│ │
+│ within limits │
+│ │ │
+│ ▼ │
 ├─────────────────────────────────────────────────────────────────┤
-│                         AGENT                                   │
-│  ─────────────────────────────────────────                      │
-│  intercept(request) → InterceptResult                           │
-│  Sync, zero-allocation hot-path                                 │
-│  Content-based signature (collision-resistant)                  │
-│                                                                 │
-│                    threat detected                              │
-│                           │                                     │
-│                           ▼                                     │
+│ AGENT │
+│ ───────────────────────────────────────── │
+│ intercept(request) → InterceptResult │
+│ Sync, zero-allocation hot-path │
+│ Content-based signature (collision-resistant) │
+│ │
+│ threat detected │
+│ │ │
+│ ▼ │
 ├─────────────────────────────────────────────────────────────────┤
-│                      QUARANTINE                                 │
-│  ─────────────────────────────────────────                      │
-│  Map<ThreatSignature, EvidenceHandle>                           │
-│  Ownership model: atomic neutralize                             │
-│  Priority-based eviction                                        │
-│  gzip + binary encoded evidence                                 │
-│                                                                 │
-│       neutralize() → atomic(snapshot + destroy)                 │
-│       evacuate()   → gzip + log → safe-zone                     │
-│                                                                 │
-│                    threshold exceeded                           │
-│                           │                                     │
-│                           ▼                                     │
+│ QUARANTINE │
+│ ───────────────────────────────────────── │
+│ Map<ThreatSignature, EvidenceHandle> │
+│ Ownership model: atomic neutralize │
+│ Priority-based eviction │
+│ gzip + binary encoded evidence │
+│ │
+│ neutralize() → atomic(snapshot + destroy) │
+│ evacuate() → gzip + log → safe-zone │
+│ │
+│ threshold exceeded │
+│ │ │
+│ ▼ │
 ├─────────────────────────────────────────────────────────────────┤
-│                    HOUND POOL                                   │
-│  ─────────────────────────────────────────                      │
-│  Pre-spawned sandboxed processes                                │
-│  Read-only return channel                                       │
-│  Timeout + force-terminate                                      │
-│  Jittered rotation cycle                                        │
-│                                                                 │
+│ HOUND POOL │
+│ ───────────────────────────────────────── │
+│ Pre-spawned sandboxed processes │
+│ Read-only return channel │
+│ Timeout + force-terminate │
+│ Jittered rotation cycle │
+│ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -387,13 +387,13 @@ function evict(handle: EvidenceHandle): void {
 
 Hound MUST execute in a **separate OS process**.
 
-| Guarantee                 | Description                                          |
-| ------------------------- | ---------------------------------------------------- |
-| Independent crash domain  | Hound crash does not affect Core                     |
-| OS-level memory isolation | No shared memory with Core                           |
+| Guarantee                 | Description                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------- |
+| Independent crash domain  | Hound crash does not affect Core                                                |
+| OS-level memory isolation | No shared memory with Core                                                      |
 | Process constraints       | Memory limit enforced where available; other denies are declarative/best-effort |
-| Bounded pool              | No unbounded spawn                                   |
-| Binary IPC                | Length-prefixed protocol over stdio                  |
+| Bounded pool              | No unbounded spawn                                                              |
+| Binary IPC                | Length-prefixed protocol over stdio                                             |
 
 ### v2+ (Optional)
 
@@ -439,9 +439,9 @@ Hound processes MUST be managed by a **bounded pool of process slots**.
 
 ```md
 HoundPool
- ├─ process slots: N
- ├─ active: ≤ poolSize
- └─ overflow handling: drop | escalate | defer
+├─ process slots: N
+├─ active: ≤ poolSize
+└─ overflow handling: drop | escalate | defer
 ```
 
 **Rules:**
@@ -762,18 +762,18 @@ interface TracehoundConfig {
 
 ## Security Checklist
 
-| Threat                  | Mitigation                   | Status |
-| ----------------------- | ---------------------------- | ------ |
-| Evidence tampering      | Atomic neutralize            | ✅     |
-| Signature collision     | Content-based hash           | ✅     |
-| Process escape          | OS isolation + read-only IPC | ✅     |
-| Pool exhaustion DoS     | Rate limiting + timeout      | ✅     |
-| Memory exhaustion       | Priority eviction + alerts   | ✅     |
-| ID predictability       | crypto.randomUUID + random suffix | ✅ |
-| Scheduler timing attack | Jittered rotation            | ✅     |
-| Payload overflow        | maxPayloadSize               | ✅     |
-| Alert fatigue           | Rate-limited alerts          | ✅     |
-| Audit trail tampering   | Cryptographic hash chain     | ✅     |
+| Threat                  | Mitigation                        | Status |
+| ----------------------- | --------------------------------- | ------ |
+| Evidence tampering      | Atomic neutralize                 | ✅     |
+| Signature collision     | Content-based hash                | ✅     |
+| Process escape          | OS isolation + read-only IPC      | ✅     |
+| Pool exhaustion DoS     | Rate limiting + timeout           | ✅     |
+| Memory exhaustion       | Priority eviction + alerts        | ✅     |
+| ID predictability       | crypto.randomUUID + random suffix | ✅     |
+| Scheduler timing attack | Jittered rotation                 | ✅     |
+| Payload overflow        | maxPayloadSize                    | ✅     |
+| Alert fatigue           | Rate-limited alerts               | ✅     |
+| Audit trail tampering   | Cryptographic hash chain          | ✅     |
 
 ---
 

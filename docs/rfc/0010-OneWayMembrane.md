@@ -2,15 +2,15 @@
 
 ## Title and Metadata
 
-| Field          | Value                  |
-| -------------- | ---------------------- |
-| RFC            | 0010                   |
-| Status         | Implemented            |
-| Author         | Tracehound Engineering |
-| Created        | 2026-03-03             |
-| Updated        | 2026-03-26             |
-| Depends on     | RFC-0000, RFC-0009     |
-| Supersedes     | None                   |
+| Field          | Value                                                                                                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RFC            | 0010                                                                                                                                                                                                                          |
+| Status         | Implemented                                                                                                                                                                                                                   |
+| Author         | Tracehound Engineering                                                                                                                                                                                                        |
+| Created        | 2026-03-03                                                                                                                                                                                                                    |
+| Updated        | 2026-03-26                                                                                                                                                                                                                    |
+| Depends on     | RFC-0000, RFC-0009                                                                                                                                                                                                            |
+| Supersedes     | None                                                                                                                                                                                                                          |
 | Implemented in | `packages/core/src/core/agent.ts`, `packages/core/src/types/result.ts`, `packages/core/src/utils/trace-registry.ts`, `packages/express/src/index.ts`, `packages/fastify/src/index.ts`, `packages/cli/src/commands/inspect.ts` |
 
 ## Motivation

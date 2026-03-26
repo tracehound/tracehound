@@ -30,6 +30,11 @@ import {
   formatHoundTimeoutReason,
   SYSTEM_PANIC_REASONS,
 } from './operational-events.js'
+import {
+  PressureController,
+  type PressureThresholds,
+  type PressureTransition,
+} from './pressure-controller.js'
 import { Quarantine } from './quarantine.js'
 import { createRateLimiter, type IRateLimiter } from './rate-limiter.js'
 import { createScheduler, type IScheduler } from './scheduler.js'
@@ -91,6 +96,17 @@ export interface TracehoundOptions {
    * Hound pool configuration.
    */
   houndPool?: Partial<HoundPoolConfig>
+
+  /**
+   * Pressure containment configuration.
+   */
+  pressure?: {
+    elevatedWatermark?: number
+    criticalWatermark?: number
+    recoverToElevatedWatermark?: number
+    recoverToNormalWatermark?: number
+    recoveryCooldownMs?: number
+  }
 
   /**
    * System snapshot export configuration.
@@ -180,18 +196,25 @@ class Tracehound implements ITracehound {
   readonly coldStorage: IColdStorageAdapter | null
 
   private readonly evidenceFactory: IEvidenceFactory
+  private readonly pressureController: PressureController
   private readonly scheduler: IScheduler | null
   private readonly snapshotPath: string | null
   private readonly snapshotSecret: string | null
   private readonly snapshotIntervalMs: number | null
+  private houndOverloaded = false
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null
 
   constructor(options: TracehoundOptions = {}) {
     const runtimeNow = options.runtime?.now ?? (() => Date.now())
+    const pressureThresholds = normalizePressureThresholds(
+      options.pressure,
+      options.watcher?.quarantineHighWatermark,
+    )
 
     // Initialize components
     this.auditChain = new AuditChain()
     this.notifications = createNotificationEmitter()
+    this.pressureController = new PressureController(pressureThresholds, runtimeNow)
     const shouldProvisionDefaultColdStorage =
       typeof options.quarantine?.ttlMs === 'number' &&
       options.quarantine.ttlMs > 0 &&
@@ -204,6 +227,8 @@ class Tracehound implements ITracehound {
         ? {}
         : {
             coldStorage: this.coldStorage,
+            isArchiveSuppressed: (): boolean =>
+              this.pressureController.snapshot().archiveSuppressed,
           }
 
     this.quarantine = new Quarantine(
@@ -237,6 +262,7 @@ class Tracehound implements ITracehound {
       quarantineHighWatermark: options.watcher?.quarantineHighWatermark ?? 0.8,
       _now: runtimeNow,
     })
+    this.applyPressureState(null)
 
     this.evidenceFactory = new EvidenceFactory()
     this.scheduler = this.createQuarantineDecayScheduler(options.quarantine, runtimeNow)
@@ -259,12 +285,16 @@ class Tracehound implements ITracehound {
       this.houndPool,
       this.watcher,
       this.notifications,
+      (count, bytes, maxBytes) => {
+        this.syncPressureFromQuarantine(count, bytes, maxBytes)
+      },
     )
 
     // Wire HoundPool results back into Watcher and NotificationEmitter.
     // timeout/error outcomes are security-relevant events that SecOps must see.
     this.houndPool.onResult((result) => {
       this.syncOverloadState(result)
+      this.syncPressureFromHoundResult(result)
 
       if (result.status === 'timeout') {
         this.watcher.alert({
@@ -382,10 +412,57 @@ class Tracehound implements ITracehound {
     }
   }
 
+  private syncPressureFromQuarantine(count: number, bytes: number, maxBytes: number): void {
+    this.watcher.updateQuarantine(count, bytes, maxBytes)
+    const transition = this.pressureController.observeQuarantine(
+      this.quarantine.stats,
+      maxBytes,
+      this.quarantine.maxCount,
+    )
+    this.applyPressureState(transition)
+  }
+
+  private syncPressureFromHoundResult(result: HoundResult): void {
+    const transition = this.pressureController.observeHoundResult(
+      result,
+      this.quarantine.stats,
+      this.quarantine.maxBytes,
+      this.quarantine.maxCount,
+    )
+    this.applyPressureState(transition)
+  }
+
+  private applyPressureState(transition: PressureTransition | null): void {
+    const pressure = this.pressureController.snapshot()
+    this.watcher.setPressure(pressure)
+    this.reconcileOverloadState()
+
+    if (!transition) {
+      return
+    }
+
+    this.notifications.emit('pressure.transition', {
+      previousMode: transition.previous.mode,
+      currentMode: transition.current.mode,
+      reason: transition.reason,
+      archiveSuppressed: transition.current.archiveSuppressed,
+      pressure: transition.current,
+    })
+
+    if (transition.previous.archiveSuppressed !== transition.current.archiveSuppressed) {
+      this.notifications.emit('pressure.archive_suppressed', {
+        mode: transition.current.mode,
+        suppressed: transition.current.archiveSuppressed,
+        reason: transition.reason,
+        pressure: transition.current,
+      })
+    }
+  }
+
   private syncOverloadState(result: HoundResult): void {
-    const overloadSignal = this.isOverloadSignal(result)
-    if (overloadSignal) {
-      this.watcher.setOverloaded(true)
+    if (this.isOverloadSignal(result)) {
+      this.houndOverloaded = true
+      this.reconcileOverloadState()
     }
 
     if (!this.shouldEvaluateOverloadRecovery(result)) {
@@ -397,9 +474,17 @@ class Tracehound implements ITracehound {
     queueMicrotask(() => {
       const stats = this.houndPool.stats
       const hasHeadroom = stats.totalProcesses === 0 || stats.activeProcesses < stats.totalProcesses
-      if (hasHeadroom) {
-        this.watcher.setOverloaded(false)
+      if (!hasHeadroom) {
+        return
       }
+
+      this.houndOverloaded = false
+      const transition = this.pressureController.observeHoundRecovery(
+        this.quarantine.stats,
+        this.quarantine.maxBytes,
+        this.quarantine.maxCount,
+      )
+      this.applyPressureState(transition)
     })
   }
 
@@ -435,6 +520,11 @@ class Tracehound implements ITracehound {
     return isHoundPressureError(result.error)
   }
 
+  private reconcileOverloadState(): void {
+    const pressure = this.pressureController.snapshot()
+    this.watcher.setOverloaded(this.houndOverloaded || pressure.signals.overloaded)
+  }
+
   private createQuarantineDecayScheduler(
     quarantineOptions: TracehoundOptions['quarantine'],
     now: () => number,
@@ -463,6 +553,11 @@ class Tracehound implements ITracehound {
       priority: 10,
       execute: async (): Promise<void> => {
         await this.quarantine.decayExpired()
+        this.syncPressureFromQuarantine(
+          this.quarantine.stats.count,
+          this.quarantine.stats.bytes,
+          this.quarantine.maxBytes,
+        )
       },
     })
     scheduler.start()
@@ -493,6 +588,75 @@ function normalizeSnapshotInterval(intervalMs: number | undefined): number {
   }
 
   return Math.floor(intervalMs)
+}
+
+function normalizePressureThresholds(
+  pressure: TracehoundOptions['pressure'],
+  fallbackElevatedWatermark: number | undefined,
+): PressureThresholds {
+  const elevatedWatermark = pressure?.elevatedWatermark ?? fallbackElevatedWatermark ?? 0.8
+  const defaultCriticalWatermark = 0.95
+  const criticalWatermark =
+    pressure?.criticalWatermark ??
+    (defaultCriticalWatermark > elevatedWatermark
+      ? defaultCriticalWatermark
+      : Math.min(1, elevatedWatermark + 0.01))
+  const recoverToElevatedWatermark =
+    pressure?.recoverToElevatedWatermark ??
+    deriveRecoverToElevatedWatermark(elevatedWatermark, criticalWatermark)
+  const recoverToNormalWatermark =
+    pressure?.recoverToNormalWatermark ?? Math.max(0.01, elevatedWatermark - 0.1)
+  const rawRecoveryCooldownMs = pressure?.recoveryCooldownMs ?? 5_000
+
+  if (
+    !Number.isFinite(elevatedWatermark) ||
+    !Number.isFinite(criticalWatermark) ||
+    !Number.isFinite(recoverToElevatedWatermark) ||
+    !Number.isFinite(recoverToNormalWatermark) ||
+    !Number.isFinite(rawRecoveryCooldownMs)
+  ) {
+    throw Errors.invalidConfigPressure('pressure thresholds must be finite numbers')
+  }
+
+  const recoveryCooldownMs = Math.floor(rawRecoveryCooldownMs)
+
+  if (
+    !(
+      recoverToNormalWatermark > 0 &&
+      recoverToNormalWatermark < elevatedWatermark &&
+      elevatedWatermark < recoverToElevatedWatermark &&
+      recoverToElevatedWatermark < criticalWatermark &&
+      criticalWatermark <= 1
+    )
+  ) {
+    throw Errors.invalidConfigPressure(
+      'pressure thresholds must satisfy 0 < recoverToNormal < elevated < recoverToElevated < critical <= 1',
+    )
+  }
+
+  if (recoveryCooldownMs <= 0) {
+    throw Errors.invalidConfigPressure('pressure recoveryCooldownMs must be positive')
+  }
+
+  return {
+    elevatedWatermark,
+    criticalWatermark,
+    recoverToElevatedWatermark,
+    recoverToNormalWatermark,
+    recoveryCooldownMs,
+  }
+}
+
+function deriveRecoverToElevatedWatermark(
+  elevatedWatermark: number,
+  criticalWatermark: number,
+): number {
+  const preferred = Math.min(criticalWatermark - 0.01, elevatedWatermark + 0.05)
+  if (preferred > elevatedWatermark) {
+    return preferred
+  }
+
+  return elevatedWatermark + (criticalWatermark - elevatedWatermark) / 2
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

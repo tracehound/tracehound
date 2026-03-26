@@ -23,6 +23,20 @@ type ConsoleLogSpy = ReturnType<typeof vi.spyOn>
 
 function createFixtureSnapshot(): SystemSnapshot {
   const now = Date.now()
+  const pressure = {
+    mode: 'normal' as const,
+    archiveSuppressed: false,
+    updatedAt: now,
+    signals: {
+      quarantineBytes: 4096,
+      quarantineCount: 4,
+      quarantineCapacityPercent: 50,
+      droppedEvents: 1,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+      overloaded: false,
+    },
+  }
 
   return {
     generatedAt: now,
@@ -78,6 +92,7 @@ function createFixtureSnapshot(): SystemSnapshot {
       alertsInWindow: 1,
       lastAlert: null,
       overloaded: false,
+      pressure,
       snapshotTime: now,
       quarantine: {
         count: 4,
@@ -85,6 +100,7 @@ function createFixtureSnapshot(): SystemSnapshot {
         capacityPercent: 50,
       },
     },
+    pressure,
     houndPool: {
       activeProcesses: 1,
       totalProcesses: 2,
@@ -280,6 +296,7 @@ describe('CLI Commands', () => {
       expect(logSpy).toHaveBeenCalled()
       const output = readLogOutput(logSpy)
       expect(output).toContain('TRACEHOUND STATUS')
+      expect(output).toContain('Archive Failures')
     })
 
     it('status command action should print JSON', () => {
@@ -619,6 +636,14 @@ describe('CLI Commands', () => {
             version: 'test',
             uptime: '1m',
             health: snapshot.snapshot.systemHealth,
+          },
+          pressure: {
+            mode: snapshot.snapshot.pressure.mode,
+            archiveSuppressed: snapshot.snapshot.pressure.archiveSuppressed,
+            capacityPercent: snapshot.snapshot.pressure.signals.quarantineCapacityPercent,
+            droppedEvents: snapshot.snapshot.pressure.signals.droppedEvents,
+            archiveFailureCount: snapshot.snapshot.pressure.signals.archiveFailureCount,
+            houndPressureEvents: snapshot.snapshot.pressure.signals.houndPressureEvents,
           },
           quarantine: {
             count: snapshot.snapshot.quarantine.count,

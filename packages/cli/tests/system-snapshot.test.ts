@@ -9,6 +9,21 @@ import { loadSystemSnapshot } from '../src/lib/system-snapshot.js'
 const SNAPSHOT_SECRET = 'tracehound-cli-test-snapshot-secret'
 
 function createFixtureSnapshot(generatedAt: number): SystemSnapshot {
+  const pressure = {
+    mode: 'normal' as const,
+    archiveSuppressed: false,
+    updatedAt: generatedAt,
+    signals: {
+      quarantineBytes: 4096,
+      quarantineCount: 4,
+      quarantineCapacityPercent: 50,
+      droppedEvents: 1,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+      overloaded: false,
+    },
+  }
+
   return {
     generatedAt,
     systemHealth: 'degraded',
@@ -63,6 +78,7 @@ function createFixtureSnapshot(generatedAt: number): SystemSnapshot {
       alertsInWindow: 1,
       lastAlert: null,
       overloaded: false,
+      pressure,
       snapshotTime: generatedAt,
       quarantine: {
         count: 4,
@@ -70,6 +86,7 @@ function createFixtureSnapshot(generatedAt: number): SystemSnapshot {
         capacityPercent: 50,
       },
     },
+    pressure,
     houndPool: {
       activeProcesses: 1,
       totalProcesses: 2,
@@ -457,5 +474,39 @@ describe('system snapshot freshness', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('INTEGRITY_VIOLATION')
+  })
+
+  it('should load legacy signed snapshot when pressure fields are absent', () => {
+    const now = new Date('2026-03-05T10:00:00.000Z')
+    vi.setSystemTime(now)
+    const modern = createFixtureSnapshot(now.getTime())
+    const legacyPayload = {
+      ...modern,
+      watcher: {
+        ...modern.watcher,
+      },
+    } as Record<string, unknown>
+
+    delete legacyPayload.pressure
+    delete (legacyPayload.watcher as Record<string, unknown>).pressure
+
+    const payloadText = JSON.stringify(legacyPayload)
+    const signature = createHmac('sha256', SNAPSHOT_SECRET).update(payloadText).digest('hex')
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: legacyPayload,
+        signature,
+      }),
+      'utf8',
+    )
+
+    const result = loadSystemSnapshot()
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.pressure.mode).toBe('normal')
+    expect(result.snapshot.watcher.pressure.mode).toBe('normal')
   })
 })

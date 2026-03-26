@@ -2,36 +2,35 @@
 
 ## Title and Metadata
 
-| Field          | Value                  |
-| -------------- | ---------------------- |
-| RFC            | 0011                   |
-| Status         | Draft                  |
-| Author         | Tracehound Engineering |
-| Created        | 2026-03-03             |
-| Updated        | 2026-03-26             |
-| Depends on     | RFC-0000, RFC-0010     |
-| Supersedes     | None                   |
-| Implemented in | TBD                    |
+| Field          | Value                                                                                                                                                                                                                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RFC            | 0011                                                                                                                                                                                                                                                                                            |
+| Status         | Implemented                                                                                                                                                                                                                                                                                     |
+| Author         | Tracehound Engineering                                                                                                                                                                                                                                                                          |
+| Created        | 2026-03-03                                                                                                                                                                                                                                                                                      |
+| Updated        | 2026-03-26                                                                                                                                                                                                                                                                                      |
+| Depends on     | RFC-0000, RFC-0010                                                                                                                                                                                                                                                                              |
+| Supersedes     | None                                                                                                                                                                                                                                                                                            |
+| Implemented in | `packages/core/src/core/pressure-controller.ts`, `packages/core/src/core/tracehound.ts`, `packages/core/src/core/quarantine.ts`, `packages/core/src/core/watcher.ts`, `packages/core/src/utils/system-snapshot.ts`, `packages/cli/src/commands/status.ts`, `packages/cli/src/commands/watch.ts` |
 
 ## Implementation Status
 
-As of 2026-03-26, this RFC is only partially implemented.
+As of 2026-03-26, the OSS scope of this RFC is implemented.
 
-Implemented building blocks:
+Implemented OSS behaviors:
 
-1. Deterministic Drop and Count exists in Quarantine via bounded insert/drop behavior and observable `droppedCount` metrics.
-2. Memory-first cold storage buffering exists, and disk buffering remains explicit opt-in.
-3. Express and Fastify adapters return graceful `413 Payload Too Large` responses without destructive socket-reset behavior by default.
-4. Overload signaling exists through `Watcher.setOverloaded()` and is wired from HoundPool pressure/error outcomes.
+1. Core exports first-class `PressureMode` and `PressureState` types.
+2. A deterministic pressure controller transitions runtime state between `normal`, `elevated`, and `critical` using bounded quarantine stats, archive-failure signals, and Hound pressure outcomes.
+3. Pressure state is exposed through watcher snapshots, signed runtime snapshots, and CLI `status` / `watch` surfaces.
+4. TTL decay continues under pressure, while `critical` mode suppresses optional decay-time archival.
+5. Quarantine pressure accounts for both byte saturation and count saturation before hard-cap drops occur.
+6. Acute overload visibility remains separate from sticky pressure state, so recovery can clear transient overload while cooldown still preserves `critical` pressure truth.
 
-Open implementation gaps:
+Explicit OSS non-goals:
 
-1. No first-class `PressureMode` / `PressureState` runtime type currently exists in core public APIs.
-2. No deterministic threshold engine currently transitions the system between `normal`, `elevated`, and `critical`.
-3. Archive suppression is not yet driven by pressure mode; archival behavior is currently configuration-driven, not pressure-state-driven.
-4. Pressure state is not exported through `SystemSnapshot`, CLI status surfaces, or watcher snapshots as a first-class `PressureState` structure; current snapshot surfaces expose watcher overload state only.
-5. Recovery rules from sustained `critical` pressure back to `normal` are implicit and fragmented, not defined as one canonical state machine.
-6. RFC metadata still lists `Implemented in: TBD` because the design is not yet fully closed.
+1. No operator override API is exposed.
+2. No pressure policy hook or control-plane callback surface is exposed.
+3. AuditChain remains evidence-centric; pressure transitions are observable through snapshots and notifications, not separate audit records.
 
 ## Motivation
 
@@ -52,15 +51,37 @@ type PressureMode = 'normal' | 'elevated' | 'critical'
 
 interface PressureState {
   readonly mode: PressureMode
-  readonly quarantineBytes: number
-  readonly droppedEvents: number
+  readonly archiveSuppressed: boolean
   readonly updatedAt: number
+  readonly signals: {
+    quarantineBytes: number
+    quarantineCount: number
+    quarantineCapacityPercent: number
+    droppedEvents: number
+    archiveFailureCount: number
+    houndPressureEvents: number
+    overloaded: boolean
+  }
 }
+```
+
+OSS configuration surface:
+
+```ts
+createTracehound({
+  pressure: {
+    elevatedWatermark: 0.8,
+    criticalWatermark: 0.95,
+    recoverToElevatedWatermark: 0.85,
+    recoverToNormalWatermark: 0.7,
+    recoveryCooldownMs: 5_000,
+  },
+})
 ```
 
 ### Drop and Count Policy
 
-1. Under `critical` pressure, Tracehound stops optional archive forwarding.
+1. Under `critical` pressure, Tracehound stops optional decay-time archive forwarding.
 2. New events beyond bounded limits are dropped deterministically and counted.
 3. `droppedEvents` is monotonic and observable through metrics.
 4. No unbounded retry loops are allowed while in `critical` pressure mode.
@@ -70,6 +91,7 @@ interface PressureState {
 1. Default buffering model is in-memory ring buffer with hard byte and count limits.
 2. Disk-based write-ahead persistence is explicit opt-in only.
 3. On overflow, oldest low-priority entries are evicted first per deterministic rules.
+4. Pressure transitions are driven by the stronger of byte utilization and count utilization.
 
 ### Graceful Shielding
 
@@ -77,15 +99,23 @@ interface PressureState {
 2. Stream rejection paths should avoid aggressive socket reset semantics by default.
 3. If graceful handling fails, fallback path must preserve host survivability and fail-open semantics.
 
+### OSS Observation Surface
+
+1. `th.watcher.snapshot()` exposes first-class pressure state.
+2. `th.snapshot()` includes signed pressure state for CLI/runtime truth.
+3. `th.notifications` emits `pressure.transition` and `pressure.archive_suppressed`.
+4. OSS scope remains observation-oriented; no policy override or manual pressure control API is included.
+
 ## Security Considerations
 
 1. Trust boundary: upstream request input is untrusted and can be adversarially oversized.
 2. Attack vector: pressure-induced self-DoS by forcing expensive archive behavior.
-3. Mitigation: deterministic Drop and Count and bounded background work.
+3. Mitigation: deterministic Drop and Count, bounded background work, and critical-mode archival suppression.
 4. Attack vector: retry amplification from abrupt connection resets.
 5. Mitigation: graceful error signaling where possible and bounded handling paths.
 6. Fail-open behavior: Tracehound overload must not hard-crash host process.
 7. Data safety: counters and pressure telemetry remain metadata-only; no payload serialization.
+8. OSS scope intentionally excludes operator control hooks so pressure logic cannot be bypassed at runtime.
 
 ## Performance Impact
 
@@ -96,36 +126,31 @@ interface PressureState {
 
 ## Backward Compatibility
 
-1. No runtime behavior changes are applied in this governance sprint.
-2. Future pressure controls are expected to be additive behind configuration defaults.
+1. Pressure containment adds a new optional `pressure` config surface and new snapshot / notification fields.
+2. Safe defaults are provided when `pressure` config is omitted.
 3. Adapter status map remains unchanged.
-4. Existing deployments can remain on current behavior until pressure controls are explicitly enabled.
+4. Existing deployments gain additional observability and critical-mode archival suppression without introducing policy hooks or manual override APIs.
 
 ## Implementation Plan
 
 1. Introduce canonical `PressureMode` and `PressureState` types in core and expose them through public type exports.
-2. Add a bounded pressure controller that derives mode transitions from deterministic signals already present in the system:
-   quarantine byte pressure, quarantine drop counters, cold-storage degradation, and HoundPool pressure outcomes.
-3. Extend `Watcher` and `SystemSnapshot` to expose pressure state explicitly instead of relying only on the `overloaded` boolean.
+2. Add a bounded pressure controller that derives mode transitions from deterministic signals already present in the system.
+3. Extend `Watcher`, `SystemSnapshot`, and CLI surfaces to expose pressure state explicitly instead of relying only on the `overloaded` boolean.
 4. Gate optional archival forwarding on pressure mode so `critical` pressure suppresses non-essential archive work deterministically.
-5. Add integration tests for mode transitions, sustained pressure recovery, and cold-storage degradation while preserving fail-open host behavior.
-6. Update RFC metadata from `Draft` to `Implemented` only after the above state machine, observability surface, and tests exist together.
+5. Add integration tests for mode transitions, sustained pressure recovery, count saturation, and cold-storage suppression while preserving fail-open host behavior.
+6. Keep enterprise-oriented policy hooks, operator overrides, and operational audit expansion out of OSS scope.
 
 ## Test Plan
 
-1. Unit:
-2. Pressure mode transitions based on deterministic thresholds.
-3. Drop and Count counter monotonicity and overflow safety.
-4. Ring-buffer bound enforcement and eviction determinism.
-5. Integration:
-6. Core pressure mode with cold storage unavailable/degraded.
-7. Adapter behavior for oversized requests producing `413`.
-8. Scenario:
-9. Burst traffic + slow sink + TTL storm with bounded memory verification.
-10. Recovery path from `critical` to `normal` mode without host interruption.
-11. Security-negative:
-12. Resource exhaustion attempts with malformed and oversized Scent inputs.
-13. Retry amplification simulation under repeated oversized request floods.
+1. Unit: pressure mode transitions based on deterministic thresholds.
+2. Unit: Drop and Count counter monotonicity and overflow safety.
+3. Unit: count saturation raises pressure before hard-cap drop.
+4. Integration: core pressure mode with Hound pressure recovery cooldown.
+5. Integration: critical pressure suppresses decay-time archival without incrementing archive-failure counters.
+6. Integration: adapter behavior for oversized requests producing `413`.
+7. Scenario: burst traffic + slow sink + TTL storm with bounded memory verification.
+8. Security-negative: resource exhaustion attempts with malformed and oversized Scent inputs.
+9. Security-negative: retry amplification simulation under repeated oversized request floods.
 
 ## Alternatives Considered
 

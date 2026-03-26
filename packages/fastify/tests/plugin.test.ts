@@ -570,7 +570,10 @@ describe('tracehoundPlugin', () => {
       expect(scent.source.ip).toBe('unknown')
       // source.userAgent uses first value only — prevents comma-split confusion downstream
       expect(scent.source.userAgent).toBe('ua-a')
-      const headers = (scent.payload as Record<string, unknown>)['headers'] as Record<string, unknown>
+      const headers = (scent.payload as Record<string, unknown>)['headers'] as Record<
+        string,
+        unknown
+      >
       expect(headers['user-agent']).toBe('ua-a')
       // Forensic anomaly flag signals the non-standard duplicate header
       expect(headers['x-multiple-user-agents']).toBe('true')
@@ -620,7 +623,11 @@ describe('tracehoundPlugin', () => {
       const agent = createMockAgent({ status: 'clean' })
       const fastify = createMockFastify()
 
-      tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, maxPayloadSize: 100 }, () => {})
+      tracehoundPlugin(
+        fastify as unknown as FastifyInstance,
+        { agent, maxPayloadSize: 100 },
+        () => {},
+      )
 
       const req = createMockReq({
         body: { data: 'some content' },
@@ -644,7 +651,11 @@ describe('tracehoundPlugin', () => {
       const agent = createMockAgent({ status: 'clean' })
       const fastify = createMockFastify()
 
-      tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, maxPayloadSize: 1000 }, () => {})
+      tracehoundPlugin(
+        fastify as unknown as FastifyInstance,
+        { agent, maxPayloadSize: 1000 },
+        () => {},
+      )
 
       const req = createMockReq({
         body: { data: 'small' },

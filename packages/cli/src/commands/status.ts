@@ -26,6 +26,14 @@ export const statusCommand = new Command('status')
 interface SystemStatus {
   uptime: number
   health: CliSystemSnapshot['systemHealth']
+  pressure: {
+    mode: CliSystemSnapshot['pressure']['mode']
+    archiveSuppressed: boolean
+    capacityPercent: number
+    droppedEvents: number
+    archiveFailureCount: number
+    houndPressureEvents: number
+  }
   quarantine: {
     count: number
     bytes: number
@@ -48,6 +56,14 @@ function getSystemStatus(snapshot: CliSystemSnapshot): SystemStatus {
   return {
     uptime: Math.floor(snapshot.watcher.uptimeMs / 1000),
     health: snapshot.systemHealth,
+    pressure: {
+      mode: snapshot.pressure.mode,
+      archiveSuppressed: snapshot.pressure.archiveSuppressed,
+      capacityPercent: snapshot.pressure.signals.quarantineCapacityPercent,
+      droppedEvents: snapshot.pressure.signals.droppedEvents,
+      archiveFailureCount: snapshot.pressure.signals.archiveFailureCount,
+      houndPressureEvents: snapshot.pressure.signals.houndPressureEvents,
+    },
     quarantine: {
       count: snapshot.quarantine.count,
       bytes: snapshot.quarantine.bytes,
@@ -110,6 +126,21 @@ function printStatus(snapshotResult: CliSnapshotLoadResult): void {
     ],
   )
   console.log(quarantineTable.toString())
+  console.log()
+
+  const pressureTable = new Table({
+    head: ['PRESSURE', 'Value'],
+    style: { head: ['red'], border: ['gray'] },
+  })
+  pressureTable.push(
+    ['Mode', status.pressure.mode],
+    ['Archive', status.pressure.archiveSuppressed ? 'suppressed' : 'active'],
+    ['Capacity', `${status.pressure.capacityPercent.toFixed(1)}%`],
+    ['Drops', String(status.pressure.droppedEvents)],
+    ['Archive Failures', String(status.pressure.archiveFailureCount)],
+    ['Hound Pressure', String(status.pressure.houndPressureEvents)],
+  )
+  console.log(pressureTable.toString())
   console.log()
 
   // Rate Limit Table

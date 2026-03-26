@@ -6,6 +6,12 @@ export type { AuditRecord, IAuditChain } from './audit.js'
 export type { AuditLifecycleRecord } from './audit.js'
 export type { JsonPrimitive, JsonSerializable, Severity } from './common.js'
 export type {
+  PressureMode,
+  PressureSignals,
+  PressureState,
+  PressureTransitionReason,
+} from './pressure.js'
+export type {
   CoordinationFeature,
   CoordinationHealth,
   CoordinationMode,

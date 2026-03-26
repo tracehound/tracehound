@@ -15,6 +15,7 @@ import {
 import type { SystemPanicPayload } from '../src/core/notification-emitter.js'
 import { formatHoundErrorReason, SYSTEM_PANIC_REASONS } from '../src/core/operational-events.js'
 import { createTracehound } from '../src/core/tracehound.js'
+import type { TracehoundError } from '../src/types/errors.js'
 import { readSystemSnapshotFromDisk, SYSTEM_SNAPSHOT_ENV } from '../src/utils/system-snapshot.js'
 
 async function flushMicrotasks(): Promise<void> {
@@ -117,6 +118,82 @@ describe('Tracehound Factory', () => {
       })
 
       expect(tracehound.houndPool).toBeDefined()
+    })
+
+    it('throws when pressure thresholds are not finite numbers', () => {
+      try {
+        createTracehound({
+          pressure: {
+            elevatedWatermark: Number.NaN,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain('pressure thresholds must be finite numbers')
+      }
+    })
+
+    it('throws when pressure thresholds do not satisfy hysteresis ordering', () => {
+      try {
+        createTracehound({
+          pressure: {
+            elevatedWatermark: 0.8,
+            criticalWatermark: 0.85,
+            recoverToElevatedWatermark: 0.86,
+            recoverToNormalWatermark: 0.75,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain(
+          'pressure thresholds must satisfy 0 < recoverToNormal < elevated < recoverToElevated < critical <= 1',
+        )
+      }
+    })
+
+    it('throws when pressure recovery cooldown is not positive', () => {
+      try {
+        createTracehound({
+          pressure: {
+            recoveryCooldownMs: 0,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain('pressure recoveryCooldownMs must be positive')
+      }
+    })
+
+    it('accepts high elevated watermarks by deriving a valid recovery threshold', () => {
+      const tracehound = createTracehound({
+        pressure: {
+          elevatedWatermark: 0.95,
+        },
+      })
+
+      expect(tracehound).toBeDefined()
+      tracehound.shutdown()
+    })
+
+    it('rejects fractional cooldowns that normalize to zero milliseconds', () => {
+      try {
+        createTracehound({
+          pressure: {
+            recoveryCooldownMs: 0.5,
+          },
+        })
+        expect.fail('createTracehound should throw')
+      } catch (error: unknown) {
+        const typed = error as TracehoundError
+        expect(typed.code).toBe('CONFIG_PRESSURE_INVALID')
+        expect(typed.message).toContain('pressure recoveryCooldownMs must be positive')
+      }
     })
 
     it('should use default values when config not provided', () => {
@@ -602,6 +679,117 @@ describe('Tracehound Factory', () => {
       await flushMicrotasks()
       expect(tracehound.watcher.snapshot().overloaded).toBe(false)
       tracehound.shutdown()
+    })
+
+    it('keeps pressure mode critical after hound recovery until cooldown elapses', async () => {
+      let fakeTime = 1_000
+      const adapter = createMockAdapter()
+      const tracehound = createTracehound({
+        houndPool: {
+          poolSize: 1,
+          timeout: 1000,
+          rotationJitterMs: 10,
+          onPoolExhausted: 'escalate',
+          adapter,
+        },
+        pressure: {
+          recoveryCooldownMs: 100,
+        },
+        runtime: {
+          now: () => fakeTime,
+        },
+      })
+
+      const first = tracehound.agent.intercept({
+        id: 'hound-pressure-1',
+        timestamp: fakeTime,
+        source: { ip: '1.2.3.21' },
+        threat: { category: 'injection', severity: 'high' },
+        payload: { first: true },
+      })
+      const second = tracehound.agent.intercept({
+        id: 'hound-pressure-2',
+        timestamp: fakeTime + 1,
+        source: { ip: '1.2.3.22' },
+        threat: { category: 'injection', severity: 'high' },
+        payload: { second: true },
+      })
+
+      expect(first.status).toBe('quarantined')
+      expect(second.status).toBe('quarantined')
+      expect(tracehound.watcher.snapshot().pressure.mode).toBe('critical')
+
+      const pid = [...adapter.getMockProcesses().keys()][0]!
+      const analysisMessage = encodeHoundMessage({
+        type: 'analysis',
+        hash: 'a1b2c3',
+        entropy: 7.1,
+        contentType: 'json',
+        sizeBytes: 128,
+      })
+      const completeMessage = encodeHoundMessage({
+        type: 'status',
+        state: 'complete',
+      })
+
+      adapter.simulateMessage(pid, new Uint8Array(analysisMessage.subarray(4)).buffer)
+      adapter.simulateMessage(pid, new Uint8Array(completeMessage.subarray(4)).buffer)
+
+      await flushMicrotasks()
+      expect(tracehound.watcher.snapshot().overloaded).toBe(false)
+      expect(tracehound.watcher.snapshot().pressure.mode).toBe('critical')
+
+      fakeTime += 101
+      tracehound.agent.intercept({
+        id: 'hound-pressure-3',
+        timestamp: fakeTime,
+        source: { ip: '1.2.3.23' },
+        threat: { category: 'injection', severity: 'high' },
+        payload: { third: true },
+      })
+
+      expect(tracehound.watcher.snapshot().pressure.mode).toBe('normal')
+      tracehound.shutdown()
+    })
+
+    it('raises elevated pressure from count saturation before hard-cap drops occur', () => {
+      const tracehound = createTracehound({
+        quarantine: {
+          maxCount: 4,
+          maxBytes: 1_000_000,
+        },
+        pressure: {
+          elevatedWatermark: 0.5,
+          criticalWatermark: 0.9,
+          recoverToElevatedWatermark: 0.8,
+          recoverToNormalWatermark: 0.25,
+          recoveryCooldownMs: 100,
+        },
+      })
+
+      try {
+        tracehound.agent.intercept({
+          id: 'count-pressure-1',
+          timestamp: Date.now(),
+          source: { ip: '1.2.3.31' },
+          threat: { category: 'injection', severity: 'low' },
+          payload: { slot: 1 },
+        })
+        tracehound.agent.intercept({
+          id: 'count-pressure-2',
+          timestamp: Date.now() + 1,
+          source: { ip: '1.2.3.32' },
+          threat: { category: 'injection', severity: 'low' },
+          payload: { slot: 2 },
+        })
+
+        const snapshot = tracehound.watcher.snapshot()
+        expect(tracehound.quarantine.stats.droppedCount).toBe(0)
+        expect(snapshot.pressure.mode).toBe('elevated')
+        expect(snapshot.pressure.signals.quarantineCapacityPercent).toBe(50)
+      } finally {
+        tracehound.shutdown()
+      }
     })
 
     it('creates the decay scheduler when TTL is enabled without a custom interval', () => {

@@ -53,6 +53,14 @@ interface Snapshot {
     uptime: string
     health: 'healthy' | 'degraded' | 'critical'
   }
+  pressure: {
+    mode: 'normal' | 'elevated' | 'critical'
+    archiveSuppressed: boolean
+    capacityPercent: number
+    droppedEvents: number
+    archiveFailureCount: number
+    houndPressureEvents: number
+  }
   quarantine: {
     count: number
     bytes: number
@@ -195,6 +203,14 @@ function toDashboardSnapshot(
       uptime: fmtUptime(Math.floor(snapshot.watcher.uptimeMs / 1000)),
       health: snapshot.systemHealth,
     },
+    pressure: {
+      mode: snapshot.pressure.mode,
+      archiveSuppressed: snapshot.pressure.archiveSuppressed,
+      capacityPercent: snapshot.pressure.signals.quarantineCapacityPercent,
+      droppedEvents: snapshot.pressure.signals.droppedEvents,
+      archiveFailureCount: snapshot.pressure.signals.archiveFailureCount,
+      houndPressureEvents: snapshot.pressure.signals.houndPressureEvents,
+    },
     quarantine: {
       count: snapshot.quarantine.count,
       bytes: snapshot.quarantine.bytes,
@@ -244,10 +260,14 @@ export function renderOverview(s: Snapshot, w: number, refreshMs: number): void 
   const now = new Date()
 
   const poolStatus = s.houndPool.status === 'exhausted' ? 'EXHAUSTED' : 'STABLE'
-  const qStatus =
-    s.quarantine.archiveFailures > 0 || s.quarantine.dropped > 0 ? 'DEGRADED' : 'NOMINAL'
+  const qStatus = s.pressure.archiveSuppressed
+    ? 'SUPPRESSED'
+    : s.quarantine.archiveFailures > 0 || s.quarantine.dropped > 0
+      ? 'DEGRADED'
+      : 'NOMINAL'
   const agentStatus = s.system.health === 'healthy' ? 'OK' : fmtStatus(s.system.health)
   const rlStatus = s.rateLimiter.blocked > 0 ? 'ENFORCING' : 'IDLE'
+  const pressureStatus = s.pressure.mode === 'normal' ? 'NOMINAL' : fmtStatus(s.pressure.mode)
 
   // Header
   console.log()
@@ -265,7 +285,9 @@ export function renderOverview(s: Snapshot, w: number, refreshMs: number): void 
   console.log(
     row3(`Agent ${agentStatus}`, `Hound Pool ${poolStatus}`, `Quarantine ${qStatus}`, 28, 30),
   )
-  console.log(row2(`Watcher ACTIVE`, `Rate Limiter ${rlStatus}`, 28))
+  console.log(
+    row3(`Watcher ACTIVE`, `Rate Limiter ${rlStatus}`, `Pressure ${pressureStatus}`, 28, 30),
+  )
   console.log()
 
   // LOAD
@@ -388,7 +410,10 @@ export function renderOverview(s: Snapshot, w: number, refreshMs: number): void 
 
   // WARNING (only when system is not fully healthy)
   const hasWarning =
-    s.system.health !== 'healthy' || s.agent.errors > 0 || s.quarantine.archiveFailures > 0
+    s.system.health !== 'healthy' ||
+    s.agent.errors > 0 ||
+    s.quarantine.archiveFailures > 0 ||
+    s.pressure.mode !== 'normal'
 
   if (hasWarning) {
     console.log(sec('WARNING', w))
@@ -400,6 +425,16 @@ export function renderOverview(s: Snapshot, w: number, refreshMs: number): void 
     }
     if (s.quarantine.archiveFailures > 0) {
       console.log(warning(`  [MEDIUM] ${s.quarantine.archiveFailures} Archive Failure(s)`))
+    }
+    if (s.pressure.mode !== 'normal') {
+      console.log(
+        warning(
+          `  [${fmtStatus(s.pressure.mode)}] Pressure ${s.pressure.mode} (${s.pressure.capacityPercent.toFixed(1)}% capacity)`,
+        ),
+      )
+    }
+    if (s.pressure.archiveSuppressed) {
+      console.log(warning('  [CRITICAL] Archive forwarding suppressed under pressure'))
     }
     console.log()
   }
@@ -424,6 +459,19 @@ export function renderWatcher(s: Snapshot, w: number): void {
 
   // CATEGORY SUMMARY
   console.log(sec('CATEGORY SUMMARY', w))
+  console.log(
+    field(
+      'Pressure',
+      `${s.pressure.mode}${s.pressure.archiveSuppressed ? ' / archive suppressed' : ''}`,
+    ),
+  )
+  console.log(
+    field(
+      'Signals',
+      `capacity ${s.pressure.capacityPercent.toFixed(1)}%  drops ${s.pressure.droppedEvents}  hound ${s.pressure.houndPressureEvents}`,
+    ),
+  )
+  console.log()
   const entries = Object.entries(s.watcher.byCategory).sort(([, a], [, b]) => b - a)
   if (entries.length > 0) {
     for (const [cat, count] of entries) {
@@ -468,7 +516,11 @@ export function renderQuarantine(s: Snapshot, w: number): void {
     s.quarantine.maxBytes > 0
       ? ((s.quarantine.bytes / s.quarantine.maxBytes) * 100).toFixed(1)
       : '0.0'
-  const archiveStatus = s.quarantine.archiveFailures > 0 ? 'DEGRADED' : 'OK'
+  const archiveStatus = s.pressure.archiveSuppressed
+    ? 'SUPPRESSED'
+    : s.quarantine.archiveFailures > 0
+      ? 'DEGRADED'
+      : 'OK'
   const nextExpStr = s.quarantine.nextExpiryAt
     ? fmtDuration(Math.max(0, s.quarantine.nextExpiryAt - Date.now()))
     : '–'
@@ -495,6 +547,7 @@ export function renderQuarantine(s: Snapshot, w: number): void {
     ),
   )
   console.log(field('archive status', archiveStatus))
+  console.log(field('pressure mode', s.pressure.mode))
   console.log(field('dropped items', String(s.quarantine.dropped)))
   console.log()
 

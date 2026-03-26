@@ -1,4 +1,5 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHmac } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -63,6 +64,21 @@ function createWatcherSnapshot(
   partial: Partial<WatcherSnapshot> = {},
   now = Date.now(),
 ): WatcherSnapshot {
+  const pressure = {
+    mode: 'normal' as const,
+    archiveSuppressed: false,
+    updatedAt: now,
+    signals: {
+      quarantineBytes: 1024,
+      quarantineCount: 3,
+      quarantineCapacityPercent: 20,
+      droppedEvents: 0,
+      archiveFailureCount: 0,
+      houndPressureEvents: 0,
+      overloaded: false,
+    },
+  }
+
   return {
     uptimeMs: 5000,
     threats: {
@@ -79,6 +95,7 @@ function createWatcherSnapshot(
     alertsInWindow: 0,
     lastAlert: null,
     overloaded: false,
+    pressure,
     snapshotTime: now,
     ...partial,
   }
@@ -201,6 +218,56 @@ describe('system-snapshot utilities', () => {
     expect(snapshot.systemHealth).toBe('critical')
   })
 
+  it('should derive pressure-driven health states from watcher pressure mode', () => {
+    const elevated = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot({
+          pressure: {
+            ...createWatcherSnapshot().pressure,
+            mode: 'elevated',
+          },
+        }),
+        createHoundPoolStats(),
+      ),
+    )
+    const critical = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot({
+          pressure: {
+            ...createWatcherSnapshot().pressure,
+            mode: 'critical',
+            archiveSuppressed: true,
+          },
+        }),
+        createHoundPoolStats(),
+      ),
+    )
+
+    expect(elevated.systemHealth).toBe('degraded')
+    expect(critical.systemHealth).toBe('critical')
+  })
+
+  it('should keep pool exhaustion critical even when pressure mode is elevated', () => {
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(
+        createWatcherSnapshot({
+          overloaded: false,
+          alertsInWindow: 0,
+          pressure: {
+            ...createWatcherSnapshot().pressure,
+            mode: 'elevated',
+          },
+        }),
+        createHoundPoolStats({
+          activeProcesses: 4,
+          totalProcesses: 4,
+        }),
+      ),
+    )
+
+    expect(snapshot.systemHealth).toBe('critical')
+  })
+
   it('should derive degraded and healthy health states', () => {
     const degraded = exportSystemSnapshot(
       createMockTracehound(createWatcherSnapshot({ alertsInWindow: 2 }), createHoundPoolStats()),
@@ -297,10 +364,7 @@ describe('system-snapshot utilities', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
     const path = join(dir, 'snapshot.json')
     const snapshot = exportSystemSnapshot(
-      createMockTracehound(
-        createWatcherSnapshot(),
-        createHoundPoolStats({}),
-      ),
+      createMockTracehound(createWatcherSnapshot(), createHoundPoolStats({})),
     )
 
     writeSystemSnapshotToDisk(snapshot, path, 'secret')
@@ -353,6 +417,61 @@ describe('system-snapshot utilities', () => {
       ok: false,
       reason: 'INVALID_FORMAT',
     })
+
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('should read legacy signed snapshots when pressure fields are absent', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tracehound-system-snapshot-'))
+    const path = join(dir, 'legacy-snapshot.json')
+    const generatedAt = Date.now()
+    const legacyPayload = {
+      generatedAt,
+      systemHealth: 'degraded' as const,
+      agent: createAgentStats(),
+      quarantine: createQuarantineStats(),
+      quarantineMaxBytes: 4096,
+      watcher: {
+        uptimeMs: 5000,
+        threats: {
+          total: 3,
+          byCategory: { injection: 2, ddos: 1 },
+          bySeverity: { critical: 1, high: 1, medium: 1, low: 0 },
+        },
+        quarantine: {
+          count: 3,
+          bytes: 1024,
+          capacityPercent: 20,
+        },
+        totalAlerts: 0,
+        alertsInWindow: 0,
+        lastAlert: null,
+        overloaded: false,
+        snapshotTime: generatedAt,
+      },
+      houndPool: createHoundPoolStats(),
+      rateLimiter: createRateLimiterStats(),
+    }
+    const payloadText = JSON.stringify(legacyPayload)
+    const signature = createHmac('sha256', 'secret').update(payloadText).digest('hex')
+
+    writeFileSync(
+      path,
+      JSON.stringify({
+        version: 1,
+        algorithm: 'HMAC-SHA256',
+        payload: legacyPayload,
+        signature,
+      }),
+      'utf8',
+    )
+
+    const result = readSystemSnapshotFromDisk(path, 'secret')
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.pressure.mode).toBe('normal')
+    expect(result.snapshot.pressure.archiveSuppressed).toBe(false)
+    expect(result.snapshot.watcher.pressure.mode).toBe('normal')
 
     rmSync(dir, { recursive: true, force: true })
   })
@@ -498,6 +617,20 @@ describe('system-snapshot utilities', () => {
             bySeverity: null,
           },
           watcher: createWatcherSnapshot(),
+          pressure: {
+            mode: 'elevated',
+            archiveSuppressed: false,
+            updatedAt: Date.now(),
+            signals: {
+              quarantineBytes: 1024,
+              quarantineCount: 3,
+              quarantineCapacityPercent: '50',
+              droppedEvents: 0,
+              archiveFailureCount: 0,
+              houndPressureEvents: 0,
+              overloaded: false,
+            },
+          },
           houndPool: createHoundPoolStats(),
           rateLimiter: createRateLimiterStats(),
         },

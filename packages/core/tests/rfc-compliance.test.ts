@@ -8,10 +8,12 @@
 import { describe, expect, it } from 'vitest'
 import { Agent } from '../src/core/agent.js'
 import { AuditChain } from '../src/core/audit-chain.js'
+import type { IColdStorageAdapter } from '../src/core/cold-storage.js'
 import { createEvidenceFactory, EvidenceFactory } from '../src/core/evidence-factory.js'
 import { Evidence } from '../src/core/evidence.js'
 import { Quarantine } from '../src/core/quarantine.js'
 import { createRateLimiter } from '../src/core/rate-limiter.js'
+import { createTracehound } from '../src/core/tracehound.js'
 import type {
   CoordinationFeature,
   CoordinationHealth,
@@ -505,6 +507,103 @@ describe('RFC-0000 Compliance', () => {
 
       expect(health.mode).toBe('degraded')
       expect(result.status).toBe('quarantined')
+    })
+  })
+
+  describe('Pressure Containment Compliance (RFC-0011 OSS)', () => {
+    it('exposes first-class pressure state on watcher and runtime snapshots', () => {
+      const tracehound = createTracehound({
+        quarantine: {
+          maxCount: 1,
+          maxBytes: 10_000,
+        },
+        pressure: {
+          elevatedWatermark: 0.01,
+          criticalWatermark: 0.02,
+          recoverToElevatedWatermark: 0.015,
+          recoverToNormalWatermark: 0.005,
+          recoveryCooldownMs: 1,
+        },
+      })
+
+      try {
+        const anchor = tracehound.agent.intercept({
+          id: 'pressure-anchor',
+          payload: { attack: 'anchor' },
+          source: { ip: 'pressure-source' },
+          timestamp: Date.now(),
+          threat: { category: 'injection', severity: 'high' },
+        })
+        const result = tracehound.agent.intercept({
+          id: 'pressure-drop',
+          payload: { attack: 'overflow' },
+          source: { ip: 'pressure-source-2' },
+          timestamp: Date.now() + 1,
+          threat: { category: 'injection', severity: 'low' },
+        })
+
+        expect(anchor.status).toBe('quarantined')
+        expect(result.status).toBe('ignored')
+        expect(tracehound.watcher.snapshot().pressure.mode).toBe('critical')
+        expect(tracehound.snapshot().pressure.archiveSuppressed).toBe(true)
+      } finally {
+        tracehound.shutdown()
+      }
+    })
+
+    it('suppresses decay archival when pressure mode is critical', async () => {
+      let now = 1_000
+      let writes = 0
+      const coldStorage = {
+        write: async () => {
+          writes++
+          return { success: true } as const
+        },
+        read: async () => ({ found: false }) as const,
+        delete: async () => true,
+        isAvailable: async () => true,
+      } satisfies IColdStorageAdapter
+
+      const tracehound = createTracehound({
+        quarantine: {
+          maxCount: 10,
+          maxBytes: 1024,
+          ttlMs: 1,
+          archiveOnDecay: true,
+        },
+        coldStorage,
+        pressure: {
+          elevatedWatermark: 0.01,
+          criticalWatermark: 0.02,
+          recoverToElevatedWatermark: 0.015,
+          recoverToNormalWatermark: 0.005,
+          recoveryCooldownMs: 1,
+        },
+        runtime: {
+          now: () => now,
+        },
+      })
+
+      try {
+        const result = tracehound.agent.intercept({
+          id: 'pressure-decay',
+          payload: { attack: 'expire-under-pressure' },
+          source: { ip: 'pressure-source' },
+          timestamp: now,
+          threat: { category: 'injection', severity: 'high' },
+        })
+
+        expect(result.status).toBe('quarantined')
+        expect(tracehound.snapshot().pressure.archiveSuppressed).toBe(true)
+
+        now += 10
+        await tracehound.quarantine.decayExpired()
+
+        expect(writes).toBe(0)
+        expect(tracehound.quarantine.stats.decayedCount).toBe(1)
+      } finally {
+        tracehound.shutdown()
+      }
     })
   })
 })

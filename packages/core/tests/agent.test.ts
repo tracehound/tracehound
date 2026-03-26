@@ -1343,4 +1343,47 @@ describe('Agent', () => {
       expect(agentInstance).toBeDefined()
     })
   })
+
+  describe('quarantine telemetry', () => {
+    it('returns early when quarantine telemetry source is null', () => {
+      const localAgent = new Agent(
+        agentConfig,
+        null as unknown as Quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const telemetryInvoker = localAgent as unknown as {
+        emitQuarantineTelemetry: () => void
+      }
+
+      expect(() => telemetryInvoker.emitQuarantineTelemetry()).not.toThrow()
+      expect(mockWatcher.updateQuarantine).not.toHaveBeenCalled()
+    })
+
+    it('returns early when quarantine telemetry shape is invalid', () => {
+      const localAgent = new Agent(
+        agentConfig,
+        {
+          has: vi.fn(() => false),
+          insert: vi.fn(),
+        } as unknown as Quarantine,
+        createRateLimiter(rateLimitConfig),
+        createEvidenceFactory(),
+        undefined,
+        mockWatcher,
+        mockNotifications,
+      )
+
+      const telemetryInvoker = localAgent as unknown as {
+        emitQuarantineTelemetry: () => void
+      }
+
+      expect(() => telemetryInvoker.emitQuarantineTelemetry()).not.toThrow()
+      expect(mockWatcher.updateQuarantine).not.toHaveBeenCalled()
+    })
+  })
 })

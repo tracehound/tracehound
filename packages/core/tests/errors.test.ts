@@ -48,13 +48,15 @@ describe('Error Factories', () => {
       expect(error.state).toBe('config')
     })
 
-    it('should create snapshot and webhook config errors', () => {
+    it('should create snapshot, pressure, and webhook config errors', () => {
       const snapshotError = Errors.invalidConfigSnapshot('bad-interval')
+      const pressureError = Errors.invalidConfigPressure('bad-threshold')
       const secretError = Errors.snapshotSecretMissing()
       const webhookUrlError = Errors.invalidConfigWebhookUrl('http://127.0.0.1')
       const webhookSecretError = Errors.invalidConfigWebhookSecret(32)
 
       expect(snapshotError.code).toBe('CONFIG_SNAPSHOT_INVALID')
+      expect(pressureError.code).toBe('CONFIG_PRESSURE_INVALID')
       expect(secretError.code).toBe('CONFIG_SNAPSHOT_SECRET_MISSING')
       expect(webhookUrlError.code).toBe('CONFIG_WEBHOOK_URL_INVALID')
       expect(webhookSecretError.code).toBe('CONFIG_WEBHOOK_SECRET_INVALID')

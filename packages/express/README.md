@@ -43,24 +43,24 @@ app.use(
 
 ## Options
 
-| Option | Type | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `agent` | `IAgent` | Yes | - | Tracehound Agent instance |
-| `emitSignatureInResponse` | `boolean` | No | `false` | Include signature in `403` body |
-| `emitTraceIdHeader` | `boolean` | No | `false` | Emit `x-tracehound-trace-id` on quarantined responses |
-| `extractScent` | `(req: Request) => Scent` | No | internal extractor | Override Scent extraction |
-| `onIntercept` | `(result, req, res) => void` | No | internal handler | Override response behavior |
+| Option                    | Type                         | Required | Default            | Description                                           |
+| ------------------------- | ---------------------------- | -------- | ------------------ | ----------------------------------------------------- |
+| `agent`                   | `IAgent`                     | Yes      | -                  | Tracehound Agent instance                             |
+| `emitSignatureInResponse` | `boolean`                    | No       | `false`            | Include signature in `403` body                       |
+| `emitTraceIdHeader`       | `boolean`                    | No       | `false`            | Emit `x-tracehound-trace-id` on quarantined responses |
+| `extractScent`            | `(req: Request) => Scent`    | No       | internal extractor | Override Scent extraction                             |
+| `onIntercept`             | `(result, req, res) => void` | No       | internal handler   | Override response behavior                            |
 
 ## Default Status Mapping
 
-| Intercept status | HTTP behavior |
-| --- | --- |
-| `clean` | pass through (`next()`) |
-| `ignored` | pass through (`next()`) |
-| `rate_limited` | `429` + `Retry-After` |
-| `payload_too_large` | `413` |
-| `quarantined` | `403` |
-| `error` | fail-open pass through |
+| Intercept status    | HTTP behavior           |
+| ------------------- | ----------------------- |
+| `clean`             | pass through (`next()`) |
+| `ignored`           | pass through (`next()`) |
+| `rate_limited`      | `429` + `Retry-After`   |
+| `payload_too_large` | `413`                   |
+| `quarantined`       | `403`                   |
+| `error`             | fail-open pass through  |
 
 ## onIntercept Pattern
 

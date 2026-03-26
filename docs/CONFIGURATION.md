@@ -51,6 +51,43 @@ Operational meaning:
 
 If TTL decay is enabled, no custom cold storage adapter is supplied, and `archiveOnDecay` is not explicitly disabled, Tracehound provisions the built-in memory-first adapter automatically.
 
+## Pressure Containment Configuration
+
+`TracehoundOptions.pressure` controls OSS pressure thresholds without exposing a full control plane:
+
+```ts
+createTracehound({
+  pressure: {
+    elevatedWatermark: 0.8,
+    criticalWatermark: 0.95,
+    recoverToElevatedWatermark: 0.85,
+    recoverToNormalWatermark: 0.7,
+    recoveryCooldownMs: 5_000,
+  },
+})
+```
+
+Operational meaning:
+
+1. `elevatedWatermark`: quarantine capacity ratio that raises mode to `elevated`.
+2. `criticalWatermark`: quarantine capacity ratio that raises mode to `critical`.
+3. `recoverToElevatedWatermark`: lower bound needed to leave `critical`.
+4. `recoverToNormalWatermark`: lower bound needed to leave `elevated`.
+5. `recoveryCooldownMs`: quiet period before pressure recovery is allowed.
+
+Runtime invariants:
+
+1. Thresholds must satisfy `0 < recoverToNormalWatermark < elevatedWatermark < recoverToElevatedWatermark < criticalWatermark <= 1`.
+2. `recoveryCooldownMs` must normalize to a positive integer millisecond value.
+3. Invalid combinations fail fast during `createTracehound()` initialization with a pressure config error.
+
+Safety rules remain fixed even when thresholds are customized:
+
+1. `quarantine.maxBytes`, `quarantine.maxCount`, and `maxPayloadSize` remain hard caps.
+2. `critical` pressure suppresses decay-time archival to protect host survivability.
+3. TTL decay still runs under pressure; expired evidence is removed deterministically even when archival is suppressed.
+4. OSS runtime exposes pressure through snapshots, CLI `status/watch`, and notification events only; it does not expose policy hooks or operator overrides.
+
 ## Canonical Rule
 
 `API.md` remains the canonical technical definition for option shapes.

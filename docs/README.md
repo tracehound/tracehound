@@ -1,7 +1,7 @@
 # Documentation Index
 
 > **Last Updated:** 2026-03-30
-> **Version:** v1.8.9
+> **Version:** v1.8.10
 > **Model:** Open-Source
 
 ---
@@ -50,7 +50,7 @@
 
 ## Release Boundary
 
-Tracehound `v1.8.9` treats release provenance as a first-class security boundary:
+Tracehound `v1.8.10` treats release provenance as a first-class security boundary:
 
 - Release gate: immutable lockfile, offline/clean install, `pnpm build`, package parity verification, artifact manifest metadata
 - Security/tooling gate: tests, coverage, chaos, forensic lab, SBOM, audit and CVE triage

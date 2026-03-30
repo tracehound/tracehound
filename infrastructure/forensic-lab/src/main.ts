@@ -167,7 +167,7 @@ function createThreatScent(id: string, severity: 'low' | 'medium' | 'high' | 'cr
     timestamp: Date.now(),
     source: {
       ip: '203.0.113.10',
-      userAgent: 'tracehound-forensic-lab/1.8.9',
+      userAgent: 'tracehound-forensic-lab/1.8.10',
     },
     payload: {
       method: 'POST',

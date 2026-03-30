@@ -1,7 +1,7 @@
 {
   "name": "tracehound-chaos-testing",
   "private": true,
-  "version": "1.8.9",
+  "version": "1.8.10",
   "description": "Local chaos validation harness for Tracehound release artifacts",
   "type": "module",
   "scripts": {

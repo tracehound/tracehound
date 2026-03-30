@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.10] - 2026-03-30 - Release Boundary Hardening and Validation Uplift
+
+### Features
+
+- **Release trust boundary formalization (`repo`, `security`, `docs`)**: Publish provenance is now consistently defined around immutable lockfile input, offline/clean install expectations, `tsc-first` package artifacts, package parity verification, and release manifest metadata. Test tooling remains outside the trusted release boundary.
+- **Dedicated forensic lab (`infrastructure/forensic-lab`)**: Added a deterministic forensic validation lane focused on signed snapshot readback, custody invariants, trace-registry continuity, cold-storage parity, and legacy snapshot compatibility.
+- **Dedicated chaos workspace (`infrastructure/chaos`)**: Extracted chaos verification into its own workspace package with compiled entrypoints and release-aware result summaries, reducing root dependency ownership and clarifying validation boundaries.
+- **Dedicated soak smoke lane (`infrastructure/soak`)**: Added a short-lived soak smoke runner that validates startup, telemetry output, release metadata emission, and traffic generation without promoting full soak behavior into the regular unit-test gate.
+
+### Fixed
+
+- **Root dependency ownership (`repo`)**: Moved chaos-specific runtime dependencies out of the root manifest and into the dedicated chaos workspace so root devDependencies better reflect actual top-level tooling needs.
+- **Fail-safe injected clock propagation (`@tracehound/core`)**: `createFailSafe()` now preserves `_now` injection from partial config, restoring deterministic testability for factory-based callers.
+- **Forensic harness cold-storage safety (`infrastructure/forensic-lab`)**: Hardened artifact filename derivation, validated metadata shape before successful reads, and isolated payload copies returned to callers to avoid shared-buffer exposure.
+- **Soak metadata resilience (`infrastructure/soak`)**: Release metadata writing is now best-effort, package version lookup is repo-root based instead of cwd-sensitive, and smoke validation now guards against early child exit, stale artifact timestamps, and shutdown races.
+- **Trace registry test isolation (`@tracehound/core`)**: Removed a default-path write from the trace-registry suite so clock-injection tests no longer couple to ambient registry state.
+- **Forensic-lab runtime prerequisites (`repo`, `@tracehound/cli`)**: `test:forensic-lab` now builds the required workspaces before execution, avoiding missing-`dist` failures when the lane is run independently.
+- **Regular unit-test scope (`repo`)**: Root `pnpm test` no longer recurses into infrastructure workspaces, preventing Docker/chaos validation from leaking into the normal package test gate.
+
+### Documentation
+
+- **Release boundary and package docs**: Updated docs and package READMEs to reflect `v1.8.10` release-boundary wording, package ownership changes, pressure/validation surfaces, and operator guidance for chaos, forensic-lab, and soak smoke workflows.
+- **Release notes**: Added a dedicated `release-notes/v1.8.10.md` draft for GitHub/npm release preparation.
+
+### Operational Impact
+
+- No breaking public API changes.
+- OSS validation lanes are more clearly separated: package tests, chaos, soak smoke, and forensic-lab now have distinct execution surfaces.
+- Release verification remains `tsc-first`; generated package manifests should be regenerated as part of the final publish cut for `v1.8.10`.
+
 ## [1.8.9] - 2026-03-26 - OSS Pressure Containment and Operational Truth Alignment
 
 ### Features

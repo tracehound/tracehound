@@ -144,7 +144,7 @@ createTracehound({
 })
 ```
 
-Pressure containment is part of the OSS runtime contract in `v1.8.9`:
+Pressure containment is part of the OSS runtime contract in `v1.8.10`:
 
 - `elevated` and `critical` pressure modes are surfaced through watcher snapshots, signed system snapshots, notifications, and CLI status/watch
 - `critical` pressure suppresses decay-time archival to protect host survivability

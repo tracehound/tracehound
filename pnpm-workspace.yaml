@@ -1,4 +1,5 @@
 packages:
   - 'packages/*'
+  - 'infrastructure/chaos'
   - 'infrastructure/soak'
   - 'infrastructure/forensic-lab'

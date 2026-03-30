@@ -54,15 +54,15 @@ If `rawBody` is absent, signatures are generated from canonicalized payload.
 
 ## Options
 
-| Option                    | Type                             | Required | Default            | Description                                           |
-| ------------------------- | -------------------------------- | -------- | ------------------ | ----------------------------------------------------- |
-| `agent`                   | `IAgent`                         | Yes      | -                  | Tracehound Agent instance                             |
-| `emitSignatureInResponse` | `boolean`                        | No       | `false`            | Include signature in `403` body                       |
-| `emitTraceIdHeader`       | `boolean`                        | No       | `false`            | Emit `x-tracehound-trace-id` on quarantined responses |
-| `maxPayloadSize`          | `number`                         | No       | unset              | Skip unsafe body clone work when `Content-Length` already exceeds the limit |
-| `resolveSourceIp`         | `(req: FastifyRequest) => string` | No      | internal resolver  | Override `req.ip` when proxy/CDN trust settings should not be relied on |
-| `extractScent`            | `(req: FastifyRequest) => Scent` | No       | internal extractor | Override Scent extraction                             |
-| `onIntercept`             | `(result, req, reply) => void`   | No       | internal handler   | Override response behavior                            |
+| Option                    | Type                              | Required | Default            | Description                                                                 |
+| ------------------------- | --------------------------------- | -------- | ------------------ | --------------------------------------------------------------------------- |
+| `agent`                   | `IAgent`                          | Yes      | -                  | Tracehound Agent instance                                                   |
+| `emitSignatureInResponse` | `boolean`                         | No       | `false`            | Include signature in `403` body                                             |
+| `emitTraceIdHeader`       | `boolean`                         | No       | `false`            | Emit `x-tracehound-trace-id` on quarantined responses                       |
+| `maxPayloadSize`          | `number`                          | No       | unset              | Skip unsafe body clone work when `Content-Length` already exceeds the limit |
+| `resolveSourceIp`         | `(req: FastifyRequest) => string` | No       | internal resolver  | Override `req.ip` when proxy/CDN trust settings should not be relied on     |
+| `extractScent`            | `(req: FastifyRequest) => Scent`  | No       | internal extractor | Override Scent extraction                                                   |
+| `onIntercept`             | `(result, req, reply) => void`    | No       | internal handler   | Override response behavior                                                  |
 
 ## Default Status Mapping
 

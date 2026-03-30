@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const HOUND_PROCESS_PATH = resolve(__dirname, '../../packages/core/dist/core/hound-process.js')
+const REPO_ROOT = resolve(__dirname, '../../..')
+const HOUND_PROCESS_PATH = resolve(REPO_ROOT, 'packages/core/dist/core/hound-process.js')
 const MAX_RECENT_PANICS = 32
 const MAX_PAYLOAD_SIZE = 5_000_000
 const port = 3000

@@ -1,0 +1,23 @@
+{
+  "name": "tracehound-chaos-testing",
+  "private": true,
+  "version": "1.8.9",
+  "description": "Local chaos validation harness for Tracehound release artifacts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "node dist/run-chaos-suite.js",
+    "clean": "node ../../scripts/build/clean-dist.mjs dist"
+  },
+  "dependencies": {
+    "@tracehound/core": "workspace:*",
+    "@tracehound/express": "workspace:*",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

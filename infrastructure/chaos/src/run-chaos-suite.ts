@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const REPO_ROOT = resolve(__dirname, '../..')
+const REPO_ROOT = resolve(__dirname, '../../..')
 const COMPOSE_FILE = resolve(REPO_ROOT, 'infrastructure/chaos/docker-compose.yml')
 const CHAOS_DATA_DIR = resolve(REPO_ROOT, 'infrastructure/chaos/data')
 const HOST_SNAPSHOT_PATH = resolve(CHAOS_DATA_DIR, 'snapshot/system-snapshot.json')

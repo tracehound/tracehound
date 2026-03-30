@@ -55,6 +55,9 @@ interface MetricsSample {
     totalAlerts: number
     alertsInWindow: number
     overloaded: boolean
+    pressureMode: string
+    archiveSuppressed: boolean
+    houndPressureEvents: number
   }
   traffic: {
     total: number
@@ -68,6 +71,8 @@ interface MetricsSample {
     realisticUserTotal: number
     falsePositive429: number
     falsePositive403: number
+    traceHeadersOn403: number
+    missingTraceHeadersOn403: number
   }
 }
 
@@ -94,10 +99,11 @@ function renderStatus(sample: MetricsSample): string {
   const agt = `total=${pad(sample.agent.total)} clean=${pad(sample.agent.clean)} quar=${pad(sample.agent.quarantined)} ign=${pad(sample.agent.ignored)} rl=${pad(sample.agent.rateLimited)} vf=${pad(sample.agent.validationFailures, 4)} err=${pad(sample.agent.errors, 4)}`
   const qua = `Q[${sample.quarantine.count} items / ${toMb(sample.quarantine.bytes)}MB decay=${sample.quarantine.decayed}]`
   const wtc = `W[alerts=${sample.watcher.totalAlerts} win=${sample.watcher.alertsInWindow}${sample.watcher.overloaded ? ' OVERLOAD' : ''}]`
+  const pressure = `P[mode=${sample.watcher.pressureMode} archive=${sample.watcher.archiveSuppressed ? 'suppressed' : 'active'} hound=${sample.watcher.houndPressureEvents}]`
   const trf = `tx=${sample.traffic.total} ok=${sample.traffic.status200} 403=${sample.traffic.status403} 413=${sample.traffic.status413} 429=${sample.traffic.status429} 5xx=${sample.traffic.status500} tErr=${sample.traffic.errors}`
-  const fp = `FP[429=${sample.traffic.falsePositive429} 403=${sample.traffic.falsePositive403} realUsr=${sample.traffic.realisticUserTotal}]`
+  const fp = `FP[429=${sample.traffic.falsePositive429} 403=${sample.traffic.falsePositive403} trace403=${sample.traffic.traceHeadersOn403}/${sample.traffic.missingTraceHeadersOn403} realUsr=${sample.traffic.realisticUserTotal}]`
 
-  return `[${ts}] uptime=${sample.uptimeS}s ${mem} | ${agt} | ${qua} | ${wtc} | ${trf} | ${fp}`
+  return `[${ts}] uptime=${sample.uptimeS}s ${mem} | ${agt} | ${qua} | ${wtc} | ${pressure} | ${trf} | ${fp}`
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +154,9 @@ export function createMetricsCollector(
         totalAlerts: snap.watcher.totalAlerts,
         alertsInWindow: snap.watcher.alertsInWindow,
         overloaded: snap.watcher.overloaded,
+        pressureMode: snap.pressure.mode,
+        archiveSuppressed: snap.pressure.archiveSuppressed,
+        houndPressureEvents: snap.pressure.signals.houndPressureEvents,
       },
       traffic: {
         total: trafficCounters.total,
@@ -161,6 +170,8 @@ export function createMetricsCollector(
         realisticUserTotal: trafficCounters.byLane.realistic_user,
         falsePositive429: trafficCounters.falsePositive429,
         falsePositive403: trafficCounters.falsePositive403,
+        traceHeadersOn403: trafficCounters.traceHeadersOn403,
+        missingTraceHeadersOn403: trafficCounters.missingTraceHeadersOn403,
       },
     }
 

@@ -16,6 +16,8 @@ const HOST_SNAPSHOT_READBACK_PATH = resolve(
   'snapshot/system-snapshot.readback.json',
 )
 const HOST_TRACE_REGISTRY_PATH = resolve(CHAOS_DATA_DIR, 'trace/trace-registry.ndjson')
+const HOST_RESULTS_DIR = resolve(CHAOS_DATA_DIR, 'results')
+const HOST_SUMMARY_PATH = resolve(HOST_RESULTS_DIR, 'chaos-summary.json')
 const COMPOSE_PROJECT_NAME = 'tracehound-chaos'
 
 const TARGET_SERVICE = 'target-app'
@@ -87,6 +89,12 @@ interface ChaosRuntimeState {
 interface HealthResponse {
   readonly status: 'ok'
   readonly snapshotConfigured: boolean
+}
+
+interface ChaosCheckResult {
+  readonly name: string
+  readonly passed: boolean
+  readonly details: string
 }
 
 const state = {
@@ -195,11 +203,25 @@ function resetHostChaosData(): void {
     rmSync(CHAOS_DATA_DIR, { force: true, recursive: true })
     mkdirSync(resolve(CHAOS_DATA_DIR, 'snapshot'), { recursive: true })
     mkdirSync(resolve(CHAOS_DATA_DIR, 'trace'), { recursive: true })
+    mkdirSync(HOST_RESULTS_DIR, { recursive: true })
     // Pre-create snapshot as empty so the bind-mount exposes a file (not a
     // directory) if a previous Test 4 fault left one behind.
     writeFileSync(HOST_SNAPSHOT_PATH, '')
   } catch (error: unknown) {
     console.error(`[Setup] Failed to reset host chaos data: ${toErrorMessage(error)}`)
+  }
+}
+
+function resolveCommitSha(): string {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: REPO_ROOT,
+      stdio: 'pipe',
+    })
+      .toString('utf8')
+      .trim()
+  } catch {
+    return 'unknown'
   }
 }
 
@@ -536,6 +558,8 @@ async function runTests(): Promise<void> {
   ensureDockerReady()
   const snapshotSecret = prepareEnvironment()
   resetDanglingInfrastructure()
+  const releaseLabel = process.env['TRACEHOUND_RELEASE_LABEL'] ?? 'local'
+  const checks: ChaosCheckResult[] = []
 
   // Collect trace entries in memory throughout the test. Written to disk once,
   // after the container is stopped, so there are no concurrent writes or duplicates.
@@ -592,6 +616,11 @@ async function runTests(): Promise<void> {
       250,
     )
     if (!snapshotReady) {
+      checks.push({
+        name: 'signed_snapshot_readback',
+        passed: false,
+        details: `lastReadState=${snapshotReadFailure ?? 'UNKNOWN'}`,
+      })
       console.error(
         `  ❌ FAILED: Snapshot file was not written and verified. Last read state=${snapshotReadFailure ?? 'UNKNOWN'}.`,
       )
@@ -600,6 +629,11 @@ async function runTests(): Promise<void> {
     } else {
       const snapshot = readSystemSnapshotFromDisk(HOST_SNAPSHOT_PATH, snapshotSecret)
       const health = snapshot.ok ? snapshot.snapshot.systemHealth : 'unknown'
+      checks.push({
+        name: 'signed_snapshot_readback',
+        passed: true,
+        details: `systemHealth=${health}`,
+      })
       console.log(`  ✅ PASSED: Snapshot file is signed and readable. System health=${health}`)
     }
 
@@ -615,10 +649,20 @@ async function runTests(): Promise<void> {
     if (traceObserved !== null) collectTraceEntries(traceObserved)
 
     if (traceObserved !== null && traceSeed.traceId !== null) {
+      checks.push({
+        name: 'trace_registry_observation',
+        passed: true,
+        details: `traceId=${traceSeed.traceId}, uniqueTraceIds=${traceObserved.traceRegistry.uniqueTraceIds}`,
+      })
       console.log(
         `  ✅ PASSED: Quarantined response emitted traceId=${traceSeed.traceId} and registry uniqueTraceIds=${traceObserved.traceRegistry.uniqueTraceIds}.`,
       )
     } else {
+      checks.push({
+        name: 'trace_registry_observation',
+        passed: false,
+        details: `status=${traceSeed.status}, traceId=${traceSeed.traceId ?? 'null'}`,
+      })
       console.error(
         `  ❌ FAILED: Expected HTTP 403 with visible trace output for quarantined request. status=${traceSeed.status}, traceId=${traceSeed.traceId ?? 'null'}`,
       )
@@ -703,10 +747,20 @@ async function runTests(): Promise<void> {
       recovered &&
       recoveryTraceObserved !== null
     ) {
+      checks.push({
+        name: 'mixed_plane_pressure_recovery',
+        passed: true,
+        details: `cleanP95=${cleanP95}, floodTraceHeaders=${floodTraceIds}, recovered=${recovered}`,
+      })
       console.log(
         '  ✅ PASSED: Clean traffic stayed inside budget, pressure was observed, and trace emission recovered.',
       )
     } else {
+      checks.push({
+        name: 'mixed_plane_pressure_recovery',
+        passed: false,
+        details: `pressureObserved=${pressureObserved}, cleanStatusesHealthy=${cleanStatusesHealthy}, cleanP95=${cleanP95}, recovered=${recovered}, recoveryTraceStatus=${recoveryTrace?.status ?? 'n/a'}, recoveryTraceId=${recoveryTrace?.traceId ?? 'null'}`,
+      })
       console.error(
         `  ❌ FAILED: Mixed-plane invariant broke. pressureObserved=${pressureObserved}, cleanStatusesHealthy=${cleanStatusesHealthy}, cleanP95=${cleanP95}, recovered=${recovered}, recoveryTraceStatus=${recoveryTrace?.status ?? 'n/a'}, recoveryTraceId=${recoveryTrace?.traceId ?? 'null'}`,
       )
@@ -752,8 +806,18 @@ async function runTests(): Promise<void> {
         traceFailureResponse.traceId !== null &&
         registryDropped
       ) {
+        checks.push({
+          name: 'trace_sink_fail_open',
+          passed: true,
+          details: `status=${traceFailureResponse.status}, traceId=${traceFailureResponse.traceId}, droppedObserved=${registryDropped}`,
+        })
         console.log('  ✅ PASSED: Trace registry writes failed without taking down the host.')
       } else {
+        checks.push({
+          name: 'trace_sink_fail_open',
+          passed: false,
+          details: `status=${traceFailureResponse.status}, traceId=${traceFailureResponse.traceId ?? 'null'}, droppedObserved=${registryDropped}`,
+        })
         console.error(
           `  ❌ FAILED: Registry sink failure was not observed safely. status=${traceFailureResponse.status}, traceId=${traceFailureResponse.traceId ?? 'null'}, droppedObserved=${registryDropped}`,
         )
@@ -784,10 +848,20 @@ async function runTests(): Promise<void> {
       const snapshotRead = readSystemSnapshotFromDisk(HOST_SNAPSHOT_PATH, snapshotSecret)
 
       if (snapshotFailureObserved && healthResponse.ok && !snapshotRead.ok) {
+        checks.push({
+          name: 'snapshot_write_fail_open',
+          passed: true,
+          details: `snapshotRead=${snapshotRead.reason}, health=${healthResponse.status}`,
+        })
         console.log(
           `  ✅ PASSED: Snapshot failure was observed (${snapshotRead.reason}) and the application stayed healthy.`,
         )
       } else {
+        checks.push({
+          name: 'snapshot_write_fail_open',
+          passed: false,
+          details: `observed=${snapshotFailureObserved}, health=${healthResponse.status}, snapshotReadOk=${snapshotRead.ok}`,
+        })
         console.error(
           `  ❌ FAILED: Snapshot failure invariant did not hold. observed=${snapshotFailureObserved}, health=${healthResponse.status}, snapshotReadOk=${snapshotRead.ok}`,
         )
@@ -817,6 +891,25 @@ async function runTests(): Promise<void> {
         'utf8',
       )
     }
+
+    writeFileSync(
+      HOST_SUMMARY_PATH,
+      JSON.stringify(
+        {
+          release: releaseLabel,
+          artifactSource: 'workspace',
+          buildMode: 'tsc-first',
+          commitSha: resolveCommitSha(),
+          executedAt: new Date().toISOString(),
+          snapshotPath: HOST_SNAPSHOT_PATH,
+          traceRegistryPath: HOST_TRACE_REGISTRY_PATH,
+          checks,
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    )
   }
 
   if (failedTests > 0) {

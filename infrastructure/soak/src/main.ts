@@ -19,6 +19,8 @@ import { createAuditLogger } from './audit.js'
 import { createMetricsCollector } from './metrics.js'
 import { createSoakServer, resolveSoakSnapshotSecret } from './server.js'
 import { createTrafficGenerator } from './traffic.js'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config from environment
@@ -35,6 +37,44 @@ const PORT = readInt('SOAK_PORT', 8_099)
 const RPS = readInt('SOAK_RPS', 10)
 const INTERVAL_MS = readInt('SOAK_INTERVAL', 5_000)
 const AUDIT_INTERVAL_MS = readInt('SOAK_AUDIT_INTERVAL', 10_000)
+const RELEASE_LABEL = process.env['TRACEHOUND_RELEASE_LABEL'] ?? 'local'
+
+function resolveCommitSha(): string {
+  const fromEnv = process.env['GITHUB_SHA']
+  return typeof fromEnv === 'string' && fromEnv.length > 0 ? fromEnv : 'unknown'
+}
+
+function readPackageVersion(packageDir: string): string {
+  const raw = JSON.parse(readFileSync(resolve(process.cwd(), packageDir, 'package.json'), 'utf8')) as {
+    version?: string
+  }
+  return raw.version ?? 'unknown'
+}
+
+function writeReleaseMetadata(snapshotPath: string): void {
+  const logsDir = resolve(process.cwd(), 'infrastructure', 'soak', 'logs')
+  mkdirSync(logsDir, { recursive: true })
+  writeFileSync(
+    resolve(logsDir, 'release-metadata.json'),
+    JSON.stringify(
+      {
+        release: RELEASE_LABEL,
+        artifactSource: 'workspace',
+        buildMode: 'tsc-first',
+        commitSha: resolveCommitSha(),
+        executedAt: new Date().toISOString(),
+        snapshotPath,
+        packages: {
+          core: readPackageVersion('packages/core'),
+          express: readPackageVersion('packages/express'),
+        },
+      },
+      null,
+      2,
+    ),
+    'utf8',
+  )
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Bootstrap
@@ -58,8 +98,10 @@ async function main(): Promise<void> {
 
   const snapshotSecret = resolveSoakSnapshotSecret()
   const snapshotPath = server.snapshotPath
+  writeReleaseMetadata(snapshotPath)
 
   process.stdout.write(`[soak] Server listening on http://127.0.0.1:${PORT}\n`)
+  process.stdout.write(`[soak] Release label → ${RELEASE_LABEL}\n`)
   process.stdout.write(`[soak] Snapshot → ${snapshotPath}\n`)
   process.stdout.write(`[soak] To watch with the CLI (PowerShell):\n`)
   process.stdout.write(`[soak]   $env:TRACEHOUND_SYSTEM_SNAPSHOT_PATH='${snapshotPath}'\n`)

@@ -15,6 +15,7 @@ coverage/
 semgrep/
 security/artifacts/generated/
 infrastructure/chaos/data/
+test-results/
 
 # IDE
 .vscode/

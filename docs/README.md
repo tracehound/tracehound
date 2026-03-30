@@ -1,7 +1,7 @@
 # Documentation Index
 
-> **Last Updated:** 2026-03-26
-> **Version:** v1.8.2
+> **Last Updated:** 2026-03-30
+> **Version:** v1.8.9
 > **Model:** Open-Source
 
 ---
@@ -14,7 +14,8 @@
 | **API**           | [API.md](./API.md)                                                                         | Public API reference                             |
 | **Configuration** | [CONFIGURATION.md](./CONFIGURATION.md)                                                     | Runtime and adapter configuration defaults       |
 | **Migration**     | [BREAKING-CHANGES.md](./BREAKING-CHANGES.md)                                               | Breaking changes and upgrade path                |
-| **Roadmap**       | [roadmap/TRACEHOUND-UNIFIED-ROADMAP.md](./roadmap/TRACEHOUND-UNIFIED-ROADMAP.md)           | Authoritative technical roadmap                  |
+| **Supply Chain**  | [../security/supply-chain.md](../security/supply-chain.md)                                 | Release trust boundary and build provenance      |
+| **Harness**       | [../security/HARNESS.md](../security/HARNESS.md)                                           | External harness boundary and local forensic lab |
 | **Validation**    | [../security/paranoid-validation-playbook.md](../security/paranoid-validation-playbook.md) | Deep security review and release validation path |
 
 ---
@@ -43,14 +44,25 @@
 | [0010-OneWayMembrane.md](./rfc/0010-OneWayMembrane.md)                                     | ✅ Implemented | One-way membrane and trace id signaling                   |
 | [0011-PressureContainment.md](./rfc/0011-PressureContainment.md)                           | ✅ Implemented | Pressure containment and graceful shielding               |
 | [0013-OperationalTruthAndHoundAnalysis.md](./rfc/0013-OperationalTruthAndHoundAnalysis.md) | ✅ Implemented | Signed operational truth and deterministic hound analysis |
+| [0015-ExternalThreatSignalAdapters.md](./rfc/0015-ExternalThreatSignalAdapters.md)         | ⚠️ Draft       | Public draft for external threat signal adapter contract  |
 
 ---
 
-## Roadmap
+## Release Boundary
 
-`docs/roadmap/TRACEHOUND-UNIFIED-ROADMAP.md` is the only active roadmap.
-`ENHANCED-QUARANTINE-PROTOCOL.md` is now a completed implementation record for the core quarantine expansion.
-Other roadmap files remain historical reference material unless restated in the unified roadmap.
+Tracehound `v1.8.9` treats release provenance as a first-class security boundary:
+
+- Release gate: immutable lockfile, offline/clean install, `pnpm build`, package parity verification, artifact manifest metadata
+- Security/tooling gate: tests, coverage, chaos, forensic lab, SBOM, audit and CVE triage
+- `vite`, `vitest`, `tsx`, and optional bundlers remain developer/test tooling, not trusted release-build inputs
+- `docs/` in this repository is the canonical OSS source; external sites consume and mirror this material
+
+## Validation Lanes
+
+- `pnpm test` validates package behavior and regression coverage.
+- `pnpm test:chaos` validates fail-open, pressure, snapshot, and trace-registry invariants.
+- `pnpm test:forensic-lab` validates evidence/custody parity, signed snapshot truth, and cold-storage readback.
+- `infrastructure/soak` remains the sustained-traffic lane for audit continuity and operational truth.
 
 ---
 

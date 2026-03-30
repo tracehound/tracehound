@@ -60,7 +60,7 @@ npm install @tracehound/core
 ### 1. Create Tracehound Instance
 
 ```typescript
-import { createTracehound } from '@tracehound/core'
+import { createTracehound, generateSecureId, type ThreatSignal } from '@tracehound/core'
 
 // Initialize Tracehound
 const th = createTracehound({
@@ -101,7 +101,10 @@ function createScent(req: Request): Scent {
   return {
     id: generateSecureId(),
     timestamp: Date.now(),
-    source: req.ip,
+    source: {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    },
     payload: {
       method: req.method,
       path: req.path,
@@ -132,6 +135,12 @@ app.use((req, res, next) => {
     case 'ignored':
       // Duplicate threat, already quarantined
       res.status(403).json({ error: 'Request blocked' })
+      break
+    case 'payload_too_large':
+      res.status(413).json({ error: 'Payload too large', limit: result.limit })
+      break
+    case 'error':
+      next() // Fail-open: let the host application continue
       break
   }
 })
@@ -232,8 +241,16 @@ The input data structure representing a request:
 interface Scent {
   id: string // Unique ID (crypto.randomUUID)
   timestamp: number // Unix timestamp
-  source: string // Client IP or identifier
-  payload: unknown // Request data
+  source: {
+    ip: string
+    userAgent?: string
+    tls?: {
+      protocol?: string
+      cipherSuite?: string
+      alpn?: string
+    }
+  }
+  payload: unknown // JSON-serializable request data
   threat?: ThreatSignal // External detection result
 }
 ```
@@ -244,10 +261,8 @@ Signal from external detector:
 
 ```typescript
 interface ThreatSignal {
-  category: string // e.g., 'injection', 'ddos'
+  category: 'injection' | 'ddos' | 'flood' | 'spam' | 'malware' | 'unknown'
   severity: 'critical' | 'high' | 'medium' | 'low'
-  confidence?: number // 0-1
-  metadata?: Record<string, unknown>
 }
 ```
 
@@ -258,9 +273,11 @@ Result from `agent.intercept()`:
 ```typescript
 type InterceptResult =
   | { status: 'clean' }
-  | { status: 'quarantined'; handle: EvidenceHandle }
+  | { status: 'quarantined'; handle: RuntimeEvidenceHandle }
   | { status: 'rate_limited'; retryAfter: number }
-  | { status: 'ignored'; reason: string }
+  | { status: 'payload_too_large'; limit: number }
+  | { status: 'ignored'; signature: string }
+  | { status: 'error'; error: TracehoundError }
 ```
 
 ---
@@ -269,6 +286,7 @@ type InterceptResult =
 
 - [API & Configuration Reference](./API.md)
 - [RFC-0000: Core Architecture](./rfc/0000-Proposal.md)
+- [Supply Chain & Release Boundary](../security/supply-chain.md)
 
 ---
 

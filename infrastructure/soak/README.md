@@ -12,6 +12,7 @@ This is **not** a replacement for the full 15-day soak defined in the security h
 - Observing quarantine accumulation and TTL decay over time
 - Detecting obvious memory leaks in a short developer session (30 min – a few hours)
 - Confirming deduplication, rate limiting, and fail-open behaviour on your own machine
+- Verifying trace-id continuity, pressure visibility, signed snapshot export, and file-backed archival parity
 
 ## Traffic mix
 
@@ -81,6 +82,7 @@ Status lines are printed to stdout every `SOAK_INTERVAL` ms:
 ```
 
 Each sample is also appended as a JSONL record to `infrastructure/soak/logs/metrics.jsonl`.
+Release provenance for the current run is written to `infrastructure/soak/logs/release-metadata.json`.
 Analyse with `jq`:
 
 ```bash

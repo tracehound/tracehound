@@ -177,8 +177,20 @@ The request unit entering the Agent.
 interface Scent {
   id: string // request identifier
   payload: unknown // request data (size-limited)
-  source: string // origin (IP, user agent, etc.)
+  source: {
+    ip: string
+    userAgent?: string
+    tls?: {
+      protocol?: string
+      cipherSuite?: string
+      alpn?: string
+    }
+  } // structured origin for rate limiting and forensic continuity
   timestamp: number // capture time
+  threat?: {
+    category: ThreatCategory
+    severity: 'low' | 'medium' | 'high' | 'critical'
+  }
 }
 ```
 
@@ -239,8 +251,8 @@ Early rejection before Agent processing.
 
 ```ts
 interface RateLimiter {
-  check(source: string): RateLimitResult
-  reset(source: string): void
+  check(source: Scent['source']): RateLimitResult
+  reset(source: Scent['source']): void
 }
 
 type RateLimitResult = { allowed: true } | { allowed: false; retryAfter: number; reason: string }
@@ -856,7 +868,7 @@ interface PurgeRecord {
   reason: 'timeout' | 'error' | 'abort' | 'panic'
   scent: {
     id: string
-    source: string
+    source: Scent['source']
     timestamp: number
     payloadHash: string // hash only, not full payload
     payloadSize: number

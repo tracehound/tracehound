@@ -139,6 +139,7 @@ export function createSoakServer(port: number): Promise<SoakServer> {
   app.use(
     tracehound({
       agent: th.agent,
+      emitTraceIdHeader: true,
       extractScent: (req): Scent => {
         const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown'
         const userAgent = req.get('user-agent')

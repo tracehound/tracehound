@@ -19,6 +19,7 @@ This directory contains only RFCs that define one or more of:
 3. `RFC-0010` - One-way membrane and trace ID signaling
 4. `RFC-0011` - Pressure containment and graceful shielding
 5. `RFC-0013` - Operational truth and Hound analysis
+6. `RFC-0015` - External threat signal adapters (public draft)
 
 ## Exclusions
 

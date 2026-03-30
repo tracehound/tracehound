@@ -104,7 +104,11 @@ jobs:
 
       - name: Install dependencies
         if: needs.affected.outputs.has_packages == 'true'
-        run: pnpm install --frozen-lockfile
+        run: pnpm fetch --frozen-lockfile
+
+      - name: Install dependencies offline
+        if: needs.affected.outputs.has_packages == 'true'
+        run: pnpm install --offline --frozen-lockfile
 
       - name: Build @tracehound/core
         if: needs.affected.outputs.has_packages == 'true'
@@ -125,6 +129,12 @@ jobs:
       - name: Build affected workspaces
         if: needs.affected.outputs.has_packages == 'true'
         run: pnpm -r ${{ needs.affected.outputs.filters }} build
+
+      - name: Verify publish packages
+        if: needs.affected.outputs.has_packages == 'true'
+        run: node scripts/release/verify-publish-packages.mjs
+        env:
+          TRACEHOUND_RELEASE_LABEL: pr-${{ github.event.pull_request.number }}-${{ github.sha }}
 
       - name: Test affected workspaces
         if: needs.affected.outputs.has_packages == 'true'

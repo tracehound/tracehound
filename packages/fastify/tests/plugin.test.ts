@@ -727,11 +727,7 @@ describe('tracehoundPlugin', () => {
     const agent = createMockAgent({ status: 'clean' })
     const fastify = createMockFastify()
 
-    tracehoundPlugin(
-      fastify as unknown as FastifyInstance,
-      { agent, _now: () => 654 },
-      () => {},
-    )
+    tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, _now: () => 654 }, () => {})
 
     const req = createMockReq()
     const reply = createMockReply()

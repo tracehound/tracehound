@@ -45,7 +45,9 @@ function resolveCommitSha(): string {
 }
 
 function readPackageVersion(packageDir: string): string {
-  const raw = JSON.parse(readFileSync(resolve(process.cwd(), packageDir, 'package.json'), 'utf8')) as {
+  const raw = JSON.parse(
+    readFileSync(resolve(process.cwd(), packageDir, 'package.json'), 'utf8'),
+  ) as {
     version?: string
   }
   return raw.version ?? 'unknown'

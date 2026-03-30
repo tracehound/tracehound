@@ -191,7 +191,10 @@ async function main() {
     )
   }
 
-  if (metadata.compiler.module !== 'NodeNext' || metadata.compiler.moduleResolution !== 'NodeNext') {
+  if (
+    metadata.compiler.module !== 'NodeNext' ||
+    metadata.compiler.moduleResolution !== 'NodeNext'
+  ) {
     throw new Error(
       `Release trust boundary requires NodeNext compiler settings. Received module=${metadata.compiler.module} moduleResolution=${metadata.compiler.moduleResolution}`,
     )

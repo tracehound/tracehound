@@ -137,7 +137,11 @@ function writeLegacySignedSnapshot(
   writeFileSync(snapshotPath, JSON.stringify(signed), 'utf8')
 }
 
-function runCliStatus(snapshotPath: string, secret: string, env: Record<string, string>): CliStatusJson {
+function runCliStatus(
+  snapshotPath: string,
+  secret: string,
+  env: Record<string, string>,
+): CliStatusJson {
   const stdout = execFileSync(
     'node',
     [resolve(REPO_ROOT, 'packages', 'cli', 'dist', 'index.js'), 'status', '--json'],
@@ -277,7 +281,10 @@ async function main(): Promise<void> {
     )
     checks.push({
       name: 'signed_snapshot_readback',
-      passed: snapshot.systemHealth === 'healthy' || snapshot.systemHealth === 'degraded' || snapshot.systemHealth === 'critical',
+      passed:
+        snapshot.systemHealth === 'healthy' ||
+        snapshot.systemHealth === 'degraded' ||
+        snapshot.systemHealth === 'critical',
       details: `snapshot written at ${snapshot.generatedAt} and verified with HMAC`,
     })
 
@@ -447,9 +454,7 @@ async function main(): Promise<void> {
         `- Artifact source: ${metadata.artifactSource}`,
         `- Commit: ${metadata.commitSha}`,
         '',
-        ...checks.map((check) =>
-          `- [${check.passed ? 'x' : ' '}] ${check.name}: ${check.details}`,
-        ),
+        ...checks.map((check) => `- [${check.passed ? 'x' : ' '}] ${check.name}: ${check.details}`),
         '',
       ].join('\n'),
       'utf8',

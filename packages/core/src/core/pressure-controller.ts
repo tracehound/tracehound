@@ -26,7 +26,10 @@ export class PressureController {
   private houndPressureEvents = 0
   private readonly now: () => number
 
-  constructor(private readonly thresholds: PressureThresholds, now?: () => number) {
+  constructor(
+    private readonly thresholds: PressureThresholds,
+    now?: () => number,
+  ) {
     // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
     this.now = now ?? ((): number => Date.now())
     this.state = freezePressureState({

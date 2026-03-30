@@ -11,7 +11,7 @@
     "test:fuzz:regression": "vitest run packages/core/tests/fuzz",
     "test:coverage": "vitest run --coverage",
     "test:chaos": "pnpm build && tsx scripts/chaos/run-chaos-suite.ts",
-    "test:forensic-lab": "pnpm --filter tracehound-forensic-lab build && node infrastructure/forensic-lab/dist/main.js --release local",
+    "test:forensic-lab": "pnpm --filter tracehound-forensic-lab build && node infrastructure/forensic-lab/dist/main.js",
     "verify:release": "node scripts/release/verify-publish-packages.mjs",
     "verify:release-boundary": "node scripts/release/verify-publish-packages.mjs",
     "validate:paranoid": "pnpm lint && pnpm format && pnpm build && pnpm test && pnpm test:fuzz:regression && pnpm test:coverage && pnpm test:chaos && pnpm test:forensic-lab && node scripts/release/verify-publish-packages.mjs",

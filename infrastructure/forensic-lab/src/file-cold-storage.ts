@@ -22,7 +22,8 @@ interface ArtifactMeta {
 }
 
 function sanitizeId(id: string): string {
-  return id.replace(/:/g, '_')
+  const sanitized = id.replace(/[^A-Za-z0-9._-]/g, '_')
+  return sanitized.length > 0 ? sanitized : 'artifact'
 }
 
 function payloadPath(dir: string, id: string): string {

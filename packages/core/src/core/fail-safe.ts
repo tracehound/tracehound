@@ -319,6 +319,7 @@ export function createFailSafe(config?: Partial<FailSafeConfig>): FailSafe {
     memory: { ...DEFAULT_FAIL_SAFE_CONFIG.memory, ...config?.memory },
     quarantine: { ...DEFAULT_FAIL_SAFE_CONFIG.quarantine, ...config?.quarantine },
     errorRate: { ...DEFAULT_FAIL_SAFE_CONFIG.errorRate, ...config?.errorRate },
+    ...(config?._now ? { _now: config._now } : {}),
   }
 
   return new FailSafe(mergedConfig)

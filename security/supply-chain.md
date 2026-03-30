@@ -61,5 +61,5 @@ These tools may still be used for testing, local workflows, or packaging conveni
 
 - Dependency tree artifact is generated.
 - `pnpm audit` endpoint returned 403 in this environment; output and error are captured in artifact.
-- SBOM artifact is generated via local fallback generator due registry restrictions in `pnpm dlx` path.
+- SBOM artifact is generated via local fallback generator due to registry restrictions in `pnpm dlx` path.
 - Release package verification now emits package-level metadata with `release`, `artifactSource`, `buildMode`, `commitSha`, `executedAt`, and `sourcePath`.

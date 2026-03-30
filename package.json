@@ -7,11 +7,11 @@
   "scripts": {
     "build": "pnpm -r build",
     "pretest": "pnpm --filter @tracehound/core build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter \"@tracehound/*\" test",
     "test:fuzz:regression": "vitest run packages/core/tests/fuzz",
     "test:coverage": "vitest run --coverage",
     "test:chaos": "pnpm build && pnpm --filter tracehound-chaos-testing test",
-    "test:forensic-lab": "pnpm --filter tracehound-forensic-lab build && node infrastructure/forensic-lab/dist/main.js",
+    "test:forensic-lab": "pnpm --filter @tracehound/core --filter @tracehound/cli --filter tracehound-forensic-lab build && node infrastructure/forensic-lab/dist/main.js",
     "verify:release": "node scripts/release/verify-publish-packages.mjs",
     "verify:release-boundary": "node scripts/release/verify-publish-packages.mjs",
     "validate:all": "pnpm lint && pnpm format && pnpm build && pnpm test && pnpm test:fuzz:regression && pnpm test:coverage && pnpm test:chaos && pnpm test:forensic-lab && node scripts/release/verify-publish-packages.mjs",

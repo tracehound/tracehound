@@ -11,6 +11,7 @@
     "test:fuzz:regression": "vitest run packages/core/tests/fuzz",
     "test:coverage": "vitest run --coverage",
     "test:chaos": "pnpm build && pnpm --filter tracehound-chaos-testing test",
+    "test:soak:smoke": "pnpm build && node infrastructure/soak/dist/smoke.js",
     "test:forensic-lab": "pnpm --filter @tracehound/core --filter @tracehound/cli --filter tracehound-forensic-lab build && node infrastructure/forensic-lab/dist/main.js",
     "verify:release": "node scripts/release/verify-publish-packages.mjs",
     "verify:release-boundary": "node scripts/release/verify-publish-packages.mjs",

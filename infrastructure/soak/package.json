@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/main.js",
+    "smoke": "node dist/smoke.js",
     "dev": "tsc && node dist/main.js",
     "dev:quick": "tsc --noEmit && echo TypeScript OK || exit 1"
   },

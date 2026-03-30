@@ -46,6 +46,9 @@ pnpm --filter tracehound-soak-testing build
 
 # Run
 node infrastructure/soak/dist/main.js
+
+# Short startup + telemetry smoke
+pnpm test:soak:smoke
 ```
 
 Or use the convenience script from the soak package directory:

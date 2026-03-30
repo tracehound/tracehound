@@ -74,6 +74,11 @@ export const SYSTEM_SNAPSHOT_ENV = Object.freeze({
 let windowsAclWarningEmitted = false
 const WATCHER_ALERT_TYPE_SET: ReadonlySet<string> = new Set(WATCHER_ALERT_TYPES)
 
+function resolveNow(now?: () => number): () => number {
+  // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of call-site construction order
+  return now ?? ((): number => Date.now())
+}
+
 /**
  * Resolve snapshot path from explicit path, env, or default.
  */
@@ -109,14 +114,15 @@ export function resolveSystemSnapshotSecret(secretOverride?: string): string | n
 /**
  * Export immutable runtime snapshot from a live Tracehound instance.
  */
-export function exportSystemSnapshot(tracehound: ITracehound): SystemSnapshot {
+export function exportSystemSnapshot(tracehound: ITracehound, now?: () => number): SystemSnapshot {
+  const currentNow = resolveNow(now)
   const watcher = tracehound.watcher.snapshot()
   const pool = tracehound.houndPool.stats
 
   const systemHealth: SystemHealth = deriveSystemHealth(watcher, pool)
 
   return Object.freeze({
-    generatedAt: Date.now(),
+    generatedAt: currentNow(),
     systemHealth,
     agent: tracehound.agent.getStats(),
     quarantine: tracehound.quarantine.stats,
@@ -135,7 +141,9 @@ export function writeSystemSnapshotToDisk(
   snapshot: SystemSnapshot,
   path: string,
   secret: string,
+  now?: () => number,
 ): void {
+  const currentNow = resolveNow(now)
   if (secret.length === 0) {
     throw Errors.snapshotSecretMissing()
   }
@@ -150,7 +158,7 @@ export function writeSystemSnapshotToDisk(
   const signedText = JSON.stringify(signed)
 
   const parent = dirname(path)
-  const tmpPath = `${path}.tmp-${process.pid}-${Date.now()}`
+  const tmpPath = `${path}.tmp-${process.pid}-${currentNow()}`
 
   try {
     mkdirSync(parent, { recursive: true })
@@ -159,7 +167,7 @@ export function writeSystemSnapshotToDisk(
       mode: 0o600,
       flag: 'w',
     })
-    replaceSnapshotFile(tmpPath, path)
+    replaceSnapshotFile(tmpPath, path, currentNow)
 
     if (process.platform !== 'win32') {
       try {
@@ -229,7 +237,7 @@ function signPayload(payloadText: string, secret: string): string {
   return createHmac('sha256', secret).update(payloadText).digest('hex')
 }
 
-function replaceSnapshotFile(tmpPath: string, path: string): void {
+function replaceSnapshotFile(tmpPath: string, path: string, now: () => number): void {
   if (!existsSync(path)) {
     renameSync(tmpPath, path)
     return
@@ -241,7 +249,7 @@ function replaceSnapshotFile(tmpPath: string, path: string): void {
     return
   }
 
-  const backupPath = `${path}.bak-${process.pid}-${Date.now()}`
+  const backupPath = `${path}.bak-${process.pid}-${now()}`
   renameSync(path, backupPath)
 
   let committed = false

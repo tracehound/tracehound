@@ -81,6 +81,12 @@ export interface FailSafeConfig {
   quarantine: ThresholdConfig
   /** Error rate thresholds (errors per minute) */
   errorRate: ThresholdConfig
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 /**
@@ -121,8 +127,12 @@ export class FailSafe {
   private panicHistory: PanicEvent[] = []
   private _lastPanic: PanicEvent | undefined = undefined
   private readonly maxHistory = 100
+  private readonly now: () => number
 
-  constructor(private config: FailSafeConfig = DEFAULT_FAIL_SAFE_CONFIG) {}
+  constructor(private config: FailSafeConfig = DEFAULT_FAIL_SAFE_CONFIG) {
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    this.now = config._now ?? ((): number => Date.now())
+  }
 
   /**
    * Register a callback for a panic level.
@@ -159,7 +169,7 @@ export class FailSafe {
       this.trigger({
         level,
         reason: 'memory_threshold',
-        timestamp: Date.now(),
+        timestamp: this.now(),
         context: {
           current: ratio,
           threshold: this.config.memory[level],
@@ -183,7 +193,7 @@ export class FailSafe {
       this.trigger({
         level,
         reason: 'quarantine_capacity',
-        timestamp: Date.now(),
+        timestamp: this.now(),
         context: {
           current: ratio,
           threshold: this.config.quarantine[level],
@@ -205,7 +215,7 @@ export class FailSafe {
       this.trigger({
         level,
         reason: 'error_rate',
-        timestamp: Date.now(),
+        timestamp: this.now(),
         context: {
           current: errorsPerMinute,
           threshold: this.config.errorRate[level],
@@ -225,7 +235,7 @@ export class FailSafe {
     this.trigger({
       level,
       reason: 'manual',
-      timestamp: Date.now(),
+      timestamp: this.now(),
       context: details ? { details } : {},
     })
   }

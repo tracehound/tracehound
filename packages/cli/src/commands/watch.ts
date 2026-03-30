@@ -31,6 +31,11 @@ import {
 const require = createRequire(import.meta.url)
 const { version } = require('../../package.json')
 
+function currentTime(): number {
+  // eslint-disable-next-line no-restricted-syntax -- CLI render bridge defers to global Date.now so fake timers remain effective
+  return Date.now()
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type Screen = 'overview' | 'watcher' | 'quarantine' | 'pool' | 'agent' | 'help'
@@ -258,6 +263,7 @@ function toDashboardSnapshot(
 export function renderOverview(s: Snapshot, w: number, refreshMs: number): void {
   const mode = calcWidthMode(w)
   const now = new Date()
+  const nowMs = currentTime()
 
   const poolStatus = s.houndPool.status === 'exhausted' ? 'EXHAUSTED' : 'STABLE'
   const qStatus = s.pressure.archiveSuppressed
@@ -339,7 +345,7 @@ export function renderOverview(s: Snapshot, w: number, refreshMs: number): void 
 
   // SUBSYSTEMS
   const nextExpStr = s.quarantine.nextExpiryAt
-    ? fmtDuration(Math.max(0, s.quarantine.nextExpiryAt - Date.now()))
+    ? fmtDuration(Math.max(0, s.quarantine.nextExpiryAt - nowMs))
     : '–'
 
   console.log(sec('SUBSYSTEMS', w))
@@ -512,6 +518,7 @@ export function renderWatcher(s: Snapshot, w: number): void {
 // ── Screen: QUARANTINE ────────────────────────────────────────────────────
 
 export function renderQuarantine(s: Snapshot, w: number): void {
+  const nowMs = currentTime()
   const usagePct =
     s.quarantine.maxBytes > 0
       ? ((s.quarantine.bytes / s.quarantine.maxBytes) * 100).toFixed(1)
@@ -522,7 +529,7 @@ export function renderQuarantine(s: Snapshot, w: number): void {
       ? 'DEGRADED'
       : 'OK'
   const nextExpStr = s.quarantine.nextExpiryAt
-    ? fmtDuration(Math.max(0, s.quarantine.nextExpiryAt - Date.now()))
+    ? fmtDuration(Math.max(0, s.quarantine.nextExpiryAt - nowMs))
     : '–'
   const bySev = s.quarantine.bySeverity
 

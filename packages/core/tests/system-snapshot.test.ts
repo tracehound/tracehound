@@ -204,6 +204,15 @@ describe('system-snapshot utilities', () => {
     expect(snapshot.systemHealth).toBe('critical')
   })
 
+  it('should honor injected clock when exporting snapshot', () => {
+    const snapshot = exportSystemSnapshot(
+      createMockTracehound(createWatcherSnapshot(), createHoundPoolStats()),
+      () => 123_456,
+    )
+
+    expect(snapshot.generatedAt).toBe(123_456)
+  })
+
   it('should derive critical health when pool is exhausted', () => {
     const watcher = createWatcherSnapshot({
       overloaded: false,

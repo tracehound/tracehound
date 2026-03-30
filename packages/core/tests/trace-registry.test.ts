@@ -41,6 +41,22 @@ describe('trace inspection registry', () => {
     }
   })
 
+  it('uses injected clock when recording entries', () => {
+    const recorded = recordTraceInspectionEntry(
+      {
+        traceId: 'trace-now',
+        signature: 'injection:sig-now',
+        severity: 'high',
+        size: 1,
+        captured: 100,
+        source: '127.0.0.1',
+      },
+      { _now: () => 42 },
+    )
+
+    expect(recorded?.recordedAt).toBe(42)
+  })
+
   it('finds entry by signature', () => {
     const dir = mkdtempSync(join(tmpdir(), 'tracehound-registry-test-'))
     const path = join(dir, 'trace-registry.ndjson')

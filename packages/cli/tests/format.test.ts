@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   fmtAgo,
   fmtBytes,
@@ -11,6 +11,10 @@ import {
 } from '../src/lib/format.js'
 
 describe('CLI format utilities', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   describe('formatBytes', () => {
     it('should format zero bytes', () => {
       expect(formatBytes(0)).toBe('0 B')
@@ -113,6 +117,13 @@ describe('CLI format utilities', () => {
 
     it('should format hours ago', () => {
       expect(fmtAgo(0, 3 * 3_600_000)).toBe('3h ago')
+    })
+
+    it('should use current clock when now is omitted', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date(60_000))
+
+      expect(fmtAgo(0)).toBe('1m ago')
     })
   })
 

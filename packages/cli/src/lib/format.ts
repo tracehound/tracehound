@@ -72,8 +72,13 @@ export function fmtUptime(seconds: number): string {
  * Format a past timestamp as a relative "N ago" string.
  * `now` is injectable for deterministic tests.
  */
-export function fmtAgo(ts: number, now: number = Date.now()): string {
-  const diff = now - ts
+function defaultNow(): number {
+  // eslint-disable-next-line no-restricted-syntax -- CLI formatting bridge defers to global Date.now so fake timers remain effective
+  return Date.now()
+}
+
+export function fmtAgo(ts: number, now?: number): string {
+  const diff = (now ?? defaultNow()) - ts
   if (diff <= 0) return 'just now'
   if (diff < 60_000) return `${Math.floor(diff / 1000)}s ago`
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`

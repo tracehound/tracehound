@@ -21,6 +21,11 @@ import { createMessageParser, encodeHoundMessage, type HoundStatusMessage } from
 const parser = createMessageParser()
 let isProcessing = false
 
+function currentTime(): number {
+  // eslint-disable-next-line no-restricted-syntax -- child-process local bridge still respects fake timers in tests
+  return Date.now()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Message Sending
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,13 +73,13 @@ async function processPayload(payload: ArrayBuffer): Promise<void> {
   }
 
   isProcessing = true
-  const startTime = Date.now()
+  const startTime = currentTime()
 
   try {
     sendStatus('processing')
     sendAnalysis(payload)
 
-    const processingTime = Date.now() - startTime
+    const processingTime = currentTime() - startTime
     sendMetrics(processingTime)
     sendStatus('complete')
   } catch (err) {

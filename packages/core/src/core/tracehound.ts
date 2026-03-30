@@ -196,6 +196,7 @@ class Tracehound implements ITracehound {
   readonly coldStorage: IColdStorageAdapter | null
 
   private readonly evidenceFactory: IEvidenceFactory
+  private readonly now: () => number
   private readonly pressureController: PressureController
   private readonly scheduler: IScheduler | null
   private readonly snapshotPath: string | null
@@ -205,7 +206,9 @@ class Tracehound implements ITracehound {
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null
 
   constructor(options: TracehoundOptions = {}) {
-    const runtimeNow = options.runtime?.now ?? (() => Date.now())
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    const runtimeNow = options.runtime?.now ?? ((): number => Date.now())
+    this.now = runtimeNow
     const pressureThresholds = normalizePressureThresholds(
       options.pressure,
       options.watcher?.quarantineHighWatermark,
@@ -213,14 +216,15 @@ class Tracehound implements ITracehound {
 
     // Initialize components
     this.auditChain = new AuditChain()
-    this.notifications = createNotificationEmitter()
+    this.notifications = createNotificationEmitter({ _now: runtimeNow })
     this.pressureController = new PressureController(pressureThresholds, runtimeNow)
     const shouldProvisionDefaultColdStorage =
       typeof options.quarantine?.ttlMs === 'number' &&
       options.quarantine.ttlMs > 0 &&
       options.quarantine.archiveOnDecay !== false
     this.coldStorage =
-      options.coldStorage ?? (shouldProvisionDefaultColdStorage ? createMemoryColdStorage() : null)
+      options.coldStorage ??
+      (shouldProvisionDefaultColdStorage ? createMemoryColdStorage({ _now: runtimeNow }) : null)
 
     const quarantineDependencies =
       this.coldStorage === null
@@ -271,6 +275,7 @@ class Tracehound implements ITracehound {
     const poolConfig: HoundPoolConfig = {
       ...DEFAULT_POOL_CONFIG,
       ...options.houndPool,
+      _now: runtimeNow,
     }
     this.houndPool = createHoundPool(poolConfig)
 
@@ -349,7 +354,7 @@ class Tracehound implements ITracehound {
   }
 
   snapshot(): SystemSnapshot {
-    return exportSystemSnapshot(this)
+    return exportSystemSnapshot(this, this.now)
   }
 
   shutdown(): void {
@@ -368,7 +373,7 @@ class Tracehound implements ITracehound {
     const flush = (): void => {
       try {
         const snapshot = this.snapshot()
-        writeSystemSnapshotToDisk(snapshot, this.snapshotPath!, this.snapshotSecret!)
+        writeSystemSnapshotToDisk(snapshot, this.snapshotPath!, this.snapshotSecret!, this.now)
       } catch (error: unknown) {
         this.notifications.emit('system.panic', {
           level: 'warning',

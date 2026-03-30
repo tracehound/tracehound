@@ -82,29 +82,42 @@ function readLatestMetrics(path: string): SmokeMetricsRecord | null {
 async function stopChild(child: ReturnType<typeof spawn>): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   return await new Promise((resolvePromise, reject) => {
     let settled = false
+    const settle = (code: number | null, signal: NodeJS.Signals | null): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      child.off('error', onError)
+      child.off('exit', onExit)
+      resolvePromise({ code, signal })
+    }
+    const onError = (error: Error): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      child.off('error', onError)
+      child.off('exit', onExit)
+      reject(error)
+    }
+    const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
+      settle(code, signal)
+    }
     const timeout = setTimeout(() => {
       if (!settled) {
         child.kill('SIGKILL')
       }
     }, SHUTDOWN_TIMEOUT_MS)
 
-    child.once('error', (error) => {
-      if (settled) {
-        return
-      }
-      settled = true
-      clearTimeout(timeout)
-      reject(error)
-    })
+    child.once('error', onError)
+    child.once('exit', onExit)
 
-    child.once('exit', (code, signal) => {
-      if (settled) {
-        return
-      }
-      settled = true
-      clearTimeout(timeout)
-      resolvePromise({ code, signal })
-    })
+    if (child.exitCode !== null || child.signalCode !== null) {
+      settle(child.exitCode, child.signalCode)
+      return
+    }
 
     child.kill('SIGINT')
   })
@@ -131,10 +144,14 @@ async function main(): Promise<void> {
     stdio: ['ignore', stdoutFd, stderrFd],
   })
 
-  await sleep(RUN_DURATION_MS)
-  const exit = await stopChild(child)
-  closeSync(stdoutFd)
-  closeSync(stderrFd)
+  let exit: { code: number | null; signal: NodeJS.Signals | null }
+  try {
+    await sleep(RUN_DURATION_MS)
+    exit = await stopChild(child)
+  } finally {
+    closeSync(stdoutFd)
+    closeSync(stderrFd)
+  }
 
   const metadataStat = existsSync(METADATA_PATH) ? statSync(METADATA_PATH) : undefined
   const metricsStat = existsSync(METRICS_PATH) ? statSync(METRICS_PATH) : undefined
@@ -145,11 +162,11 @@ async function main(): Promise<void> {
     throw new Error('soak smoke artifacts are missing after execution')
   }
   assert(
-    metadataBefore === undefined || metadataStat.mtimeMs >= metadataBefore,
+    metadataBefore === undefined || metadataStat.mtimeMs > metadataBefore,
     'release metadata timestamp did not advance',
   )
   assert(
-    metricsBefore === undefined || metricsStat.mtimeMs >= metricsBefore,
+    metricsBefore === undefined || metricsStat.mtimeMs > metricsBefore,
     'metrics log timestamp did not advance',
   )
 

@@ -112,7 +112,7 @@ export function createFileColdStorage(dir: string): IColdStorageAdapter {
         return {
           success: true,
           payload: {
-            compressed: new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength),
+            compressed: Uint8Array.from(payload),
             hash: parsedMeta.hash,
             originalSize: parsedMeta.originalSize,
             compressedSize: parsedMeta.compressedSize,

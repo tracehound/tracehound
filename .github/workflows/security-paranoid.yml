@@ -1,4 +1,4 @@
-name: Security Paranoid
+name: Security Deep Validation
 
 on:
   schedule:

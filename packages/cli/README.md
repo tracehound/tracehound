@@ -41,6 +41,11 @@ Optional validation overrides:
 - `TRACEHOUND_SNAPSHOT_MAX_AGE_MS` (default `5000`)
 - `TRACEHOUND_SNAPSHOT_MAX_FUTURE_SKEW_MS` (default `5000`)
 
+Snapshot truth semantics:
+
+- stale or missing snapshot => `NO_INSTANCE`
+- bad signature or future-skew violation => `INTEGRITY_VIOLATION`
+
 Example:
 
 ```bash
@@ -53,11 +58,21 @@ tracehound status
 
 `inspect`, `history clear`, and `disk clear` operate on the local trace registry.
 
+Optional environment variable:
+
+- `TRACEHOUND_TRACE_REGISTRY_PATH` to override the default trace-registry location used by inspect/history/disk commands
+
 Typical flow:
 
 1. Enable `emitTraceIdHeader: true` in Express/Fastify adapter.
 2. Capture `x-tracehound-trace-id` from a quarantined response.
 3. Run `tracehound inspect --trace-id <id>`.
+
+Lifecycle commands:
+
+- `tracehound history clear` clears logical inspection history while preserving the registry file path
+- `tracehound disk clear` removes persisted local trace-registry data from disk
+- `tracehound inspect` returns trace-registry metadata only; forensic payload bytes remain quarantine-local and are never exposed by the CLI
 
 ## Output Modes
 
@@ -69,6 +84,12 @@ Typical flow:
 - [@tracehound/core](../core/README.md)
 - [@tracehound/express](../express/README.md)
 - [@tracehound/fastify](../fastify/README.md)
+
+## Further Reading
+
+- [API Reference](../../docs/API.md)
+- [Configuration](../../docs/CONFIGURATION.md)
+- [Supply Chain & Release Boundary](../../security/supply-chain.md)
 
 ## License
 

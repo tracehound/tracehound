@@ -36,6 +36,17 @@ interface SmokeSummary {
   }
 }
 
+interface ChildExit {
+  readonly code: number | null
+  readonly signal: NodeJS.Signals | null
+}
+
+interface ChildMonitor {
+  readonly error: Error | null
+  readonly exit: ChildExit | null
+  readonly settled: Promise<void>
+}
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = resolve(__dirname, '..', '..', '..')
@@ -79,48 +90,76 @@ function readLatestMetrics(path: string): SmokeMetricsRecord | null {
   return JSON.parse(lines[lines.length - 1]!) as SmokeMetricsRecord
 }
 
-async function stopChild(child: ReturnType<typeof spawn>): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
-  return await new Promise((resolvePromise, reject) => {
-    let settled = false
-    const settle = (code: number | null, signal: NodeJS.Signals | null): void => {
-      if (settled) {
+function createChildMonitor(child: ReturnType<typeof spawn>): ChildMonitor {
+  let error: Error | null = null
+  let exit: ChildExit | null = null
+  let resolved = false
+  let resolveSettled: (() => void) | null = null
+  const settled = new Promise<void>((resolvePromise) => {
+    resolveSettled = (): void => {
+      if (resolved) {
         return
       }
-      settled = true
-      clearTimeout(timeout)
-      child.off('error', onError)
-      child.off('exit', onExit)
-      resolvePromise({ code, signal })
+      resolved = true
+      resolvePromise()
     }
-    const onError = (error: Error): void => {
-      if (settled) {
-        return
-      }
-      settled = true
-      clearTimeout(timeout)
-      child.off('error', onError)
-      child.off('exit', onExit)
-      reject(error)
-    }
-    const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
-      settle(code, signal)
-    }
-    const timeout = setTimeout(() => {
-      if (!settled) {
-        child.kill('SIGKILL')
-      }
-    }, SHUTDOWN_TIMEOUT_MS)
-
-    child.once('error', onError)
-    child.once('exit', onExit)
-
-    if (child.exitCode !== null || child.signalCode !== null) {
-      settle(child.exitCode, child.signalCode)
-      return
-    }
-
-    child.kill('SIGINT')
   })
+
+  child.once('error', (value) => {
+    error = value
+    resolveSettled?.()
+  })
+
+  child.once('exit', (code, signal) => {
+    exit = { code, signal }
+    resolveSettled?.()
+  })
+
+  return {
+    get error(): Error | null {
+      return error
+    },
+    get exit(): ChildExit | null {
+      return exit
+    },
+    settled,
+  }
+}
+
+async function stopChild(
+  child: ReturnType<typeof spawn>,
+  monitor: ChildMonitor,
+): Promise<ChildExit> {
+  if (monitor.error !== null) {
+    throw monitor.error
+  }
+
+  if (monitor.exit !== null) {
+    return monitor.exit
+  }
+
+  const timeout = setTimeout(() => {
+    if (monitor.exit === null && monitor.error === null) {
+      child.kill('SIGKILL')
+    }
+  }, SHUTDOWN_TIMEOUT_MS)
+
+  try {
+    child.kill('SIGINT')
+    await monitor.settled
+
+    if (monitor.error !== null) {
+      throw monitor.error
+    }
+
+    if (monitor.exit === null) {
+      throw new Error('soak process did not exit after shutdown signal')
+    }
+
+    return monitor.exit
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 async function main(): Promise<void> {
@@ -143,11 +182,16 @@ async function main(): Promise<void> {
     },
     stdio: ['ignore', stdoutFd, stderrFd],
   })
+  const monitor = createChildMonitor(child)
 
   let exit: { code: number | null; signal: NodeJS.Signals | null }
   try {
     await sleep(RUN_DURATION_MS)
-    exit = await stopChild(child)
+    if (monitor.error !== null) {
+      throw monitor.error
+    }
+    assert(monitor.exit === null, 'soak process exited before smoke duration elapsed')
+    exit = await stopChild(child, monitor)
   } finally {
     closeSync(stdoutFd)
     closeSync(stderrFd)

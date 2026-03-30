@@ -182,6 +182,17 @@ describe('system snapshot freshness', () => {
     expect(result.ok).toBe(true)
   })
 
+  it('should honor injected clock when evaluating freshness', () => {
+    const generatedAt = 10_000
+    writeFixtureSnapshotToDisk(createFixtureSnapshot(generatedAt), snapshotPath, SNAPSHOT_SECRET)
+
+    const result = loadSystemSnapshot({ _now: () => generatedAt + 5_001 })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.code).toBe('NO_INSTANCE')
+  })
+
   it('should reject stale snapshot as NO_INSTANCE with default max age', () => {
     const now = new Date('2026-03-05T10:00:00.000Z')
     vi.setSystemTime(now)

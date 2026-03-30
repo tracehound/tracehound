@@ -34,7 +34,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm fetch --frozen-lockfile
+      - run: pnpm install --offline --frozen-lockfile
       - run: pnpm lint
       - name: Reject forbidden memory patterns in core
         run: |
@@ -43,6 +44,9 @@ jobs:
             exit 1
           fi
       - run: pnpm build
+      - run: node scripts/release/verify-publish-packages.mjs
+        env:
+          TRACEHOUND_RELEASE_LABEL: ci-main-${{ github.sha }}
       - run: pnpm test
 
   secrets_full:

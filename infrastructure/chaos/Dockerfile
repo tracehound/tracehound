@@ -25,5 +25,5 @@ ENV NODE_ENV=production
 # Expose the API port
 EXPOSE 3000
 
-# Run the test server
-CMD ["pnpm", "exec", "tsx", "infrastructure/chaos/server.ts"]
+# Run the compiled chaos server
+CMD ["node", "infrastructure/chaos/dist/server.js"]

@@ -1,15 +1,14 @@
 {
-  "name": "tracehound-soak-testing",
+  "name": "tracehound-chaos-testing",
   "private": true,
   "version": "1.8.9",
-  "description": "Local Node.js soak test harness for Tracehound integration validation",
+  "description": "Local chaos validation harness for Tracehound release artifacts",
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/main.js",
-    "smoke": "node dist/smoke.js",
-    "dev": "tsc && node dist/main.js",
-    "dev:quick": "tsc --noEmit && echo TypeScript OK || exit 1"
+    "start": "node dist/server.js",
+    "test": "node dist/run-chaos-suite.js",
+    "clean": "node ../../scripts/build/clean-dist.mjs dist"
   },
   "dependencies": {
     "@tracehound/core": "workspace:*",

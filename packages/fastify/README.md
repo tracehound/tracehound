@@ -24,7 +24,9 @@ const th = createTracehound()
 
 app.register(tracehoundPlugin, {
   agent: th.agent,
+  maxPayloadSize: 1_000_000,
   emitTraceIdHeader: true,
+  resolveSourceIp: (req) => req.raw.socket.remoteAddress ?? req.ip ?? 'unknown',
 })
 ```
 
@@ -47,15 +49,20 @@ await app.register(rawBody, {
 
 If `rawBody` is absent, signatures are generated from canonicalized payload.
 
+- `maxPayloadSize` is a memory-safety guard for clone avoidance, not the hard enforcement point; the agent still enforces the actual payload limit
+- `resolveSourceIp` is strongly recommended behind a proxy or CDN when `req.ip` trust settings are not fully under your control
+
 ## Options
 
-| Option                    | Type                             | Required | Default            | Description                                           |
-| ------------------------- | -------------------------------- | -------- | ------------------ | ----------------------------------------------------- |
-| `agent`                   | `IAgent`                         | Yes      | -                  | Tracehound Agent instance                             |
-| `emitSignatureInResponse` | `boolean`                        | No       | `false`            | Include signature in `403` body                       |
-| `emitTraceIdHeader`       | `boolean`                        | No       | `false`            | Emit `x-tracehound-trace-id` on quarantined responses |
-| `extractScent`            | `(req: FastifyRequest) => Scent` | No       | internal extractor | Override Scent extraction                             |
-| `onIntercept`             | `(result, req, reply) => void`   | No       | internal handler   | Override response behavior                            |
+| Option                    | Type                              | Required | Default            | Description                                                                 |
+| ------------------------- | --------------------------------- | -------- | ------------------ | --------------------------------------------------------------------------- |
+| `agent`                   | `IAgent`                          | Yes      | -                  | Tracehound Agent instance                                                   |
+| `emitSignatureInResponse` | `boolean`                         | No       | `false`            | Include signature in `403` body                                             |
+| `emitTraceIdHeader`       | `boolean`                         | No       | `false`            | Emit `x-tracehound-trace-id` on quarantined responses                       |
+| `maxPayloadSize`          | `number`                          | No       | unset              | Skip unsafe body clone work when `Content-Length` already exceeds the limit |
+| `resolveSourceIp`         | `(req: FastifyRequest) => string` | No       | internal resolver  | Override `req.ip` when proxy/CDN trust settings should not be relied on     |
+| `extractScent`            | `(req: FastifyRequest) => Scent`  | No       | internal extractor | Override Scent extraction                                                   |
+| `onIntercept`             | `(result, req, reply) => void`    | No       | internal handler   | Override response behavior                                                  |
 
 ## Default Status Mapping
 
@@ -94,6 +101,29 @@ app.register(tracehoundPlugin, {
 - `tracehoundPlugin`
 - `createPlugin` (alias)
 - types re-export: `Scent`, `InterceptResult`
+
+## Custom Scent Notes
+
+If you override `extractScent`, keep the structured `Scent.source` contract:
+
+```ts
+source: {
+  ip: '203.0.113.10',
+  userAgent: req.headers['user-agent'],
+  tls: {
+    cipherSuite: 'TLS_AES_256_GCM_SHA384',
+    version: 'TLSv1.3',
+  },
+}
+```
+
+Tracehound does not detect threats in the plugin. Custom extraction should only normalize upstream threat signals into the canonical `threat` object.
+
+## Further Reading
+
+- [Configuration](../../docs/CONFIGURATION.md)
+- [API Reference](../../docs/API.md)
+- [Supply Chain & Release Boundary](../../security/supply-chain.md)
 
 ## License
 

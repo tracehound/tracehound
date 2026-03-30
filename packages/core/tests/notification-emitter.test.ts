@@ -804,6 +804,18 @@ describe('NotificationEmitter', () => {
       expect(capturedEvent!.timestamp).toBeGreaterThan(0)
       expect(capturedEvent!.id).toMatch(/^[0-9a-f-]+$/)
     })
+
+    it('uses injected clock for event timestamps', () => {
+      emitter = new NotificationEmitter({ _now: () => 123 })
+      let capturedEvent: TracehoundEvent | null = null
+      emitter.on('threat.detected', (event) => {
+        capturedEvent = event
+      })
+
+      emitter.emit('threat.detected', { test: true })
+
+      expect(capturedEvent?.timestamp).toBe(123)
+    })
   })
 
   describe('factory function', () => {

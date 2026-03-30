@@ -489,6 +489,16 @@ describe('tracehound middleware', () => {
     expect(agent.intercept).toHaveBeenCalledWith(customScent)
   })
 
+  it('uses injected clock for default scent timestamp', () => {
+    const agent = createMockAgent({ status: 'clean' })
+    const middleware = tracehound({ agent, _now: () => 321 })
+
+    middleware(createMockReq(), createMockRes(), next)
+
+    const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+    expect(scent.timestamp).toBe(321)
+  })
+
   it('should use custom onIntercept handler', () => {
     const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
     const onIntercept = vi.fn()

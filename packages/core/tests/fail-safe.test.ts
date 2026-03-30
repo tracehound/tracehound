@@ -205,5 +205,24 @@ describe('FailSafe', () => {
         }),
       )
     })
+
+    it('should preserve injected _now when using the factory helper', () => {
+      const fs = createFailSafe({
+        _now: () => 4242,
+      })
+      const handler = vi.fn()
+
+      fs.on('warning', handler)
+      fs.panic('warning', 'factory-clock')
+
+      expect(handler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timestamp: 4242,
+          context: expect.objectContaining({
+            details: 'factory-clock',
+          }),
+        }),
+      )
+    })
   })
 })

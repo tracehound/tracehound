@@ -723,6 +723,22 @@ describe('tracehoundPlugin', () => {
     expect(agent.intercept).toHaveBeenCalledWith(customScent)
   })
 
+  it('uses injected clock for default scent timestamp', () => {
+    const agent = createMockAgent({ status: 'clean' })
+    const fastify = createMockFastify()
+
+    tracehoundPlugin(fastify as unknown as FastifyInstance, { agent, _now: () => 654 }, () => {})
+
+    const req = createMockReq()
+    const reply = createMockReply()
+
+    const hookHandler = fastify.addHook.mock.calls[0][1]
+    hookHandler(req, reply, () => {})
+
+    const scent = vi.mocked(agent.intercept).mock.calls[0][0]
+    expect(scent.timestamp).toBe(654)
+  })
+
   it('should use custom onIntercept handler and fail open when no reply is sent', () => {
     const agent = createMockAgent({ status: 'rate_limited', retryAfter: 1000 })
     const onIntercept = vi.fn()

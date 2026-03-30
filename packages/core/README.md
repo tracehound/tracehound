@@ -12,6 +12,11 @@ pnpm add @tracehound/core
 npm install @tracehound/core
 ```
 
+## Release Boundary
+
+`@tracehound/core` publish artifacts are produced from raw `tsc` output and verified with package parity checks.
+Test tooling such as `vitest`, `tsx`, and optional bundlers may still exist in the repository, but they are outside the release trust boundary for published OSS artifacts.
+
 ## Quick Start
 
 ```ts
@@ -64,7 +69,7 @@ th.shutdown()
 - `clean`: no threat signal on the `Scent`
 - `rate_limited`: source exceeded rate limit window
 - `payload_too_large`: payload exceeded `maxPayloadSize`
-- `ignored`: duplicate signature or deterministic pressure drop
+- `ignored`: duplicate signature or deterministic pressure-protected drop
 - `quarantined`: evidence stored; runtime gets metadata-only handle
 - `error`: internal failure; runtime can fail-open
 
@@ -123,6 +128,13 @@ createTracehound({
     alertWindowMs?: number,
     quarantineHighWatermark?: number,
   },
+  pressure?: {
+    elevatedWatermark?: number,
+    criticalWatermark?: number,
+    recoverToElevatedWatermark?: number,
+    recoverToNormalWatermark?: number,
+    recoveryCooldownMs?: number,
+  },
   houndPool?: Partial<HoundPoolConfig>,
   snapshot?: {
     path: string,
@@ -131,6 +143,12 @@ createTracehound({
   },
 })
 ```
+
+Pressure containment is part of the OSS runtime contract in `v1.8.9`:
+
+- `elevated` and `critical` pressure modes are surfaced through watcher snapshots, signed system snapshots, notifications, and CLI status/watch
+- `critical` pressure suppresses decay-time archival to protect host survivability
+- threshold validation is fail-fast during `createTracehound()` initialization
 
 ## Runtime Snapshot and CLI Integration
 
@@ -147,6 +165,16 @@ process.env[SYSTEM_SNAPSHOT_ENV.PATH] = '/var/run/tracehound/system-snapshot.jso
 process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = 'replace-me'
 ```
 
+## Validation Surface
+
+The repository validates the runtime in separate lanes:
+
+- package tests for API and behavioral regressions
+- chaos validation for fail-open, pressure, trace-registry, and snapshot invariants
+- forensic lab validation for evidence/custody parity, membrane enforcement, and cold-storage readback
+
+Release verification emits per-package metadata with release label, build mode, artifact source, commit SHA, and source path.
+
 ## Adapters
 
 - [@tracehound/express](../express/README.md)
@@ -157,6 +185,7 @@ process.env[SYSTEM_SNAPSHOT_ENV.SECRET] = 'replace-me'
 - [API Reference](../../docs/API.md)
 - [Configuration](../../docs/CONFIGURATION.md)
 - [Breaking Changes](../../docs/BREAKING-CHANGES.md)
+- [Supply Chain & Release Boundary](../../security/supply-chain.md)
 
 ## License
 

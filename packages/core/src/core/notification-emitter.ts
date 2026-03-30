@@ -162,6 +162,12 @@ export interface NotificationEmitterOptions {
   subscriberQueueLimit?: number
   webhookQueueLimit?: number
   webhookMaxInflight?: number
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 interface SubscriberEntry {
@@ -261,6 +267,7 @@ export class NotificationEmitter implements INotificationEmitter {
   private readonly webhookMaxInflight: number
   private readonly webhookQueue: WebhookDispatchJob[] = []
   private activeWebhookDispatches = 0
+  private readonly now: () => number
 
   private _totalEmitted = 0
   private _byType = new Map<EventType, number>()
@@ -278,6 +285,8 @@ export class NotificationEmitter implements INotificationEmitter {
       options.webhookMaxInflight,
       DEFAULT_WEBHOOK_MAX_INFLIGHT,
     )
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    this.now = options._now ?? ((): number => Date.now())
   }
 
   on<T = unknown>(event: EventType, callback: EventCallback<T>): void {
@@ -376,7 +385,7 @@ export class NotificationEmitter implements INotificationEmitter {
   emit<T>(type: EventType, payload: T): void {
     const event: TracehoundEvent<T> = {
       type,
-      timestamp: Date.now(),
+      timestamp: this.now(),
       payload,
       id: generateSecureId(),
     }

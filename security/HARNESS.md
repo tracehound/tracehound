@@ -22,5 +22,7 @@ See: [Codecov breach (2021)](https://about.codecov.io/security-update/),
 
 - `security/*.md` — Security review documentation (threat model, crypto review, etc.)
 - `infrastructure/chaos/` — Defensive chaos testing (self-contained, no external tools)
+- `infrastructure/forensic-lab/` — Deterministic evidence/custody validation for signed snapshot, cold storage, membrane, and audit continuity
+- `infrastructure/soak/` — Sustained traffic validation with forensic continuity metrics
 - `.github/workflows/` — CodeQL, Semgrep, chaos-verify (all defensive)
 - `SECURITY.md` — Vulnerability disclosure policy

@@ -7,12 +7,15 @@
   "scripts": {
     "build": "pnpm -r build",
     "pretest": "pnpm --filter @tracehound/core build",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter \"@tracehound/*\" test",
     "test:fuzz:regression": "vitest run packages/core/tests/fuzz",
     "test:coverage": "vitest run --coverage",
-    "test:chaos": "pnpm build && tsx scripts/chaos/run-chaos-suite.ts",
+    "test:chaos": "pnpm build && pnpm --filter tracehound-chaos-testing test",
+    "test:soak:smoke": "pnpm build && node infrastructure/soak/dist/smoke.js",
+    "test:forensic-lab": "pnpm --filter @tracehound/core --filter @tracehound/cli --filter tracehound-forensic-lab build && node infrastructure/forensic-lab/dist/main.js",
     "verify:release": "node scripts/release/verify-publish-packages.mjs",
-    "validate:paranoid": "pnpm lint && pnpm format && pnpm build && pnpm test && pnpm test:fuzz:regression && pnpm test:coverage && pnpm test:chaos && node scripts/release/verify-publish-packages.mjs",
+    "verify:release-boundary": "node scripts/release/verify-publish-packages.mjs",
+    "validate:all": "pnpm lint && pnpm format && pnpm build && pnpm test && pnpm test:fuzz:regression && pnpm test:coverage && pnpm test:chaos && pnpm test:forensic-lab && node scripts/release/verify-publish-packages.mjs",
     "review:branch": "node scripts/review/pr-branch-review.mjs",
     "prelint": "pnpm --filter @tracehound/core build",
     "lint": "pnpm -r --filter \"@tracehound/*\" lint && eslint .",
@@ -21,15 +24,10 @@
     "clean": "pnpm -r clean"
   },
   "devDependencies": {
-    "@tracehound/core": "workspace:^",
-    "@tracehound/express": "workspace:^",
-    "@types/express": "^4.17.21",
     "@types/node": "^25.0.9",
     "@vitest/coverage-v8": "^2.0.0",
     "eslint": "^9.0.0",
-    "express": "^4.18.2",
     "prettier": "^3.6.2",
-    "tsx": "^4.0.0",
     "typescript": "^5.3.0",
     "typescript-eslint": "^8.0.0",
     "vitest": "^2.0.0"
@@ -40,6 +38,8 @@
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "overrides": {
+      "brace-expansion": "5.0.5",
+      "path-to-regexp": "0.1.13",
       "minimatch": ">=10.2.3",
       "picomatch": ">=4.0.4",
       "rollup": ">=4.59.0",

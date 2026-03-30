@@ -1,4 +1,5 @@
 packages:
   - 'packages/*'
+  - 'infrastructure/chaos'
   - 'infrastructure/soak'
-  - 'security/tests/metasploit/proxy'
+  - 'infrastructure/forensic-lab'

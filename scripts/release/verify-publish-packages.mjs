@@ -69,6 +69,45 @@ function hasRuntimeEntry(pkgJson) {
   return Boolean(pkgJson.exports || pkgJson.main || pkgJson.bin)
 }
 
+function resolveCommitSha() {
+  const fromEnv = process.env['GITHUB_SHA'] ?? process.env['TRACEHOUND_COMMIT_SHA']
+  if (typeof fromEnv === 'string' && fromEnv.length > 0) {
+    return fromEnv
+  }
+
+  try {
+    return run('git', ['rev-parse', 'HEAD'], process.cwd()).trim()
+  } catch {
+    return 'unknown'
+  }
+}
+
+function readJsonFile(filePath) {
+  return readFile(filePath, 'utf8').then((text) => JSON.parse(text))
+}
+
+async function resolveTrustBoundaryMetadata() {
+  const rootPackageJson = await readJsonFile(path.resolve('package.json'))
+  const rootTsconfig = await readJsonFile(path.resolve('tsconfig.base.json'))
+  const compilerOptions =
+    rootTsconfig && typeof rootTsconfig === 'object' ? rootTsconfig.compilerOptions : null
+
+  return {
+    releaseLabel: process.env['TRACEHOUND_RELEASE_LABEL'] ?? 'local',
+    buildMode: 'tsc-first',
+    artifactSource: process.env['TRACEHOUND_ARTIFACT_SOURCE'] ?? 'workspace',
+    sourcePath: process.cwd(),
+    executedAt: new Date().toISOString(),
+    commitSha: resolveCommitSha(),
+    packageManager: rootPackageJson.packageManager ?? 'unknown',
+    nodeVersion: process.version,
+    compiler: {
+      module: compilerOptions?.module ?? 'unknown',
+      moduleResolution: compilerOptions?.moduleResolution ?? 'unknown',
+    },
+  }
+}
+
 function findLeakPaths(files) {
   return files
     .map((entry) => entry.path)
@@ -77,7 +116,7 @@ function findLeakPaths(files) {
     )
 }
 
-async function verifyPackage(entry, outputRoot) {
+async function verifyPackage(entry, outputRoot, metadata) {
   const packageDir = path.resolve(entry.dir)
   const packageJsonPath = path.join(packageDir, 'package.json')
   const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'))
@@ -118,6 +157,12 @@ async function verifyPackage(entry, outputRoot) {
   }
 
   const report = {
+    release: metadata.releaseLabel,
+    commitSha: metadata.commitSha,
+    buildMode: metadata.buildMode,
+    artifactSource: metadata.artifactSource,
+    sourcePath: packageDir,
+    executedAt: metadata.executedAt,
     package: entry.name,
     version: packageJson.version,
     tarball: packEntry.filename,
@@ -138,10 +183,20 @@ async function verifyPackage(entry, outputRoot) {
 async function main() {
   const { outDir, selected } = parseArgs(process.argv.slice(2))
   const selectedPackages = ALL_PACKAGES.filter((entry) => selected.includes(entry.key))
+  const metadata = await resolveTrustBoundaryMetadata()
 
   if (selectedPackages.length === 0) {
     throw new Error(
       `No packages selected. Available keys: ${ALL_PACKAGES.map((entry) => entry.key).join(', ')}`,
+    )
+  }
+
+  if (
+    metadata.compiler.module !== 'NodeNext' ||
+    metadata.compiler.moduleResolution !== 'NodeNext'
+  ) {
+    throw new Error(
+      `Release trust boundary requires NodeNext compiler settings. Received module=${metadata.compiler.module} moduleResolution=${metadata.compiler.moduleResolution}`,
     )
   }
 
@@ -150,9 +205,25 @@ async function main() {
 
   const reports = []
   for (const entry of selectedPackages) {
-    const report = await verifyPackage(entry, outputRoot)
+    const report = await verifyPackage(entry, outputRoot, metadata)
     reports.push(report)
   }
+
+  const manifest = {
+    ...metadata,
+    packages: reports.map((report) => ({
+      package: report.package,
+      version: report.version,
+      tarball: report.tarball,
+      unpackedSize: report.unpackedSize,
+      fileCount: report.fileCount,
+    })),
+  }
+  await writeFile(
+    path.join(outputRoot, 'manifest.json'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    'utf8',
+  )
 
   console.log('Verified publish packages:')
   for (const report of reports) {

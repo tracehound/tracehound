@@ -137,6 +137,12 @@ export interface HoundPoolConfig {
   processScriptPath?: string
   /** Custom process adapter (for testing) */
   adapter?: IHoundProcessAdapter
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 /**
@@ -215,6 +221,7 @@ export class HoundPool implements IHoundPool {
   private readonly deferQueueLimit: number
   private readonly mergedProcessConstraints: HoundProcessConstraints
   private readonly isolationTelemetry: Readonly<HoundProcessIsolationTelemetry>
+  private readonly now: () => number
 
   // Statistics
   private _totalActivations = 0
@@ -233,6 +240,8 @@ export class HoundPool implements IHoundPool {
     this.processScriptPath = config.processScriptPath ?? defaultScript
     this.onPoolExhausted = config.onPoolExhausted ?? 'drop'
     this.deferQueueLimit = config.deferQueueLimit ?? 100
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    this.now = config._now ?? ((): number => Date.now())
     this.mergedProcessConstraints = Object.freeze({
       ...DEFAULT_CONSTRAINTS,
       ...config.processConstraints,
@@ -405,7 +414,7 @@ export class HoundPool implements IHoundPool {
     processState.busy = true
     processState.currentSignature = evidence.signature
     processState.currentAnalysis = null
-    processState.startTime = Date.now()
+    processState.startTime = this.now()
 
     // Lazy spawn if needed
     if (!processState.handle) {
@@ -529,7 +538,7 @@ export class HoundPool implements IHoundPool {
 
     // Emit result
     if (signature && startTime !== null) {
-      const durationMs = Date.now() - startTime
+      const durationMs = this.now() - startTime
 
       const result: HoundResult = {
         signature,
@@ -568,7 +577,7 @@ export class HoundPool implements IHoundPool {
 
     // Emit result
     if (signature && startTime !== null) {
-      const durationMs = Date.now() - startTime
+      const durationMs = this.now() - startTime
       this.processingTimes.push(durationMs)
 
       // Keep only last 100 times for avg calculation

@@ -72,9 +72,21 @@ export interface TracehoundMiddlewareOptions {
    * Default sends appropriate HTTP status codes.
    */
   onIntercept?: (result: InterceptResult, req: Request, res: Response) => void
+
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 const textEncoder = new TextEncoder()
+
+function defaultNow(): number {
+  // eslint-disable-next-line no-restricted-syntax -- adapter bridge preserves fake-timer compatibility without expanding runtime state
+  return Date.now()
+}
 
 /**
  * Defensive clone for safely copying deeply nested or cyclical external payloads
@@ -140,7 +152,7 @@ function extractIngressBytes(req: Request): Uint8Array | undefined {
  */
 function defaultExtractScent(
   req: Request,
-  opts: Pick<TracehoundMiddlewareOptions, 'maxPayloadSize' | 'resolveSourceIp'>,
+  opts: Pick<TracehoundMiddlewareOptions, 'maxPayloadSize' | 'resolveSourceIp' | '_now'>,
 ): Scent {
   const ip = opts.resolveSourceIp?.(req) ?? req.ip ?? req.socket.remoteAddress ?? 'unknown'
   const userAgentHeader = req.get('user-agent')
@@ -193,7 +205,7 @@ function defaultExtractScent(
 
   return {
     id: generateSecureId(),
-    timestamp: Date.now(),
+    timestamp: (opts._now ?? defaultNow)(),
     source,
     payload,
     ...(ingressBytes ? { ingressBytes } : {}),

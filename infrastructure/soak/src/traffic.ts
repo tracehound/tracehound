@@ -165,6 +165,7 @@ interface RequestSpec {
 interface ResponseResult {
   status: number
   durationMs: number
+  traceId: string | null
 }
 
 function sendRequest(port: number, spec: RequestSpec): Promise<ResponseResult> {
@@ -199,7 +200,14 @@ function sendRequest(port: number, spec: RequestSpec): Promise<ResponseResult> {
       (res) => {
         res.resume() // discard body — we only care about status
         res.on('end', () => {
-          resolve({ status: res.statusCode ?? 0, durationMs: Date.now() - start })
+          resolve({
+            status: res.statusCode ?? 0,
+            durationMs: Date.now() - start,
+            traceId:
+              typeof res.headers['x-tracehound-trace-id'] === 'string'
+                ? res.headers['x-tracehound-trace-id']
+                : null,
+          })
         })
       },
     )
@@ -446,6 +454,8 @@ export interface TrafficCounters {
   // False-positive tracking: responses from realistic_user lane that should never occur
   falsePositive429: number // rate-limited legitimate user
   falsePositive403: number // quarantined legitimate user (requires threat header — design invariant, should stay 0)
+  traceHeadersOn403: number
+  missingTraceHeadersOn403: number
 }
 
 export interface TrafficGenerator {
@@ -475,6 +485,8 @@ export function createTrafficGenerator(port: number, targetRps: number = 10): Tr
     },
     falsePositive429: 0,
     falsePositive403: 0,
+    traceHeadersOn403: 0,
+    missingTraceHeadersOn403: 0,
   }
 
   let timerId: NodeJS.Timeout | null = null
@@ -494,6 +506,13 @@ export function createTrafficGenerator(port: number, targetRps: number = 10): Tr
         counters.sent++
         const prev = counters.byStatus.get(result.status) ?? 0
         counters.byStatus.set(result.status, prev + 1)
+        if (result.status === 403) {
+          if (result.traceId !== null) {
+            counters.traceHeadersOn403++
+          } else {
+            counters.missingTraceHeadersOn403++
+          }
+        }
         // Track false positives from the realistic_user lane
         if (lane === 'realistic_user') {
           if (result.status === 429) counters.falsePositive429++
@@ -520,6 +539,13 @@ export function createTrafficGenerator(port: number, targetRps: number = 10): Tr
           counters.sent++
           const prev = counters.byStatus.get(result.status) ?? 0
           counters.byStatus.set(result.status, prev + 1)
+          if (result.status === 403) {
+            if (result.traceId !== null) {
+              counters.traceHeadersOn403++
+            } else {
+              counters.missingTraceHeadersOn403++
+            }
+          }
         })
         .catch(() => {
           counters.errors++

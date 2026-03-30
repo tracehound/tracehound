@@ -1,4 +1,4 @@
-name: Security Paranoid
+name: Security Deep Validation
 
 on:
   schedule:
@@ -17,9 +17,9 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  paranoid_validation:
+  release_gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -34,8 +34,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Fetch dependencies
+        run: pnpm fetch --frozen-lockfile
+
+      - name: Install dependencies offline
+        run: pnpm install --offline --frozen-lockfile
 
       - name: Lint all workspaces
         run: pnpm lint
@@ -50,6 +53,42 @@ jobs:
       - name: Build all workspaces
         run: pnpm build
 
+      - name: Verify publish packages
+        run: node scripts/release/verify-publish-packages.mjs
+        env:
+          TRACEHOUND_RELEASE_LABEL: paranoid-${{ github.sha }}
+
+      - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        if: always()
+        with:
+          name: release-package-verification
+          path: security/artifacts/generated/release-packages
+          if-no-files-found: error
+
+  security_tooling_gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    needs: [release_gate]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Fetch dependencies
+        run: pnpm fetch --frozen-lockfile
+
+      - name: Install dependencies offline
+        run: pnpm install --offline --frozen-lockfile
+
       - name: Run full test suite
         run: pnpm test
 
@@ -59,8 +98,10 @@ jobs:
       - name: Run chaos and invariant suite
         run: pnpm test:chaos
 
-      - name: Verify publish packages
-        run: node scripts/release/verify-publish-packages.mjs
+      - name: Run forensic lab
+        run: pnpm test:forensic-lab
+        env:
+          TRACEHOUND_RELEASE_LABEL: paranoid-${{ github.sha }}
 
       - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: always()
@@ -72,9 +113,16 @@ jobs:
       - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         if: always()
         with:
-          name: release-package-verification
-          path: security/artifacts/generated/release-packages
-          if-no-files-found: error
+          name: paranoid-chaos-results
+          path: infrastructure/chaos/data/results
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        if: always()
+        with:
+          name: paranoid-forensic-lab
+          path: test-results
+          if-no-files-found: warn
 
   supply_chain:
     runs-on: ubuntu-latest
@@ -90,8 +138,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Fetch dependencies
+        run: pnpm fetch --frozen-lockfile
+
+      - name: Install dependencies offline
+        run: pnpm install --offline --frozen-lockfile
 
       - name: Generate SBOM
         uses: anchore/sbom-action@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0

@@ -82,6 +82,12 @@ export interface MemoryColdStorageOptions {
   maxBytes?: number
   /** Optional disk buffer (explicit opt-in) */
   diskBuffer?: DiskBufferOptions
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 /**
@@ -190,6 +196,7 @@ export class MemoryColdStorage implements IColdStorageAdapter {
   private readonly diskIndex = new Map<string, DiskIndexEntry>()
   private diskIndexLoaded = false
   private diskIndexLoading: Promise<void> | null = null
+  private readonly now: () => number
 
   constructor(options: MemoryColdStorageOptions = {}) {
     this.maxEntries = coerceNonNegativeInt(options.maxEntries, DEFAULT_MAX_ENTRIES)
@@ -200,6 +207,8 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       options.diskBuffer?.maxQueueEntries,
       DEFAULT_MAX_DISK_QUEUE_ENTRIES,
     )
+    // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of construction order
+    this.now = options._now ?? ((): number => Date.now())
 
     if (this.diskBufferEnabled && this.diskBufferPath) {
       this.diskNextOffset = safeFileSize(this.diskBufferPath)
@@ -236,7 +245,7 @@ export class MemoryColdStorage implements IColdStorageAdapter {
       const enqueued = this.enqueueDiskEvent({
         kind: 'put',
         id,
-        at: Date.now(),
+        at: this.now(),
         payload: serializePayload(payload),
       })
 
@@ -264,7 +273,7 @@ export class MemoryColdStorage implements IColdStorageAdapter {
     const enqueued = this.enqueueDiskEvent({
       kind: 'put',
       id,
-      at: Date.now(),
+      at: this.now(),
       payload: serializePayload(payload),
     })
 
@@ -332,7 +341,7 @@ export class MemoryColdStorage implements IColdStorageAdapter {
     const enqueued = this.enqueueDiskEvent({
       kind: 'delete',
       id,
-      at: Date.now(),
+      at: this.now(),
     })
 
     if (!enqueued.accepted) {
@@ -648,7 +657,7 @@ export class MemoryColdStorage implements IColdStorageAdapter {
         const bytes = Buffer.byteLength(lineWithNewline)
 
         if (line.length > 0) {
-          const event = parseDiskEvent(line)
+          const event = parseDiskEvent(line, this.now)
           if (event) {
             this.diskIndex.set(event.id, {
               kind: event.kind,
@@ -703,7 +712,7 @@ export class MemoryColdStorage implements IColdStorageAdapter {
         return null
       }
 
-      const event = parseDiskEvent(line)
+      const event = parseDiskEvent(line, this.now)
       if (!event || event.kind !== 'put') {
         return null
       }
@@ -774,7 +783,7 @@ function deserializePayload(serialized: DiskPutEvent['payload']): EncodedPayload
   }
 }
 
-function parseDiskEvent(line: string): DiskEvent | null {
+function parseDiskEvent(line: string, now: () => number): DiskEvent | null {
   try {
     const parsed = JSON.parse(line) as Partial<DiskEvent>
 
@@ -793,7 +802,7 @@ function parseDiskEvent(line: string): DiskEvent | null {
         return {
           kind: 'put',
           id: candidate.id,
-          at: typeof candidate.at === 'number' ? candidate.at : Date.now(),
+          at: typeof candidate.at === 'number' ? candidate.at : now(),
           payload: candidate.payload,
         }
       }
@@ -807,7 +816,7 @@ function parseDiskEvent(line: string): DiskEvent | null {
         return {
           kind: 'delete',
           id: candidate.id,
-          at: typeof candidate.at === 'number' ? candidate.at : Date.now(),
+          at: typeof candidate.at === 'number' ? candidate.at : now(),
         }
       }
 

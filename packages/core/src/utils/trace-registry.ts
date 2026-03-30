@@ -39,6 +39,12 @@ export interface TraceRegistryOptions {
   maxEntries?: number
   maxFileBytes?: number
   maxQueueEntries?: number
+  /**
+   * Injectable clock returning current time in ms.
+   * DEFAULT: Date.now.
+   * @internal For deterministic testing only.
+   */
+  _now?: () => number
 }
 
 export interface TraceRegistryStats {
@@ -69,6 +75,7 @@ interface TraceRegistryLimits {
   maxEntries: number
   maxFileBytes: number
   maxQueueEntries: number
+  now: () => number
 }
 
 interface RegistryWriterState {
@@ -80,6 +87,11 @@ interface RegistryWriterState {
 }
 
 const WRITER_STATES = new Map<string, RegistryWriterState>()
+
+function resolveNow(options?: Pick<TraceRegistryOptions, '_now'>): () => number {
+  // eslint-disable-next-line no-restricted-syntax -- intentional bridge: closure defers to global Date.now at call time so vi.useFakeTimers() works regardless of call-site construction order
+  return options?._now ?? ((): number => Date.now())
+}
 
 /**
  * Resolve registry path.
@@ -115,7 +127,7 @@ export function recordTraceInspectionEntry(
 
   const record: TraceInspectionEntry = {
     ...entry,
-    recordedAt: Date.now(),
+    recordedAt: resolveNow(options)(),
   }
 
   const path = resolveTraceRegistryPath(options)
@@ -400,7 +412,7 @@ async function shouldBlockWrites(
   limits: TraceRegistryLimits,
   state: RegistryWriterState,
 ): Promise<boolean> {
-  const now = Date.now()
+  const now = limits.now()
   if (now - state.lastSizeCheckAt < FILE_SIZE_CHECK_INTERVAL_MS) {
     return state.blocked
   }
@@ -429,7 +441,7 @@ function includePendingEntries(
     return entries
   }
 
-  const cutoff = Date.now() - limits.ttlMs
+  const cutoff = limits.now() - limits.ttlMs
   const pending = state.queue.filter((entry) => entry.recordedAt >= cutoff)
   if (pending.length === 0) {
     return entries
@@ -454,7 +466,7 @@ function readEntries(path: string, limits: TraceRegistryLimits): TraceInspection
       return []
     }
 
-    const cutoff = Date.now() - limits.ttlMs
+    const cutoff = limits.now() - limits.ttlMs
     const lines = raw.split(/\r?\n/)
     const entries: TraceInspectionEntry[] = []
 
@@ -511,6 +523,7 @@ function resolveLimits(options?: TraceRegistryOptions): TraceRegistryLimits {
       process.env['TRACEHOUND_TRACE_REGISTRY_MAX_QUEUE_ENTRIES'],
       DEFAULT_MAX_QUEUE_ENTRIES,
     ),
+    now: resolveNow(options),
   }
 }
 

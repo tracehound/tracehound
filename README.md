@@ -10,7 +10,7 @@
 [![Semgrep Security Analysis](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/semgrep.yml)
 [![Codecov](https://github.com/tracehound/tracehound/actions/workflows/codecov.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/codecov.yml)
 [![OpenSSF Scorecard](https://github.com/tracehound/tracehound/actions/workflows/scorecard.yml/badge.svg)](https://github.com/tracehound/tracehound/actions/workflows/scorecard.yml)
-[![Paranoid Validation](https://github.com/tracehound/tracehound/actions/workflows/security-paranoid.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/security-paranoid.yml)
+[![Full Validation](https://github.com/tracehound/tracehound/actions/workflows/security-paranoid.yml/badge.svg?branch=main)](https://github.com/tracehound/tracehound/actions/workflows/security-paranoid.yml)
 [![License: Apache2.0](https://img.shields.io/badge/License-Apache2.0-blue.svg)](https://opensource.org/license/apache-2-0)
 [![npm](https://img.shields.io/npm/v/@tracehound/core.svg)](https://www.npmjs.com/package/@tracehound/core)
 

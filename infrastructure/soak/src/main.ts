@@ -20,7 +20,8 @@ import { createMetricsCollector } from './metrics.js'
 import { createSoakServer, resolveSoakSnapshotSecret } from './server.js'
 import { createTrafficGenerator } from './traffic.js'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Config from environment
@@ -38,6 +39,9 @@ const RPS = readInt('SOAK_RPS', 10)
 const INTERVAL_MS = readInt('SOAK_INTERVAL', 5_000)
 const AUDIT_INTERVAL_MS = readInt('SOAK_AUDIT_INTERVAL', 10_000)
 const RELEASE_LABEL = process.env['TRACEHOUND_RELEASE_LABEL'] ?? 'local'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const REPO_ROOT = resolve(__dirname, '..', '..', '..')
 
 function resolveCommitSha(): string {
   const fromEnv = process.env['GITHUB_SHA']
@@ -46,7 +50,7 @@ function resolveCommitSha(): string {
 
 function readPackageVersion(packageDir: string): string {
   const raw = JSON.parse(
-    readFileSync(resolve(process.cwd(), packageDir, 'package.json'), 'utf8'),
+    readFileSync(resolve(REPO_ROOT, packageDir, 'package.json'), 'utf8'),
   ) as {
     version?: string
   }
@@ -54,28 +58,34 @@ function readPackageVersion(packageDir: string): string {
 }
 
 function writeReleaseMetadata(snapshotPath: string): void {
-  const logsDir = resolve(process.cwd(), 'infrastructure', 'soak', 'logs')
-  mkdirSync(logsDir, { recursive: true })
-  writeFileSync(
-    resolve(logsDir, 'release-metadata.json'),
-    JSON.stringify(
-      {
-        release: RELEASE_LABEL,
-        artifactSource: 'workspace',
-        buildMode: 'tsc-first',
-        commitSha: resolveCommitSha(),
-        executedAt: new Date().toISOString(),
-        snapshotPath,
-        packages: {
-          core: readPackageVersion('packages/core'),
-          express: readPackageVersion('packages/express'),
+  try {
+    const logsDir = resolve(REPO_ROOT, 'infrastructure', 'soak', 'logs')
+    mkdirSync(logsDir, { recursive: true })
+    writeFileSync(
+      resolve(logsDir, 'release-metadata.json'),
+      JSON.stringify(
+        {
+          release: RELEASE_LABEL,
+          artifactSource: 'workspace',
+          buildMode: 'tsc-first',
+          commitSha: resolveCommitSha(),
+          executedAt: new Date().toISOString(),
+          snapshotPath,
+          packages: {
+            core: readPackageVersion('packages/core'),
+            express: readPackageVersion('packages/express'),
+          },
         },
-      },
-      null,
-      2,
-    ),
-    'utf8',
-  )
+        null,
+        2,
+      ),
+      'utf8',
+    )
+  } catch (error: unknown) {
+    process.stderr.write(
+      `[soak] Warning: release metadata could not be written: ${error instanceof Error ? error.message : String(error)}\n`,
+    )
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

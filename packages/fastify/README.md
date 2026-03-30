@@ -26,7 +26,7 @@ app.register(tracehoundPlugin, {
   agent: th.agent,
   maxPayloadSize: 1_000_000,
   emitTraceIdHeader: true,
-  resolveSourceIp: (req) => req.socket.remoteAddress ?? req.ip ?? 'unknown',
+  resolveSourceIp: (req) => req.raw.socket.remoteAddress ?? req.ip ?? 'unknown',
 })
 ```
 

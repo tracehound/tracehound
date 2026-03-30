@@ -22,8 +22,26 @@ interface ArtifactMeta {
 }
 
 function sanitizeId(id: string): string {
-  const sanitized = id.replace(/[^A-Za-z0-9._-]/g, '_')
-  return sanitized.length > 0 ? sanitized : 'artifact'
+  const encoded = Buffer.from(id, 'utf8').toString('hex')
+  return encoded.length > 0 ? encoded : 'artifact'
+}
+
+function isArtifactMeta(value: unknown): value is ArtifactMeta {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const candidate = value as Partial<ArtifactMeta>
+  return (
+    typeof candidate.id === 'string' &&
+    typeof candidate.hash === 'string' &&
+    typeof candidate.originalSize === 'number' &&
+    Number.isFinite(candidate.originalSize) &&
+    typeof candidate.compressedSize === 'number' &&
+    Number.isFinite(candidate.compressedSize) &&
+    typeof candidate.writtenAt === 'number' &&
+    Number.isFinite(candidate.writtenAt)
+  )
 }
 
 function payloadPath(dir: string, id: string): string {
@@ -83,14 +101,21 @@ export function createFileColdStorage(dir: string): IColdStorageAdapter {
           readFile(payloadPath(dir, id)),
           readFile(metaPath(dir, id), 'utf8'),
         ])
-        const meta = JSON.parse(metaRaw) as ArtifactMeta
+        const parsedMeta: unknown = JSON.parse(metaRaw)
+        if (!isArtifactMeta(parsedMeta)) {
+          return {
+            success: false,
+            error: 'invalid cold storage metadata',
+          }
+        }
+
         return {
           success: true,
           payload: {
             compressed: new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength),
-            hash: meta.hash,
-            originalSize: meta.originalSize,
-            compressedSize: meta.compressedSize,
+            hash: parsedMeta.hash,
+            originalSize: parsedMeta.originalSize,
+            compressedSize: parsedMeta.compressedSize,
           },
         }
       } catch (error: unknown) {

@@ -6,7 +6,7 @@ Make dependency risk and build provenance auditable without expanding the releas
 
 ## Release Trust Boundary
 
-Trusted release input for `v1.8.9` is:
+Trusted release input for `v1.8.10` is:
 
 1. Immutable `pnpm-lock.yaml`
 2. Offline/clean dependency install

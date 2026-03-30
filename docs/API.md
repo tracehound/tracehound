@@ -2,7 +2,7 @@
 
 > **Tracehound Core v1.4+** uses a unified `createTracehound` factory that encapsulates all sub-components (Agent, Quarantine, Watcher, HoundPool, etc.) behind a single, cohesive facade.
 
-> **Release Trust Boundary (v1.8.9):** publish artifacts are derived from `tsc-first` package output and verified package manifests. Test tooling such as `vitest`, `tsx`, and optional bundlers remains outside release provenance.
+> **Release Trust Boundary (v1.8.10):** publish artifacts are derived from `tsc-first` package output and verified package manifests. Test tooling such as `vitest`, `tsx`, and optional bundlers remains outside release provenance.
 
 For configuration defaults and adapter behavior flags, see [CONFIGURATION.md](./CONFIGURATION.md).
 For upgrade-impacting changes, see [BREAKING-CHANGES.md](./BREAKING-CHANGES.md).

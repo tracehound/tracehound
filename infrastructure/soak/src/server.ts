@@ -17,10 +17,11 @@ import {
 } from '@tracehound/core'
 import { tracehound } from '@tracehound/express'
 import express, { type Express } from 'express'
-import { createServer, type Server } from 'node:http'
+import { createServer, type Server } from 'node:https'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFileColdStorage } from './file-cold-storage.js'
+import { getLoopbackTlsMaterial } from './tls.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -61,7 +62,7 @@ function parseSeverity(raw: string | undefined): Severity | null {
 
 export interface SoakServer {
   readonly tracehound: ITracehound
-  readonly httpServer: Server
+  readonly httpsServer: Server
   readonly port: number
   readonly snapshotPath: string
 }
@@ -209,14 +210,21 @@ export function createSoakServer(port: number): Promise<SoakServer> {
     res.status(404).json({ error: 'not_found' })
   })
 
-  const httpServer = createServer(app)
+  const tlsMaterial = getLoopbackTlsMaterial()
+  const httpsServer = createServer(
+    {
+      cert: tlsMaterial.cert,
+      key: tlsMaterial.key,
+    },
+    app,
+  )
 
   return new Promise<SoakServer>((resolve, reject) => {
-    httpServer.once('error', reject)
-    httpServer.listen(port, () => {
-      const addr = httpServer.address()
+    httpsServer.once('error', reject)
+    httpsServer.listen(port, () => {
+      const addr = httpsServer.address()
       const boundPort = addr !== null && typeof addr === 'object' ? addr.port : port
-      resolve({ tracehound: th, httpServer, port: boundPort, snapshotPath: SOAK_SNAPSHOT_PATH })
+      resolve({ tracehound: th, httpsServer, port: boundPort, snapshotPath: SOAK_SNAPSHOT_PATH })
     })
   })
 }

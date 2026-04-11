@@ -20,3 +20,6 @@ Run from the monorepo root:
 pnpm --filter tracehound-forensic-lab build
 node infrastructure/forensic-lab/dist/main.js --release local
 ```
+
+`--release` must be a filesystem-safe label: 1-64 characters, starting with an
+alphanumeric character and then limited to alphanumerics, `.`, `_`, or `-`.

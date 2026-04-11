@@ -17,7 +17,7 @@ import {
 } from '@tracehound/core'
 import { createHmac } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createFileColdStorage } from './file-cold-storage.js'
@@ -49,18 +49,49 @@ interface CliStatusJson {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = resolve(__dirname, '..', '..', '..')
+const TEST_RESULTS_ROOT = resolve(REPO_ROOT, 'test-results')
+const RELEASE_LABEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
+type OutputArtifactName = 'summary.json' | 'summary.md'
+
+function sanitizeReleaseLabel(raw: string): string {
+  const value = raw.trim()
+  if (!RELEASE_LABEL_PATTERN.test(value)) {
+    throw new Error(
+      `invalid release label "${raw}"; expected 1-64 characters matching ${RELEASE_LABEL_PATTERN.source}`,
+    )
+  }
+  return value
+}
+
+function resolveOutputRoot(release: string): string {
+  const candidate = resolve(TEST_RESULTS_ROOT, release, 'forensic-lab')
+  const relativePath = relative(TEST_RESULTS_ROOT, candidate)
+  if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
+    throw new Error(`release label escaped test-results root: ${release}`)
+  }
+  return candidate
+}
+
+function resolveOutputArtifactPath(outputRoot: string, fileName: OutputArtifactName): string {
+  const candidate = resolve(outputRoot, fileName)
+  const relativePath = relative(outputRoot, candidate)
+  if (relativePath !== fileName) {
+    throw new Error(`invalid output artifact path: ${fileName}`)
+  }
+  return candidate
+}
 
 function parseRelease(argv: readonly string[]): string {
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--release') {
       const value = argv[index + 1]
       if (typeof value === 'string' && value.length > 0) {
-        return value
+        return sanitizeReleaseLabel(value)
       }
     }
   }
 
-  return process.env['TRACEHOUND_RELEASE_LABEL'] ?? 'local'
+  return sanitizeReleaseLabel(process.env['TRACEHOUND_RELEASE_LABEL'] ?? 'local')
 }
 
 function readPackageVersion(packageDir: string): string {
@@ -190,7 +221,7 @@ function toMessage(error: unknown): string {
 
 async function main(): Promise<void> {
   const release = parseRelease(process.argv.slice(2))
-  const outputRoot = resolve(REPO_ROOT, 'test-results', release, 'forensic-lab')
+  const outputRoot = resolveOutputRoot(release)
   const runtimeRoot = resolve(outputRoot, 'runtime')
   const snapshotPath = resolve(runtimeRoot, 'snapshot', 'system-snapshot.json')
   const traceRegistryPath = resolve(runtimeRoot, 'trace', 'trace-registry.ndjson')
@@ -442,10 +473,12 @@ async function main(): Promise<void> {
       traceRegistryPath,
       coldStorageDir,
     }
+    const summaryJsonPath = resolveOutputArtifactPath(outputRoot, 'summary.json')
+    const summaryMarkdownPath = resolveOutputArtifactPath(outputRoot, 'summary.md')
 
-    writeFileSync(resolve(outputRoot, 'summary.json'), JSON.stringify(summary, null, 2), 'utf8')
+    writeFileSync(summaryJsonPath, JSON.stringify(summary, null, 2), 'utf8')
     writeFileSync(
-      resolve(outputRoot, 'summary.md'),
+      summaryMarkdownPath,
       [
         '# Tracehound Forensic Lab',
         '',

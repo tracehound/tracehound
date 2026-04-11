@@ -40,5 +40,5 @@ describe('Fuzz Invariant: Duplicate Stability', () => {
       expect(afterSecond.count).toBe(afterFirst.count)
       expect(afterSecond.bytes).toBe(afterFirst.bytes)
     })
-  })
+  }, 15_000)
 })

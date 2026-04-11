@@ -15,10 +15,10 @@ import {
   type Scent,
   type SystemSnapshot,
 } from '@tracehound/core'
+import { execFileSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
-import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createFileColdStorage } from './file-cold-storage.js'
 
@@ -85,9 +85,10 @@ function parseRelease(argv: readonly string[]): string {
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--release') {
       const value = argv[index + 1]
-      if (typeof value === 'string' && value.length > 0) {
-        return sanitizeReleaseLabel(value)
+      if (typeof value !== 'string' || value.trim().length === 0) {
+        throw new Error('missing value for --release')
       }
+      return sanitizeReleaseLabel(value)
     }
   }
 

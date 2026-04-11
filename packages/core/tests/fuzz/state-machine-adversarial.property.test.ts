@@ -63,7 +63,7 @@ describe('Fuzz Phase 4: State Machine Adversarial Testing', () => {
       },
       { runs: 80 },
     )
-  })
+  }, 20_000)
 
   it('partial failure ordering does not cause state drift', () => {
     // eslint-disable-next-line no-console

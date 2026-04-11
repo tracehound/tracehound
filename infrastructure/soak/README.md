@@ -4,7 +4,7 @@ Local Node.js soak test harness for validating Tracehound integration under real
 
 ## What this is
 
-A self-contained Express + Tracehound server paired with a built-in traffic generator and metrics collector. It runs indefinitely, sending a mixed-profile request stream against itself and logging runtime health samples every 5 seconds.
+A self-contained Express + Tracehound server paired with a built-in traffic generator and metrics collector. It runs indefinitely, sending a mixed-profile request stream against itself over loopback HTTPS and logging runtime health samples every 5 seconds.
 
 This is **not** a replacement for the full 15-day soak defined in the security harness runbook. It is a local integration smoke/soak tool for:
 
@@ -108,6 +108,9 @@ jq '.agent.quarantined' infrastructure/soak/logs/metrics.jsonl   # cumulative qu
 - `app.set('trust proxy', true)` is enabled so `X-Forwarded-For` is respected.
   This mirrors a typical load-balancer deployment and allows diverse simulated
   source IPs to be visible to the rate limiter.
+- The harness generates a loopback-only self-signed certificate at runtime
+  under `infrastructure/soak/logs/tls/`. The client trusts that certificate
+  explicitly, so traffic stays encrypted without committing private keys.
 - Threat signals are conveyed via `x-soak-threat-category` / `x-soak-threat-severity`
   request headers — a simulation of upstream WAF tagging. Tracehound itself
   performs no detection.

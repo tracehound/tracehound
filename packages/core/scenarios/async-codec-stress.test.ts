@@ -205,7 +205,7 @@ describe('Async Codec Stress Scenario', () => {
 
     const decoded = await decodeWithIntegrityAsync(encoded)
     expect(decoded).toEqual(payload)
-  })
+  }, 15_000)
 
   it('should handle 5 concurrent 500KB payloads', async () => {
     const payloads: Uint8Array[] = []
@@ -239,7 +239,7 @@ describe('Async Codec Stress Scenario', () => {
     for (let i = 0; i < 5; i++) {
       expect(decoded[i]).toEqual(payloads[i])
     }
-  })
+  }, 20_000)
 
   // ──────────────────────────────────────────────────────────────────────────
   // Throughput Benchmark

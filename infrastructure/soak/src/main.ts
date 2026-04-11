@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   const snapshotPath = server.snapshotPath
   writeReleaseMetadata(snapshotPath)
 
-  process.stdout.write(`[soak] Server listening on http://127.0.0.1:${PORT}\n`)
+  process.stdout.write(`[soak] Server listening on https://127.0.0.1:${PORT}\n`)
   process.stdout.write(`[soak] Release label → ${RELEASE_LABEL}\n`)
   process.stdout.write(`[soak] Snapshot → ${snapshotPath}\n`)
   process.stdout.write(`[soak] To watch with the CLI (PowerShell):\n`)
@@ -155,8 +155,8 @@ async function main(): Promise<void> {
     // 3. Final audit drain (flushes pending chain records, writes final events)
     audit.stop()
 
-    // 4. Close HTTP server — stop accepting new connections
-    server.httpServer.close(() => {
+    // 4. Close HTTPS server — stop accepting new connections
+    server.httpsServer.close(() => {
       // 5. Shut down Tracehound (hound pool, snapshot loop, scheduler)
       server.tracehound.shutdown()
       process.stdout.write('[soak] Clean shutdown complete.\n\n')

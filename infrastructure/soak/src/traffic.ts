@@ -12,7 +12,8 @@
  * here — this is simulation logic, not forensic path code).
  */
 
-import http from 'node:http'
+import https from 'node:https'
+import { getLoopbackTlsMaterial } from './tls.js'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // IP Pool
@@ -171,6 +172,7 @@ interface ResponseResult {
 function sendRequest(port: number, spec: RequestSpec): Promise<ResponseResult> {
   return new Promise((resolve, reject) => {
     const start = Date.now()
+    const tlsMaterial = getLoopbackTlsMaterial()
 
     const bodyStr =
       spec.body !== undefined && spec.method !== 'GET' ? JSON.stringify(spec.body) : undefined
@@ -189,8 +191,9 @@ function sendRequest(port: number, spec: RequestSpec): Promise<ResponseResult> {
       headers['content-length'] = String(Buffer.byteLength(bodyStr))
     }
 
-    const req = http.request(
+    const req = https.request(
       {
+        ca: tlsMaterial.cert,
         hostname: '127.0.0.1',
         port,
         method: spec.method,
@@ -226,6 +229,10 @@ function sendRequest(port: number, spec: RequestSpec): Promise<ResponseResult> {
   })
 }
 
+function buildSyntheticPassword(): string {
+  return `pw-${Math.floor(Math.random() * 1_000_000)}`
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Lane definitions
 // ─────────────────────────────────────────────────────────────────────────────
@@ -235,7 +242,11 @@ function buildCleanSpec(): RequestSpec {
     { method: 'GET', path: '/health' },
     { method: 'GET', path: '/api/search?q=soak-test' },
     { method: 'POST', path: '/api/data', body: { event: 'page_view', ts: Date.now() } },
-    { method: 'POST', path: '/api/login', body: { username: 'tester', password: 'secret' } },
+    {
+      method: 'POST',
+      path: '/api/login',
+      body: { username: 'tester', password: buildSyntheticPassword() },
+    },
   ]
 
   const ipIndex = Math.floor(Math.random() * CLEAN_IPS.length)
@@ -348,10 +359,11 @@ function buildRealisticUserSpec(): RequestSpec {
     const username = REALISTIC_USERNAMES[
       Math.floor(Math.random() * REALISTIC_USERNAMES.length)
     ] as string
+    const password = buildSyntheticPassword()
     base = {
       method: 'POST',
       path: '/api/login',
-      body: { username, password: 'hunter2', rememberMe: Math.random() > 0.5 },
+      body: { username, password, rememberMe: Math.random() > 0.5 },
     }
   } else {
     // Health / status check (browser prefetch, uptime monitors)
